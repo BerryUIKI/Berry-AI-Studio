@@ -69,9 +69,13 @@ jobs:
           # Set partition list to avoid GUI authorization prompts
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | sed -e 's/^[ \t]*//' | tr -d '"')
+          security default-keychain -s "$KEYCHAIN_PATH"
 
           echo "Certificates imported successfully."
           security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+          echo "KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> "$GITHUB_ENV"
 
       # ── Install Provisioning Profile ─────────────────────────────────────────
       - name: Install Provisioning Profile
@@ -103,26 +107,37 @@ jobs:
           MAS_INSTALLER_IDENTITY: ${{ vars.MAS_INSTALLER_IDENTITY }}
         run: |
           set -euo pipefail
+          shopt -s nullglob
 
-          APP_DIR=$(find target/aarch64-apple-darwin/release/bundle/macos src-tauri/target/aarch64-apple-darwin/release/bundle/macos -name "*.app" -maxdepth 1 2>/dev/null | head -n 1)
-          if [[ -z "$APP_DIR" || ! -d "$APP_DIR" ]]; then
+          app_dirs=(
+            "target/aarch64-apple-darwin/release/bundle/macos/"*.app
+            "src-tauri/target/aarch64-apple-darwin/release/bundle/macos/"*.app
+          )
+          if (( ${#app_dirs[@]} == 0 )); then
             echo "::error::Could not locate built .app bundle"
             exit 1
           fi
+          APP_DIR="${app_dirs[0]}"
           echo "Found app bundle at: $APP_DIR"
           ENTITLEMENTS="src-tauri/Entitlements.plist"
           PKG_OUT="$RUNNER_TEMP/Berry-AI-Studio-${{ inputs.version }}.pkg"
 
+          # Re-unlock keychain before signing
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" || true
+
           # Embed provisioning profile inside .app bundle
           cp "$RUNNER_TEMP/embedded.provisionprofile" "$APP_DIR/Contents/embedded.provisionprofile"
 
-          echo "Signing frameworks and dylibs..."
-          find "$APP_DIR/Contents/Frameworks" -type f 2>/dev/null | while read -r lib; do
-            codesign --force --timestamp --options runtime --sign "$MAS_APP_IDENTITY" "$lib" || true
-          done
+          if [[ -d "$APP_DIR/Contents/Frameworks" ]]; then
+            echo "Signing frameworks and dylibs..."
+            find "$APP_DIR/Contents/Frameworks" -type f 2>/dev/null | while read -r lib; do
+              codesign --force --timestamp --options runtime --keychain "$KEYCHAIN_PATH" --sign "$MAS_APP_IDENTITY" "$lib" || true
+            done
+          fi
 
           echo "Signing application bundle with App Sandbox entitlements..."
           codesign --force --timestamp --options runtime \
+            --keychain "$KEYCHAIN_PATH" \
             --entitlements "$ENTITLEMENTS" \
             --sign "$MAS_APP_IDENTITY" \
             "$APP_DIR"
@@ -133,6 +148,7 @@ jobs:
           echo "Building Mac App Store installer package with productbuild..."
           productbuild \
             --component "$APP_DIR" /Applications \
+            --keychain "$KEYCHAIN_PATH" \
             --sign "$MAS_INSTALLER_IDENTITY" \
             "$PKG_OUT"
 
