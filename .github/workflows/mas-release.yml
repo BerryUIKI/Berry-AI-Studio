@@ -149,13 +149,17 @@ jobs:
 
       # ── Upload to App Store Connect via xcrun altool / notarytool ───────────
       - name: Upload to App Store Connect
-        if: ${{ secrets.APPLE_API_KEY != '' }}
         env:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
         run: |
           set -euo pipefail
+
+          if [[ -z "${APPLE_API_KEY:-}" || -z "${APPLE_API_ISSUER:-}" || -z "${APPLE_API_KEY_CONTENT:-}" ]]; then
+            echo "App Store Connect API credentials not provided or incomplete. Skipping upload."
+            exit 0
+          fi
 
           KEY_DIR="$HOME/.appstoreconnect/private_keys"
           mkdir -p "$KEY_DIR"
