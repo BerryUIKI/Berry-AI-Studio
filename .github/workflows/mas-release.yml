@@ -104,7 +104,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          APP_DIR="src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Berry AI Studio.app"
+          APP_DIR=$(find target/aarch64-apple-darwin/release/bundle/macos src-tauri/target/aarch64-apple-darwin/release/bundle/macos -name "*.app" -maxdepth 1 2>/dev/null | head -n 1)
+          if [[ -z "$APP_DIR" || ! -d "$APP_DIR" ]]; then
+            echo "::error::Could not locate built .app bundle"
+            exit 1
+          fi
+          echo "Found app bundle at: $APP_DIR"
           ENTITLEMENTS="src-tauri/Entitlements.plist"
           PKG_OUT="$RUNNER_TEMP/Berry-AI-Studio-${{ inputs.version }}.pkg"
 
@@ -144,7 +149,7 @@ jobs:
 
       # ── Upload to App Store Connect via xcrun altool / notarytool ───────────
       - name: Upload to App Store Connect
-        if: env.APPLE_API_KEY != ''
+        if: ${{ secrets.APPLE_API_KEY != '' }}
         env:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}

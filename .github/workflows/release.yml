@@ -36,7 +36,7 @@ jobs:
     runs-on: macos-latest
 
     env:
-      APP_NAME: Berry-AIGC-Toolbox
+      APP_NAME: Berry AI Studio
       RELEASE_TAG: >-
         ${{ github.event_name == 'workflow_dispatch'
             && inputs.tag_name
@@ -205,11 +205,12 @@ jobs:
           shopt -s nullglob
 
           dmg_files=(
+            "target/${{ matrix.target }}/release/bundle/dmg/"*.dmg
             "src-tauri/target/${{ matrix.target }}/release/bundle/dmg/"*.dmg
           )
 
-          if (( ${#dmg_files[@]} != 1 )); then
-            echo "::error::Expected exactly one DMG, found ${#dmg_files[@]}."
+          if (( ${#dmg_files[@]} == 0 )); then
+            echo "::error::No DMG files found."
             exit 1
           fi
 
@@ -248,14 +249,24 @@ jobs:
           set -euo pipefail
           shopt -s nullglob
 
-          app_path="src-tauri/target/${{ matrix.target }}/release/bundle/macos/${APP_NAME}.app"
+          app_path=$(find "target/${{ matrix.target }}/release/bundle/macos" "src-tauri/target/${{ matrix.target }}/release/bundle/macos" -name "*.app" -maxdepth 1 2>/dev/null | head -n 1)
+          if [[ -z "$app_path" || ! -d "$app_path" ]]; then
+            echo "::error::Could not locate built .app bundle"
+            exit 1
+          fi
 
           dmg_files=(
+            "target/${{ matrix.target }}/release/bundle/dmg/"*.dmg
             "src-tauri/target/${{ matrix.target }}/release/bundle/dmg/"*.dmg
           )
+          if (( ${#dmg_files[@]} == 0 )); then
+            echo "::error::No DMG files found."
+            exit 1
+          fi
           dmg_path="${dmg_files[0]}"
 
-          echo "=== Verifying .app ==="
+          echo "=== Verifying .app: $app_path ==="
+          echo "=== Verifying DMG: $dmg_path ==="
           codesign --verify --deep --strict --verbose=2 "$app_path"
           codesign --verify --strict --verbose=2 "$dmg_path"
 
@@ -307,8 +318,13 @@ jobs:
           shopt -s nullglob
 
           dmg_files=(
+            "target/${{ matrix.target }}/release/bundle/dmg/"*.dmg
             "src-tauri/target/${{ matrix.target }}/release/bundle/dmg/"*.dmg
           )
+          if (( ${#dmg_files[@]} == 0 )); then
+            echo "::error::No DMG files found."
+            exit 1
+          fi
           dmg_path="${dmg_files[0]}"
 
           mount_path="$(mktemp -d)"
@@ -324,7 +340,12 @@ jobs:
             -mountpoint "$mount_path" \
             >/dev/null
 
-          mounted_app="$mount_path/${APP_NAME}.app"
+          mounted_app=$(find "$mount_path" -name "*.app" -maxdepth 2 2>/dev/null | head -n 1)
+          if [[ -z "$mounted_app" || ! -d "$mounted_app" ]]; then
+            echo "::error::Could not locate .app bundle inside mounted DMG."
+            exit 1
+          fi
+          echo "Found mounted app at: $mounted_app"
 
           codesign --verify \
             --deep \
@@ -351,8 +372,13 @@ jobs:
           shopt -s nullglob
 
           dmg_files=(
+            "target/${{ matrix.target }}/release/bundle/dmg/"*.dmg
             "src-tauri/target/${{ matrix.target }}/release/bundle/dmg/"*.dmg
           )
+          if (( ${#dmg_files[@]} == 0 )); then
+            echo "::error::No DMG files found."
+            exit 1
+          fi
           dmg_path="${dmg_files[0]}"
 
           final_path="$RUNNER_TEMP/${{ matrix.dmg_asset_name }}"
