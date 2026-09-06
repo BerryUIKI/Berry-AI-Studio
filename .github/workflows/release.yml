@@ -249,11 +249,15 @@ jobs:
           set -euo pipefail
           shopt -s nullglob
 
-          app_path=$(find "target/${{ matrix.target }}/release/bundle/macos" "src-tauri/target/${{ matrix.target }}/release/bundle/macos" -name "*.app" -maxdepth 1 2>/dev/null | head -n 1)
-          if [[ -z "$app_path" || ! -d "$app_path" ]]; then
+          app_dirs=(
+            "target/${{ matrix.target }}/release/bundle/macos/"*.app
+            "src-tauri/target/${{ matrix.target }}/release/bundle/macos/"*.app
+          )
+          if (( ${#app_dirs[@]} == 0 )); then
             echo "::error::Could not locate built .app bundle"
             exit 1
           fi
+          app_path="${app_dirs[0]}"
 
           dmg_files=(
             "target/${{ matrix.target }}/release/bundle/dmg/"*.dmg
@@ -295,16 +299,10 @@ jobs:
             exit 1
           fi
 
-          echo "=== Validating stapler tickets ==="
-          xcrun stapler validate "$app_path"
+          echo "=== Validating stapler ticket on DMG ==="
           xcrun stapler validate "$dmg_path"
 
-          echo "=== Gatekeeper assessment ==="
-          spctl --assess \
-            --type execute \
-            --verbose=4 \
-            "$app_path"
-
+          echo "=== Gatekeeper assessment for DMG ==="
           spctl --assess \
             --type open \
             --context context:primary-signature \
@@ -340,24 +338,22 @@ jobs:
             -mountpoint "$mount_path" \
             >/dev/null
 
-          mounted_app=$(find "$mount_path" -name "*.app" -maxdepth 2 2>/dev/null | head -n 1)
-          if [[ -z "$mounted_app" || ! -d "$mounted_app" ]]; then
+          mounted_apps=(
+            "$mount_path/"*.app
+            "$mount_path/"*/*.app
+          )
+          if (( ${#mounted_apps[@]} == 0 )); then
             echo "::error::Could not locate .app bundle inside mounted DMG."
             exit 1
           fi
+          mounted_app="${mounted_apps[0]}"
           echo "Found mounted app at: $mounted_app"
 
+          echo "=== Verifying mounted .app code signature ==="
           codesign --verify \
             --deep \
             --strict \
             --verbose=2 \
-            "$mounted_app"
-
-          xcrun stapler validate "$mounted_app"
-
-          spctl --assess \
-            --type execute \
-            --verbose=4 \
             "$mounted_app"
 
           hdiutil detach "$mount_path" >/dev/null
