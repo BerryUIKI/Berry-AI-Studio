@@ -22,6 +22,9 @@ tauri-build = { version = "2", features = [] }
 berry-domain = { path = "../crates/berry-domain" }
 berry-scan = { path = "../crates/berry-scan" }
 berry-storage = { path = "../crates/berry-storage" }
+berry-tagger = { path = "../crates/berry-tagger" }
+berry-clip = { path = "../crates/berry-clip" }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
 tauri = { version = "2", features = ["protocol-asset"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

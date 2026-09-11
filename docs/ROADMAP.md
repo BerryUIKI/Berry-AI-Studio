@@ -50,10 +50,12 @@ This roadmap documents completed milestones and future engineering goals for **B
 
 ## 🔮 Upcoming Milestones (v0.2.0+)
 
-### 🎯 Milestone 8: AI-Assisted Tagging & Local CLIP Search
-- [ ] Local CLIP / SigLIP embedding indexing for semantic natural language image search.
-- [ ] Local WD14 / Danbooru tagger for automated anime & realistic tag extraction.
-- [ ] Visual similarity search (find similar compositions / styles).
+### ✅ Milestone 8: AI-Assisted Tagging & Local CLIP Semantic Search
+- [x] Persistent image embedding storage (schema v7 `file_embeddings`) and high-performance local cosine similarity ranking.
+- [x] Visual similarity search (find similar compositions & styles) with real-time threshold slider and configurable result limits.
+- [x] Local WD14 / Danbooru ONNX tagger for automated anime & realistic tag extraction with confidence filtering and batch tagging.
+- [x] Local CLIP / SigLIP vision & text embedding pipeline with tokenization and batch library indexing dashboard (`ClipManagerModal.vue`).
+- [x] Free-form natural language text-to-image semantic search toggle directly integrated into the search bar.
 
 ### 🎯 Milestone 9: Advanced Generation Workflows
 - [ ] Drag-and-drop workflow send-to-WebUI / send-to-ComfyUI via WebSocket or Local HTTP API.

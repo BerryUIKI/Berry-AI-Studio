@@ -9,6 +9,10 @@ use tauri::Manager;
 pub struct AppState {
     /// The migrated SQLite database, opened in the app data directory.
     pub db: Mutex<Database>,
+    /// Optional active WD14 ONNX Tagger instance.
+    pub tagger: Mutex<Option<berry_tagger::Wd14Tagger>>,
+    /// Optional active CLIP / SigLIP text & image embedding engine.
+    pub clip: Mutex<Option<berry_clip::ClipEngine>>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -21,7 +25,11 @@ pub fn run() {
             let data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
             let db = Database::connect(&data_dir.join("berry.db"))?;
-            app.manage(AppState { db: Mutex::new(db) });
+            app.manage(AppState {
+                db: Mutex::new(db),
+                tagger: Mutex::new(None),
+                clip: Mutex::new(None),
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -82,6 +90,23 @@ pub fn run() {
             commands::batch_generate_thumbnails,
             commands::get_thumbnail_cache_stats,
             commands::clear_thumbnail_cache,
+            commands::upsert_file_embedding,
+            commands::remove_file_embedding,
+            commands::get_file_embedding,
+            commands::get_file_embedding_models,
+            commands::search_similar_files,
+            commands::find_similar_to_file,
+            commands::list_tagger_models,
+            commands::load_tagger_model,
+            commands::get_loaded_tagger_model,
+            commands::auto_tag_file,
+            commands::batch_auto_tag_files,
+            commands::list_clip_models,
+            commands::load_clip_model,
+            commands::get_loaded_clip_model,
+            commands::get_clip_index_status,
+            commands::index_clip_images_batch,
+            commands::search_by_text_prompt,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -100,6 +100,19 @@ pub const MIGRATIONS: &[&str] = &[
     CREATE INDEX IF NOT EXISTS idx_files_folder_modified ON files(folder_id, modified_at DESC);
     CREATE INDEX IF NOT EXISTS idx_files_size ON files(size_bytes DESC);
     "#,
+    // v7: file embeddings table and index.
+    r#"
+    CREATE TABLE file_embeddings (
+        file_id     INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+        model_id    TEXT NOT NULL,
+        dimensions  INTEGER NOT NULL CHECK (dimensions > 0),
+        embedding   BLOB NOT NULL,
+        updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        PRIMARY KEY (file_id, model_id)
+    ) STRICT;
+
+    CREATE INDEX idx_file_embeddings_model ON file_embeddings(model_id);
+    "#,
 ];
 
 /// The schema version the current code migrates databases to.

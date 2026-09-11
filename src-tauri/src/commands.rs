@@ -8,12 +8,14 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::MutexGuard;
 
+use berry_clip::{ClipEngine, ClipModelInfo};
 use berry_domain::{
     Album, CheckpointModelStat, DatabaseStats, FileSortField, Folder, ImageFile, ModelCacheEntry,
-    PromptStat, SearchCriteria, SortDirection, Tag,
+    PromptStat, SearchCriteria, SimilarityMatch, SortDirection, Tag,
 };
 use berry_scan::{ScanStats, Scanner};
 use berry_storage::Database;
+use berry_tagger::{ModelInfo, TagPrediction, TaggerConfig, Wd14Tagger};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 
@@ -25,6 +27,26 @@ fn db<'a>(state: &'a State<'a, AppState>) -> Result<MutexGuard<'a, Database>, St
         .db
         .lock()
         .map_err(|_| "database lock poisoned".to_string())
+}
+
+/// Lock and return the optional tagger instance.
+fn tagger_guard<'a>(
+    state: &'a State<'a, AppState>,
+) -> Result<MutexGuard<'a, Option<Wd14Tagger>>, String> {
+    state
+        .tagger
+        .lock()
+        .map_err(|_| "tagger lock poisoned".to_string())
+}
+
+/// Lock and return the optional clip engine instance.
+fn clip_guard<'a>(
+    state: &'a State<'a, AppState>,
+) -> Result<MutexGuard<'a, Option<ClipEngine>>, String> {
+    state
+        .clip
+        .lock()
+        .map_err(|_| "clip lock poisoned".to_string())
 }
 
 /// Resolve a user-supplied folder path to a canonical absolute path.
@@ -1032,4 +1054,555 @@ pub fn clear_thumbnail_cache(app_handle: AppHandle) -> Result<usize, String> {
         .app_data_dir()
         .map_err(|e| format!("Failed to get app data dir: {e}"))?;
     berry_scan::clear_thumbnail_cache(&data_dir)
+}
+
+// --- Visual Similarity and Embeddings ---
+
+/// Result item for visual similarity search combining the image file metadata with its match score.
+#[derive(Serialize, Deserialize)]
+pub struct SimilarFileItem {
+    pub file: ImageFile,
+    pub score: f32,
+}
+
+/// Upsert an embedding vector for an image file.
+#[tauri::command]
+pub fn upsert_file_embedding(
+    file_id: i64,
+    model_id: String,
+    embedding: Vec<f32>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    db(&state)?
+        .upsert_file_embedding(file_id, &model_id, &embedding)
+        .map_err(|e| e.to_string())
+}
+
+/// Remove an embedding record for an image file and model.
+#[tauri::command]
+pub fn remove_file_embedding(
+    file_id: i64,
+    model_id: String,
+    state: State<'_, AppState>,
+) -> Result<bool, String> {
+    db(&state)?
+        .remove_file_embedding(file_id, &model_id)
+        .map_err(|e| e.to_string())
+}
+
+/// Retrieve the stored embedding vector for an image file and model.
+#[tauri::command]
+pub fn get_file_embedding(
+    file_id: i64,
+    model_id: String,
+    state: State<'_, AppState>,
+) -> Result<Option<Vec<f32>>, String> {
+    db(&state)?
+        .get_file_embedding(file_id, &model_id)
+        .map_err(|e| e.to_string())
+}
+
+/// List all model IDs for which embeddings exist for an image file.
+#[tauri::command]
+pub fn get_file_embedding_models(
+    file_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Vec<String>, String> {
+    db(&state)?
+        .get_file_embedding_models(file_id)
+        .map_err(|e| e.to_string())
+}
+
+/// Search for files similar to `query` vector using cosine similarity.
+#[tauri::command]
+pub fn search_similar_files(
+    model_id: String,
+    query: Vec<f32>,
+    limit: usize,
+    state: State<'_, AppState>,
+) -> Result<Vec<SimilarityMatch>, String> {
+    db(&state)?
+        .search_similar_files(&model_id, &query, limit)
+        .map_err(|e| e.to_string())
+}
+
+/// Find files visually similar to an existing image file.
+///
+/// Returns matching files enriched with metadata and similarity score,
+/// ordered by descending similarity score.
+#[tauri::command]
+pub fn find_similar_to_file(
+    file_id: i64,
+    model_id: Option<String>,
+    limit: Option<usize>,
+    state: State<'_, AppState>,
+) -> Result<Vec<SimilarFileItem>, String> {
+    let database = db(&state)?;
+    let lim = limit.unwrap_or(100);
+    let matches = database
+        .find_similar_to_file(file_id, model_id.as_deref(), lim)
+        .map_err(|e| e.to_string())?;
+
+    let mut results = Vec::with_capacity(matches.len());
+    for m in matches {
+        if let Some(file) = database
+            .get_file_by_id(m.file_id)
+            .map_err(|e| e.to_string())?
+        {
+            results.push(SimilarFileItem {
+                file,
+                score: m.score,
+            });
+        }
+    }
+    Ok(results)
+}
+
+// --- WD14 Tagger & AI Tagging ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaggerModelSummary {
+    pub name: String,
+    pub dir_path: String,
+    pub model_path: String,
+    pub tags_path: String,
+    pub is_loaded: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatchTagResult {
+    pub processed_files: usize,
+    pub tags_added: usize,
+}
+
+/// Scan for available WD14 Tagger models.
+/// Checks `<AppData>/models/wd14/` and any model currently loaded in state.
+#[tauri::command]
+pub fn list_tagger_models(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<Vec<TaggerModelSummary>, String> {
+    let mut models = Vec::new();
+
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let wd14_dir = data_dir.join("models").join("wd14");
+    let _ = std::fs::create_dir_all(&wd14_dir);
+
+    let loaded_model_path = {
+        let guard = tagger_guard(&state)?;
+        guard.as_ref().map(|t| t.model_info.model_path.clone())
+    };
+
+    if let Ok(entries) = std::fs::read_dir(&wd14_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                let model_path = path.join("model.onnx");
+                let tags_path = path.join("selected_tags.csv");
+
+                if model_path.exists() && tags_path.exists() {
+                    let dir_name = path
+                        .file_name()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("wd14")
+                        .to_string();
+                    let is_loaded = loaded_model_path
+                        .as_ref()
+                        .map(|p| p == &model_path)
+                        .unwrap_or(false);
+
+                    models.push(TaggerModelSummary {
+                        name: dir_name,
+                        dir_path: path.to_string_lossy().to_string(),
+                        model_path: model_path.to_string_lossy().to_string(),
+                        tags_path: tags_path.to_string_lossy().to_string(),
+                        is_loaded,
+                    });
+                }
+            }
+        }
+    }
+
+    // If currently loaded model is outside app data models dir, make sure it is also included
+    if let Some(guard) = tagger_guard(&state)?.as_ref() {
+        let loaded_path_str = guard.model_info.model_path.to_string_lossy().to_string();
+        if !models.iter().any(|m| m.model_path == loaded_path_str) {
+            models.push(TaggerModelSummary {
+                name: guard.model_info.name.clone(),
+                dir_path: guard
+                    .model_info
+                    .model_path
+                    .parent()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_default(),
+                model_path: loaded_path_str,
+                tags_path: guard.model_info.tags_path.to_string_lossy().to_string(),
+                is_loaded: true,
+            });
+        }
+    }
+
+    Ok(models)
+}
+
+/// Load a WD14 Tagger ONNX model and its selected_tags.csv.
+#[tauri::command]
+pub fn load_tagger_model(
+    model_path: String,
+    tags_path: String,
+    state: State<'_, AppState>,
+) -> Result<ModelInfo, String> {
+    let tagger = Wd14Tagger::load(Path::new(&model_path), Path::new(&tags_path))
+        .map_err(|e| e.to_string())?;
+    let info = tagger.model_info.clone();
+
+    let mut guard = tagger_guard(&state)?;
+    *guard = Some(tagger);
+
+    Ok(info)
+}
+
+/// Retrieve the currently active tagger model info, if loaded.
+#[tauri::command]
+pub fn get_loaded_tagger_model(state: State<'_, AppState>) -> Result<Option<ModelInfo>, String> {
+    let guard = tagger_guard(&state)?;
+    Ok(guard.as_ref().map(|t| t.model_info.clone()))
+}
+
+/// Run tag prediction on a single image file.
+/// If `apply_tags` is true, newly recognized tags will be created in the database and linked to the image.
+#[tauri::command]
+pub fn auto_tag_file(
+    file_id: i64,
+    config: TaggerConfig,
+    apply_tags: bool,
+    state: State<'_, AppState>,
+) -> Result<Vec<TagPrediction>, String> {
+    let file = {
+        let database = db(&state)?;
+        database
+            .get_file_by_id(file_id)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| format!("File with id {file_id} not found"))?
+    };
+
+    let predictions = {
+        let guard = tagger_guard(&state)?;
+        let tagger = guard
+            .as_ref()
+            .ok_or_else(|| "No WD14 tagger model loaded. Please load a model first.".to_string())?;
+        tagger
+            .predict_file(Path::new(&file.path), &config)
+            .map_err(|e| e.to_string())?
+    };
+
+    if apply_tags {
+        let database = db(&state)?;
+        for pred in &predictions {
+            let tag = database
+                .get_or_create_tag(&pred.name, None)
+                .map_err(|e| e.to_string())?;
+            let _ = database.tag_file(file_id, tag.id);
+        }
+    }
+
+    Ok(predictions)
+}
+
+/// Batch run tag prediction across multiple image files and attach recognized tags.
+#[tauri::command]
+pub fn batch_auto_tag_files(
+    file_ids: Vec<i64>,
+    config: TaggerConfig,
+    state: State<'_, AppState>,
+) -> Result<BatchTagResult, String> {
+    let mut processed_files = 0;
+    let mut tags_added = 0;
+
+    for fid in file_ids {
+        let file = {
+            let database = db(&state)?;
+            database.get_file_by_id(fid).map_err(|e| e.to_string())?
+        };
+
+        if let Some(file) = file {
+            let predictions = {
+                let guard = tagger_guard(&state)?;
+                if let Some(tagger) = guard.as_ref() {
+                    tagger.predict_file(Path::new(&file.path), &config).ok()
+                } else {
+                    return Err(
+                        "No WD14 tagger model loaded. Please load a model first.".to_string()
+                    );
+                }
+            };
+
+            if let Some(predictions) = predictions {
+                let database = db(&state)?;
+                for pred in predictions {
+                    if let Ok(tag) = database.get_or_create_tag(&pred.name, None) {
+                        if database.tag_file(fid, tag.id).is_ok() {
+                            tags_added += 1;
+                        }
+                    }
+                }
+                processed_files += 1;
+            }
+        }
+    }
+
+    Ok(BatchTagResult {
+        processed_files,
+        tags_added,
+    })
+}
+
+// --- CLIP / SigLIP Multi-Modal Semantic Search ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClipModelSummary {
+    pub name: String,
+    pub dir_path: String,
+    pub visual_path: String,
+    pub textual_path: String,
+    pub tokenizer_path: String,
+    pub is_loaded: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClipIndexStatus {
+    pub model_id: String,
+    pub indexed_images: usize,
+    pub total_images: usize,
+    pub is_loaded: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClipBatchIndexResult {
+    pub indexed_count: usize,
+    pub remaining_count: usize,
+    pub total_count: usize,
+}
+
+/// Scan for available CLIP / SigLIP models.
+/// Checks `<AppData>/models/clip/` directory and any model currently loaded in state.
+#[tauri::command]
+pub fn list_clip_models(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<Vec<ClipModelSummary>, String> {
+    let mut models = Vec::new();
+
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let clip_dir = data_dir.join("models").join("clip");
+    let _ = std::fs::create_dir_all(&clip_dir);
+
+    let loaded_folder_path = {
+        let guard = clip_guard(&state)?;
+        guard.as_ref().map(|c| c.info.folder_path.clone())
+    };
+
+    if let Ok(entries) = std::fs::read_dir(&clip_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                let has_visual = path.join("visual.onnx").is_file()
+                    || path.join("vision_model.onnx").is_file()
+                    || path.join("model.onnx").is_file();
+                let has_textual =
+                    path.join("textual.onnx").is_file() || path.join("text_model.onnx").is_file();
+                let has_tokenizer = path.join("tokenizer.json").is_file();
+
+                if has_visual && has_textual && has_tokenizer {
+                    let dir_name = path
+                        .file_name()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("clip-model")
+                        .to_string();
+
+                    let is_loaded = loaded_folder_path
+                        .as_ref()
+                        .map(|p| p == &path)
+                        .unwrap_or(false);
+
+                    let visual_path = if path.join("visual.onnx").is_file() {
+                        path.join("visual.onnx")
+                    } else if path.join("vision_model.onnx").is_file() {
+                        path.join("vision_model.onnx")
+                    } else {
+                        path.join("model.onnx")
+                    };
+
+                    let textual_path = if path.join("textual.onnx").is_file() {
+                        path.join("textual.onnx")
+                    } else {
+                        path.join("text_model.onnx")
+                    };
+
+                    models.push(ClipModelSummary {
+                        name: dir_name,
+                        dir_path: path.to_string_lossy().to_string(),
+                        visual_path: visual_path.to_string_lossy().to_string(),
+                        textual_path: textual_path.to_string_lossy().to_string(),
+                        tokenizer_path: path.join("tokenizer.json").to_string_lossy().to_string(),
+                        is_loaded,
+                    });
+                }
+            }
+        }
+    }
+
+    // If currently loaded model is outside app data models dir, make sure it is also included
+    if let Some(guard) = clip_guard(&state)?.as_ref() {
+        let loaded_path_str = guard.info.folder_path.to_string_lossy().to_string();
+        if !models.iter().any(|m| m.dir_path == loaded_path_str) {
+            models.push(ClipModelSummary {
+                name: guard.info.name.clone(),
+                dir_path: loaded_path_str,
+                visual_path: guard.info.visual_model_path.to_string_lossy().to_string(),
+                textual_path: guard.info.textual_model_path.to_string_lossy().to_string(),
+                tokenizer_path: guard.info.tokenizer_path.to_string_lossy().to_string(),
+                is_loaded: true,
+            });
+        }
+    }
+
+    Ok(models)
+}
+
+/// Load a CLIP / SigLIP model from its folder directory.
+#[tauri::command]
+pub fn load_clip_model(
+    dir_path: String,
+    state: State<'_, AppState>,
+) -> Result<ClipModelInfo, String> {
+    let engine = ClipEngine::load_from_dir(Path::new(&dir_path)).map_err(|e| e.to_string())?;
+    let info = engine.info.clone();
+
+    let mut guard = clip_guard(&state)?;
+    *guard = Some(engine);
+
+    Ok(info)
+}
+
+/// Retrieve the currently active CLIP model info, if loaded.
+#[tauri::command]
+pub fn get_loaded_clip_model(state: State<'_, AppState>) -> Result<Option<ClipModelInfo>, String> {
+    let guard = clip_guard(&state)?;
+    Ok(guard.as_ref().map(|c| c.info.clone()))
+}
+
+/// Get embedding index progress statistics for the currently loaded model or a specified model_id.
+#[tauri::command]
+pub fn get_clip_index_status(
+    model_id: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<ClipIndexStatus, String> {
+    let active_model_id = {
+        let guard = clip_guard(&state)?;
+        guard.as_ref().map(|c| c.info.model_id.clone())
+    };
+
+    let target_model_id = match model_id {
+        Some(m) if !m.trim().is_empty() => m,
+        _ => active_model_id
+            .clone()
+            .unwrap_or_else(|| "clip-vit-base-patch32".to_string()),
+    };
+
+    let database = db(&state)?;
+    let (indexed_images, total_images) = database
+        .get_embedding_index_stats(&target_model_id)
+        .map_err(|e| e.to_string())?;
+
+    let is_loaded = active_model_id
+        .map(|m| m == target_model_id)
+        .unwrap_or(false);
+
+    Ok(ClipIndexStatus {
+        model_id: target_model_id,
+        indexed_images,
+        total_images,
+        is_loaded,
+    })
+}
+
+/// Process a batch of unindexed images using the active CLIP vision model and save embeddings to database.
+#[tauri::command]
+pub fn index_clip_images_batch(
+    batch_size: usize,
+    state: State<'_, AppState>,
+) -> Result<ClipBatchIndexResult, String> {
+    let guard = clip_guard(&state)?;
+    let engine = guard
+        .as_ref()
+        .ok_or_else(|| "No CLIP model loaded. Please load a model first.".to_string())?;
+
+    let model_id = engine.info.model_id.clone();
+    let limit = if batch_size == 0 { 20 } else { batch_size };
+
+    let unindexed = {
+        let database = db(&state)?;
+        database
+            .get_unindexed_files(&model_id, limit)
+            .map_err(|e| e.to_string())?
+    };
+
+    let mut indexed_count = 0;
+    for file in &unindexed {
+        let file_id = match file.id {
+            Some(id) => id,
+            None => continue,
+        };
+
+        if let Ok(img) = image::open(&file.path) {
+            if let Ok(embedding) = engine.encode_image(&img) {
+                let database = db(&state)?;
+                if database
+                    .upsert_file_embedding(file_id, &model_id, &embedding)
+                    .is_ok()
+                {
+                    indexed_count += 1;
+                }
+            }
+        }
+    }
+
+    let database = db(&state)?;
+    let (indexed_total, total_images) = database
+        .get_embedding_index_stats(&model_id)
+        .map_err(|e| e.to_string())?;
+
+    Ok(ClipBatchIndexResult {
+        indexed_count,
+        remaining_count: total_images.saturating_sub(indexed_total),
+        total_count: total_images,
+    })
+}
+
+/// Text-to-image semantic search: encode text prompt via active CLIP textual model and search database.
+#[tauri::command]
+pub fn search_by_text_prompt(
+    prompt: String,
+    limit: usize,
+    state: State<'_, AppState>,
+) -> Result<Vec<SimilarityMatch>, String> {
+    if prompt.trim().is_empty() {
+        return Ok(vec![]);
+    }
+
+    let guard = clip_guard(&state)?;
+    let engine = guard
+        .as_ref()
+        .ok_or_else(|| "No CLIP model loaded. Please load a CLIP model first.".to_string())?;
+
+    let model_id = engine.info.model_id.clone();
+    let query_vector = engine.encode_text(&prompt).map_err(|e| e.to_string())?;
+
+    let database = db(&state)?;
+    let results = database
+        .search_similar_files(&model_id, &query_vector, limit)
+        .map_err(|e| e.to_string())?;
+
+    Ok(results)
 }

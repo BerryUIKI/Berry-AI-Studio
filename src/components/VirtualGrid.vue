@@ -42,6 +42,7 @@ const emit = defineEmits<{
   (e: "select", file: ImageFile, event?: MouseEvent): void;
   (e: "activate", file: ImageFile): void;
   (e: "toggleSelect", file: ImageFile): void;
+  (e: "findSimilar", file: ImageFile): void;
 }>();
 
 const containerRef = ref<HTMLElement | null>(null);
@@ -364,6 +365,7 @@ watch(
             @dragstart="onDragStart($event, file)"
             @click="selectFile(file, $event)"
             @dblclick="activateFile(file)"
+            @contextmenu.prevent="emit('findSimilar', file)"
           >
             <div class="thumbnail-wrapper">
               <button
@@ -375,6 +377,15 @@ watch(
                 @click.stop="toggleSelect(file)"
               >
                 {{ selectedFilePaths?.has(file.path) ? "✓" : "" }}
+              </button>
+              <button
+                v-if="file.id"
+                type="button"
+                class="card-similar-btn"
+                :title="t.preview.findSimilar"
+                @click.stop="emit('findSimilar', file)"
+              >
+                🔍
               </button>
               <img
                 v-if="
@@ -461,6 +472,15 @@ watch(
                   :title="`Rating: ${file.rating}/10`"
                 >
                   ★ {{ file.rating }}
+                </span>
+
+                <!-- Similarity score badge -->
+                <span
+                  v-if="file.similarity_score !== undefined && file.similarity_score !== null"
+                  class="card-badge badge-similarity"
+                  :title="`${t.preview.similarityScore}: ${Math.round(file.similarity_score * 100)}%`"
+                >
+                  ⚡ {{ Math.round(file.similarity_score * 100) }}%
                 </span>
               </template>
             </div>
@@ -686,6 +706,47 @@ watch(
   font-weight: 700;
   font-size: 0.65em;
   padding: 0.05rem 0.35rem;
+}
+
+.badge-similarity {
+  top: 6px;
+  right: 6px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.4);
+}
+
+.card-similar-btn {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #fff;
+  font-size: 0.75em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.85);
+  transition: opacity 0.15s ease, transform 0.15s ease, background 0.15s ease;
+  z-index: 2;
+}
+
+.grid-card:hover .card-similar-btn {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.card-similar-btn:hover {
+  background: rgba(99, 102, 241, 0.9);
+  border-color: rgba(255, 255, 255, 0.7);
 }
 
 .thumbnail-img.nsfw-blurred {
