@@ -19,7 +19,13 @@ const emit = defineEmits<{
   updateFile: [file: ImageFile];
   filterByModel: [model: string];
   filterByHash: [hash: string];
+  findSimilar: [file: ImageFile];
+  openAutoTagModal: [file: ImageFile];
 }>();
+
+defineExpose({
+  loadTags,
+});
 
 const fileTags = ref<Tag[]>([]);
 const promptCopied = ref(false);
@@ -257,6 +263,26 @@ const promptTokens = computed(() => {
             @click="file.id && emit('openTagModal', file.id)"
           >
             🏷️
+          </button>
+
+          <!-- Find Similar -->
+          <button
+            type="button"
+            class="action-btn"
+            :title="t.preview.findSimilar"
+            @click="file && emit('findSimilar', file)"
+          >
+            🔍
+          </button>
+
+          <!-- Auto Tag (WD14) -->
+          <button
+            type="button"
+            class="action-btn"
+            :title="t.preview.autoTag"
+            @click="file && emit('openAutoTagModal', file)"
+          >
+            🤖
           </button>
         </div>
       </div>

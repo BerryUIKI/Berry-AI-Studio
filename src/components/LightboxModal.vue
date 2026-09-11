@@ -14,6 +14,7 @@ const emit = defineEmits<{
   close: [];
   navigate: [file: ImageFile];
   updateFile: [file: ImageFile];
+  findSimilar: [file: ImageFile];
 }>();
 
 const scale = ref(1);
@@ -312,6 +313,16 @@ onUnmounted(() => {
           @click="toggleFavorite"
         >
           {{ file.is_favorite ? '❤️' : '🤍' }}
+        </button>
+
+        <!-- Find Similar -->
+        <button
+          type="button"
+          class="hud-action-btn"
+          :title="t.preview.findSimilar"
+          @click="emit('findSimilar', file)"
+        >
+          <span>🔍 {{ t.preview.findSimilar }}</span>
         </button>
 
         <!-- Prompt Copy -->

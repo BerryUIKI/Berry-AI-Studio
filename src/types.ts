@@ -57,6 +57,17 @@ export interface ImageFile {
   aesthetic_score?: number | null;
   is_favorite?: boolean;
   is_nsfw?: boolean;
+  similarity_score?: number | null;
+}
+
+export interface SimilarityMatch {
+  file_id: number;
+  score: number;
+}
+
+export interface SimilarFileItem {
+  file: ImageFile;
+  score: number;
 }
 
 export interface Album {
@@ -167,6 +178,65 @@ export interface DatabaseStats {
   page_size: number;
   page_count: number;
   freelist_count: number;
+}
+
+export interface TagPrediction {
+  name: string;
+  category: "General" | "Character" | "Rating" | string | number;
+  confidence: number;
+}
+
+export interface TaggerConfig {
+  general_threshold: number;
+  character_threshold: number;
+  include_rating: boolean;
+  max_tags: number;
+}
+
+export interface TaggerModelSummary {
+  name: string;
+  dir_path: string;
+  model_path: string;
+  tags_path: string;
+  is_loaded: boolean;
+}
+
+export interface BatchTagResult {
+  processed_files: number;
+  tags_added: number;
+}
+
+export interface ClipModelSummary {
+  name: string;
+  dir_path: string;
+  visual_path: string;
+  textual_path: string;
+  tokenizer_path: string;
+  is_loaded: boolean;
+}
+
+export interface ClipIndexStatus {
+  model_id: string;
+  indexed_images: number;
+  total_images: number;
+  is_loaded: boolean;
+}
+
+export interface ClipBatchIndexResult {
+  indexed_count: number;
+  remaining_count: number;
+  total_count: number;
+}
+
+export interface ClipModelInfo {
+  model_id: string;
+  name: string;
+  folder_path: string;
+  visual_model_path: string;
+  textual_model_path: string;
+  tokenizer_path: string;
+  image_size: number;
+  embedding_dim: number;
 }
 
 

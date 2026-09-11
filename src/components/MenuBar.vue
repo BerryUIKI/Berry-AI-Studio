@@ -26,6 +26,7 @@ const emit = defineEmits<{
   resetZoom: [];
   openPromptStats: [];
   openModelManager: [];
+  openClipManager: [];
   openShortcutsHelp: [];
   openUpdater: [];
   openAbout: [];
@@ -253,6 +254,10 @@ onUnmounted(() => {
         <button type="button" class="dropdown-item" @click="handleAction(() => emit('openModelManager'))">
           <span class="item-icon">🧠</span>
           <span class="item-title">{{ t.menu.modelManager }}</span>
+        </button>
+        <button type="button" class="dropdown-item" @click="handleAction(() => emit('openClipManager'))">
+          <span class="item-icon">🔎</span>
+          <span class="item-title">{{ t.clipModal.title }}</span>
         </button>
       </div>
     </div>
