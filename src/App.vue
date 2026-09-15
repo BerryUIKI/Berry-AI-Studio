@@ -13,9 +13,11 @@ import type {
   NavTarget,
   ScanProgress,
   SearchCriteria,
+  SimilarFileItem,
   SortDirection,
   Tag,
 } from "./types";
+import { getFileName } from "./utils/image";
 import TitleBar from "./components/TitleBar.vue";
 import MenuBar from "./components/MenuBar.vue";
 import Sidebar from "./components/Sidebar.vue";
@@ -37,6 +39,8 @@ import DatabaseManagerModal from "./components/DatabaseManagerModal.vue";
 import ShortcutsHelpModal from "./components/ShortcutsHelpModal.vue";
 import SettingsModal from "./components/SettingsModal.vue";
 import UpdateModal from "./components/UpdateModal.vue";
+import AutoTagModal from "./components/AutoTagModal.vue";
+import ClipManagerModal from "./components/ClipManagerModal.vue";
 import { t } from "./i18n";
 import { countActiveFilters, criteriaToQuery } from "./utils/search";
 import { requestBatchThumbnails } from "./utils/thumbnail";
@@ -51,7 +55,15 @@ const activeTarget = ref<NavTarget>({ type: "all" });
 const files = shallowRef<ImageFile[]>([]);
 const filesLoading = ref(false);
 const searchQuery = ref("");
+const isSemanticSearch = ref(false);
+const clipModalOpen = ref(false);
 const gridItemWidth = ref(200);
+const similaritySourceFile = ref<ImageFile | null>(null);
+const rawSimilarityFiles = shallowRef<ImageFile[]>([]);
+const similarityThreshold = ref<number>(0);
+const similarityLimit = ref<number>(
+  Number(localStorage.getItem("berry_similarity_limit")) || 50
+);
 
 // UI Pane Toggles (Eagle Studio layout)
 const sidebarOpen = ref(true);
@@ -73,6 +85,9 @@ const albumModalOpen = ref(false);
 const albumTargetFileIds = ref<number[]>([]);
 const tagModalOpen = ref(false);
 const tagTargetFileIds = ref<number[]>([]);
+const autoTagModalOpen = ref(false);
+const autoTagTargetFile = ref<ImageFile | null>(null);
+const inspectorRef = ref<InstanceType<typeof InspectorPane> | null>(null);
 
 // Filter Metadata
 const distinctModels = ref<string[]>([]);
@@ -232,8 +247,16 @@ function handleWindowKeyDown(e: KeyboardEvent) {
       fileOpModalOpen.value = false;
       return;
     }
+    if (clipModalOpen.value) {
+      clipModalOpen.value = false;
+      return;
+    }
     if (selectedFilePaths.value.size > 0) {
       onClearSelection();
+      return;
+    }
+    if (similaritySourceFile.value) {
+      exitSimilaritySearch();
       return;
     }
   }
@@ -415,6 +438,8 @@ function onFolderRemoved(folderId: number) {
 }
 
 function onSelectNav(target: NavTarget) {
+  similaritySourceFile.value = null;
+  rawSimilarityFiles.value = [];
   activeTarget.value = target;
   selectedFile.value = null;
   lightboxFile.value = null;
@@ -422,6 +447,9 @@ function onSelectNav(target: NavTarget) {
 }
 
 const targetTitle = computed(() => {
+  if (similaritySourceFile.value) {
+    return `🔍 ${t.value.preview.similaritySearchTitle} ${getFileName(similaritySourceFile.value.path)}`;
+  }
   switch (activeTarget.value.type) {
     case "all":
       return t.value.nav.allImages;
@@ -566,6 +594,19 @@ function onBatchTag() {
   }
 }
 
+function handleOpenAutoTag(file?: ImageFile) {
+  autoTagTargetFile.value = file ?? selectedFile.value;
+  autoTagModalOpen.value = true;
+}
+
+async function onAutoTagsApplied() {
+  await loadAlbumsAndTags();
+  await refreshCounts();
+  if (inspectorRef.value) {
+    await inspectorRef.value.loadTags();
+  }
+}
+
 async function onBatchToggleFavorite(isFavorite: boolean) {
   const ids = selectedFilesList.value
     .map((f) => f.id)
@@ -650,18 +691,39 @@ function onUpdateFile(file: ImageFile) {
 }
 
 async function loadFiles() {
+  similaritySourceFile.value = null;
+  rawSimilarityFiles.value = [];
   filesLoading.value = true;
   selectedFilePaths.value.clear();
   try {
     const q = searchQuery.value.trim();
     if (q) {
-      const folderId = activeTarget.value.type === "folder" ? activeTarget.value.folder.id : null;
-      files.value = await invoke<ImageFile[]>("search_files_by_query", {
-        query: q,
-        folderId,
-        sort: sortField.value,
-        direction: sortDirection.value,
-      });
+      if (isSemanticSearch.value) {
+        // Text-to-image semantic search via active CLIP model
+        try {
+          const matches = await invoke<SimilarFileItem[]>("search_by_text_prompt", {
+            prompt: q,
+            limit: similarityLimit.value || 50,
+          });
+          files.value = matches.map((m) => ({
+            ...m.file,
+            similarity_score: m.score,
+          }));
+        } catch (clipErr) {
+          // If no model loaded, open CLIP modal so user can load one
+          console.warn("Semantic search failed or model not loaded:", clipErr);
+          clipModalOpen.value = true;
+          files.value = [];
+        }
+      } else {
+        const folderId = activeTarget.value.type === "folder" ? activeTarget.value.folder.id : null;
+        files.value = await invoke<ImageFile[]>("search_files_by_query", {
+          query: q,
+          folderId,
+          sort: sortField.value,
+          direction: sortDirection.value,
+        });
+      }
     } else {
       const criteria: SearchCriteria = {
         sort: sortField.value,
@@ -689,6 +751,77 @@ async function loadFiles() {
   } finally {
     filesLoading.value = false;
   }
+}
+
+function applySimilarityFilter() {
+  const minScore = similarityThreshold.value / 100;
+  const filtered = rawSimilarityFiles.value
+    .filter((f) => (f.similarity_score ?? 0) >= minScore)
+    .sort((a, b) => (b.similarity_score ?? 0) - (a.similarity_score ?? 0));
+  files.value = filtered;
+  if (filtered.length > 0) {
+    if (!selectedFile.value || !filtered.some((f) => f.id === selectedFile.value?.id)) {
+      selectedFile.value = filtered[0];
+    }
+  } else {
+    selectedFile.value = null;
+  }
+}
+
+function onSimilarityThresholdChange() {
+  applySimilarityFilter();
+}
+
+function onSimilarityLimitChange() {
+  localStorage.setItem("berry_similarity_limit", String(similarityLimit.value));
+  if (similaritySourceFile.value) {
+    void handleFindSimilar(similaritySourceFile.value);
+  }
+}
+
+async function handleFindSimilar(file: ImageFile) {
+  if (!file.id) return;
+  filesLoading.value = true;
+  try {
+    const items = await invoke<SimilarFileItem[]>("find_similar_to_file", {
+      fileId: file.id,
+      limit: similarityLimit.value,
+    });
+    if (items.length === 0) {
+      const models = await invoke<string[]>("get_file_embedding_models", {
+        fileId: file.id,
+      });
+      if (models.length === 0) {
+        alert(t.value.preview.noEmbeddingFound);
+        return;
+      }
+    }
+    similaritySourceFile.value = file;
+    selectedFilePaths.value.clear();
+    rawSimilarityFiles.value = items.map((item) => ({
+      ...item.file,
+      similarity_score: item.score,
+    }));
+    applySimilarityFilter();
+    if (files.value.length > 0) {
+      void requestBatchThumbnails(files.value.slice(0, 200));
+    }
+    if (lightboxFile.value) {
+      lightboxFile.value = null;
+    }
+  } catch (err) {
+    console.error("Find similar error:", err);
+    error.value = String(err);
+  } finally {
+    filesLoading.value = false;
+  }
+}
+
+function exitSimilaritySearch() {
+  similaritySourceFile.value = null;
+  rawSimilarityFiles.value = [];
+  similarityThreshold.value = 0;
+  void loadFiles();
 }
 
 function onSearch(query: string) {
@@ -875,6 +1008,7 @@ function onResetZoom() {
           @reset-zoom="onResetZoom"
           @open-prompt-stats="promptStatsModalOpen = true"
           @open-model-manager="modelManagerModalOpen = true"
+          @open-clip-manager="clipModalOpen = true"
           @open-shortcuts-help="shortcutsHelpModalOpen = true"
           @open-updater="updateModalOpen = true"
           @open-about="settingsModalOpen = true"
@@ -940,10 +1074,12 @@ function onResetZoom() {
           <div class="topbar-center">
             <SearchBar
               v-model="searchQuery"
+              v-model:is-semantic="isSemanticSearch"
               :loading="filesLoading"
               :result-count="searchQuery.trim() ? files.length : null"
               @search="onSearch"
               @clear="onClearSearch"
+              @open-clip-manager="clipModalOpen = true"
             />
             <button
               type="button"
@@ -1007,6 +1143,60 @@ function onResetZoom() {
           </div>
         </div>
 
+        <!-- Similarity Search Banner -->
+        <div v-if="similaritySourceFile" class="similarity-banner">
+          <div class="similarity-banner-left">
+            <span class="similarity-badge">🔍 {{ t.preview.similaritySearchTitle }}</span>
+            <span class="similarity-file-name" :title="getFileName(similaritySourceFile.path)">
+              {{ getFileName(similaritySourceFile.path) }}
+            </span>
+            <span class="similarity-count">
+              ({{ files.length }} / {{ rawSimilarityFiles.length }} {{ t.search.images }})
+            </span>
+          </div>
+          <div class="similarity-banner-controls">
+            <div class="similarity-control-group">
+              <label for="similarity-threshold-slider" class="similarity-control-label">
+                {{ t.preview.similarityThreshold }}:
+                <span class="similarity-threshold-val">≥ {{ similarityThreshold }}%</span>
+              </label>
+              <input
+                id="similarity-threshold-slider"
+                type="range"
+                min="0"
+                max="95"
+                step="5"
+                v-model.number="similarityThreshold"
+                class="similarity-slider"
+                @input="onSimilarityThresholdChange"
+              />
+            </div>
+            <div class="similarity-control-group">
+              <label for="similarity-limit-select" class="similarity-control-label">
+                {{ t.preview.similarityLimit }}:
+              </label>
+              <select
+                id="similarity-limit-select"
+                v-model.number="similarityLimit"
+                class="similarity-limit-select"
+                @change="onSimilarityLimitChange"
+              >
+                <option v-for="l in [20, 50, 100, 200]" :key="l" :value="l">
+                  {{ l }}
+                </option>
+              </select>
+            </div>
+          </div>
+          <button
+            type="button"
+            class="similarity-exit-btn"
+            :title="t.preview.similaritySearchExit"
+            @click="exitSimilaritySearch"
+          >
+            ✕ {{ t.preview.similaritySearchExit }}
+          </button>
+        </div>
+
         <!-- Main Viewport: Grid or Table -->
         <div class="gallery-viewport">
           <VirtualGrid
@@ -1021,6 +1211,7 @@ function onResetZoom() {
             @select="onFileSelected"
             @activate="onActivateFile"
             @toggle-select="toggleSelectFile"
+            @find-similar="handleFindSimilar"
           />
 
           <FileList
@@ -1045,6 +1236,7 @@ function onResetZoom() {
             @set-rating="onBatchRate"
             @add-to-album="onBatchAddToAlbum"
             @add-tag="onBatchTag"
+            @auto-tag-selected="handleOpenAutoTag()"
             @toggle-favorite="onBatchToggleFavorite"
             @toggle-nsfw="onBatchToggleNsfw"
             @move="onBatchMove"
@@ -1057,15 +1249,18 @@ function onResetZoom() {
       <!-- Right Inspector Panel (Collapsible) -->
       <InspectorPane
         v-if="inspectorOpen"
+        ref="inspectorRef"
         :file="selectedFile"
         :selected-count="selectedFilesList.length"
         @close="inspectorOpen = false"
         @open-lightbox="onActivateFile"
         @open-tag-modal="onOpenTagModal([$event])"
         @open-album-modal="onOpenAlbumModal([$event])"
+        @open-auto-tag-modal="handleOpenAutoTag"
         @update-file="onUpdateFile"
         @filter-by-model="onFilterByModel"
         @filter-by-hash="onFilterByHash"
+        @find-similar="handleFindSimilar"
       />
     </div>
 
@@ -1088,6 +1283,7 @@ function onResetZoom() {
       @close="lightboxFile = null"
       @navigate="onLightboxNavigate"
       @update-file="onUpdateFile"
+      @find-similar="handleFindSimilar"
     />
 
     <!-- Modals & Drawers -->
@@ -1152,6 +1348,23 @@ function onResetZoom() {
       @updated="loadAlbumsAndTags"
       @deleted="loadAlbumsAndTags"
       @tagged="loadAlbumsAndTags"
+    />
+
+    <!-- WD14 AI Auto-Tagger Modal -->
+    <AutoTagModal
+      :show="autoTagModalOpen"
+      :selected-file="autoTagTargetFile"
+      :selected-file-count="selectedFilesList.length"
+      :selected-file-ids="selectedFilesList.map((f) => f.id).filter((id): id is number => typeof id === 'number')"
+      @close="autoTagModalOpen = false"
+      @tags-applied="onAutoTagsApplied"
+    />
+
+    <!-- CLIP / SigLIP AI Semantic Search Manager Modal -->
+    <ClipManagerModal
+      :show="clipModalOpen"
+      @close="clipModalOpen = false"
+      @indexed="loadFiles"
     />
 
     <!-- Settings Modal -->
@@ -1404,5 +1617,122 @@ function onResetZoom() {
   .topbar-left {
     max-width: 100px;
   }
+}
+
+/* Similarity Search Banner */
+.similarity-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 14px;
+  background: linear-gradient(90deg, rgba(99, 102, 241, 0.15), rgba(139, 92, 246, 0.15));
+  border-bottom: 1px solid rgba(99, 102, 241, 0.3);
+  gap: 12px;
+  animation: fadeIn 0.2s ease;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.similarity-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.similarity-banner-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.similarity-control-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.similarity-control-label {
+  font-size: 0.74rem;
+  color: #c7d2fe;
+  white-space: nowrap;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.similarity-threshold-val {
+  font-weight: 700;
+  color: #38bdf8;
+  min-width: 40px;
+}
+
+.similarity-slider {
+  accent-color: #6366f1;
+  width: 90px;
+  height: 4px;
+  cursor: pointer;
+}
+
+.similarity-limit-select {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  color: #e2e8f0;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  padding: 2px 6px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.similarity-limit-select:focus {
+  border-color: #6366f1;
+}
+
+.similarity-badge {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #a5b4fc;
+  white-space: nowrap;
+}
+
+.similarity-file-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+
+.similarity-count {
+  font-size: 0.74rem;
+  color: #c7d2fe;
+  white-space: nowrap;
+}
+
+.similarity-exit-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #f1f5f9;
+  border-radius: 5px;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.similarity-exit-btn:hover {
+  background: rgba(239, 68, 68, 0.85);
+  border-color: rgba(239, 68, 68, 0.9);
+  color: #fff;
 }
 </style>

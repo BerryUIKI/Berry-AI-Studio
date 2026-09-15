@@ -6,6 +6,8 @@ members = [
     "crates/berry-metadata",
     "crates/berry-scan",
     "crates/berry-storage",
+    "crates/berry-tagger",
+    "crates/berry-clip",
 ]
 
 [workspace.package]

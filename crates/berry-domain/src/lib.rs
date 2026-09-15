@@ -14,6 +14,7 @@ mod metadata_format;
 mod prompt_stat;
 mod search;
 mod search_parser;
+mod similarity;
 mod tag;
 
 pub use album::Album;
@@ -26,4 +27,5 @@ pub use metadata_format::MetadataFormat;
 pub use prompt_stat::PromptStat;
 pub use search::SearchCriteria;
 pub use search_parser::parse_query;
+pub use similarity::SimilarityMatch;
 pub use tag::Tag;

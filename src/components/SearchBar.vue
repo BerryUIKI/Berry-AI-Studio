@@ -5,11 +5,13 @@ import { t } from "../i18n";
 const props = withDefaults(
   defineProps<{
     modelValue: string;
+    isSemantic?: boolean;
     placeholder?: string;
     loading?: boolean;
     resultCount?: number | null;
   }>(),
   {
+    isSemantic: false,
     placeholder: "",
     loading: false,
     resultCount: null,
@@ -18,8 +20,10 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: "update:modelValue", value: string): void;
+  (e: "update:isSemantic", value: boolean): void;
   (e: "search", value: string): void;
   (e: "clear"): void;
+  (e: "open-clip-manager"): void;
 }>();
 
 const inputRef = ref<HTMLInputElement | null>(null);
@@ -83,26 +87,47 @@ onUnmounted(() => {
     clearTimeout(debounceTimer);
   }
 });
+function toggleMode() {
+  const next = !props.isSemantic;
+  emit("update:isSemantic", next);
+  emit("search", localQuery.value.trim());
+}
 </script>
 
 <template>
   <div class="search-bar-eagle">
-    <div class="search-box">
-      <span class="search-icon">
-        <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor">
-          <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
-        </svg>
-      </span>
+    <div :class="['search-box', { 'semantic-mode': isSemantic }]">
+      <!-- Semantic Mode Toggle Button -->
+      <button
+        type="button"
+        class="mode-toggle-btn"
+        :class="{ active: isSemantic }"
+        :title="isSemantic ? t.search.semanticSearch : t.search.syntaxSearch"
+        @click="toggleMode"
+      >
+        <span class="mode-icon">{{ isSemantic ? '🧠' : '🔍' }}</span>
+      </button>
 
       <input
         ref="inputRef"
         :value="localQuery"
         type="text"
         class="search-input"
-        :placeholder="placeholder || t.search.placeholder"
+        :placeholder="isSemantic ? t.search.semanticPlaceholder : (placeholder || t.search.placeholder)"
         @input="onInput"
         @keydown.enter="onEnter"
       />
+
+      <!-- CLIP Manager Trigger Button in Semantic Mode -->
+      <button
+        v-if="isSemantic"
+        type="button"
+        class="clip-index-btn"
+        :title="t.search.clipManager"
+        @click="emit('open-clip-manager')"
+      >
+        ⚙️
+      </button>
 
       <span v-if="loading" class="spinner" :title="t.view.loading">⏳</span>
 
@@ -144,6 +169,60 @@ onUnmounted(() => {
   border-color: rgba(168, 85, 247, 0.5);
   box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.15);
   background: #242428;
+}
+
+.search-box.semantic-mode {
+  border-color: rgba(139, 92, 246, 0.4);
+  background: #211d2e;
+}
+
+.search-box.semantic-mode:focus-within {
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.25);
+  background: #262136;
+}
+
+.mode-toggle-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.82rem;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+
+.mode-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: scale(1.05);
+}
+
+.mode-toggle-btn.active {
+  background: rgba(139, 92, 246, 0.25);
+}
+
+.clip-index-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: #a855f7;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+
+.clip-index-btn:hover {
+  background: rgba(168, 85, 247, 0.2);
+  transform: scale(1.08);
 }
 
 .search-icon {

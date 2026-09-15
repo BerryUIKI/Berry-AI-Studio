@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use berry_domain::{
     Album, CheckpointModelStat, Container, DatabaseStats, ExtractedMetadata, FileSortField, Folder,
-    ImageFile, ModelCacheEntry, PromptStat, SearchCriteria, SortDirection, Tag,
+    ImageFile, ModelCacheEntry, PromptStat, SearchCriteria, SimilarityMatch, SortDirection, Tag,
 };
 use rusqlite::{params, Connection, OpenFlags};
 
@@ -38,6 +38,35 @@ pub enum DatabaseError {
         #[source]
         source: rusqlite::Error,
     },
+    #[error("model ID cannot be blank or empty")]
+    BlankModelId,
+    #[error("embedding vector cannot be empty")]
+    EmptyVector,
+    #[error("embedding vector contains non-finite value")]
+    NonFiniteVectorValue,
+    #[error("embedding vector norm is zero or negligible")]
+    ZeroVectorNorm,
+    #[error("similarity search limit must be greater than zero")]
+    ZeroResultLimit,
+    #[error("embedding dimension mismatch for file {file_id}: query dimension {query} does not match stored dimension {stored}")]
+    DimensionMismatch {
+        file_id: i64,
+        query: usize,
+        stored: usize,
+    },
+    #[error("stored embedding BLOB for file {file_id} has invalid length {actual_bytes}, expected {expected_bytes} for {dimensions} dimensions")]
+    MalformedStoredBlob {
+        file_id: i64,
+        dimensions: usize,
+        expected_bytes: usize,
+        actual_bytes: usize,
+    },
+    #[error("stored embedding for file {file_id} has invalid dimensions: {dimensions}")]
+    InvalidStoredDimensions { file_id: i64, dimensions: i64 },
+    #[error("stored embedding for file {file_id} contains corrupt non-finite value")]
+    CorruptStoredVectorValue { file_id: i64 },
+    #[error("stored embedding for file {file_id} has zero norm")]
+    CorruptStoredZeroNorm { file_id: i64 },
 }
 
 /// SQL that inserts or updates a file row keyed by its unique path.
@@ -424,6 +453,19 @@ impl Database {
              FROM files WHERE path = ?1 LIMIT 1",
         )?;
         let mut rows = stmt.query_and_then([path], Self::map_row)?;
+        match rows.next() {
+            Some(r) => Ok(Some(r?)),
+            None => Ok(None),
+        }
+    }
+
+    /// Retrieve a file by its database row ID.
+    pub fn get_file_by_id(&self, id: i64) -> Result<Option<ImageFile>, DatabaseError> {
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT id, folder_id, path, container, size_bytes, modified_at, metadata, rating, aesthetic_score, is_favorite, is_nsfw
+             FROM files WHERE id = ?1 LIMIT 1",
+        )?;
+        let mut rows = stmt.query_and_then([id], Self::map_row)?;
         match rows.next() {
             Some(r) => Ok(Some(r?)),
             None => Ok(None),
@@ -932,6 +974,34 @@ impl Database {
         }
     }
 
+    /// Retrieve a tag by its name (case-insensitive).
+    pub fn get_tag_by_name(&self, name: &str) -> Result<Option<Tag>, DatabaseError> {
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT id, name, color, created_at FROM tags WHERE LOWER(name) = LOWER(?1)",
+        )?;
+        let mut rows = stmt.query_map([name.trim()], |row| {
+            Ok(Tag {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                color: row.get(2)?,
+                created_at: row.get(3)?,
+            })
+        })?;
+        match rows.next() {
+            Some(row) => Ok(Some(row?)),
+            None => Ok(None),
+        }
+    }
+
+    /// Retrieve an existing tag by name or create it if not present.
+    pub fn get_or_create_tag(&self, name: &str, color: Option<&str>) -> Result<Tag, DatabaseError> {
+        let trimmed = name.trim();
+        if let Some(existing) = self.get_tag_by_name(trimmed)? {
+            return Ok(existing);
+        }
+        self.create_tag(trimmed, color)
+    }
+
     /// List all tags ordered by name.
     pub fn list_tags(&self) -> Result<Vec<Tag>, DatabaseError> {
         let mut stmt = self
@@ -1290,6 +1360,401 @@ impl Database {
             })?
             .collect::<Result<Vec<_>, _>>()?;
         Ok(rows)
+    }
+
+    // --- File Embeddings and Similarity Search ---
+
+    /// Insert or update an embedding vector for a file and model.
+    ///
+    /// The embedding vector is serialized as little-endian f32 bytes. If a record
+    /// exists for `(file_id, model_id)`, its dimensions and embedding are updated,
+    /// and `updated_at` is refreshed.
+    pub fn upsert_file_embedding(
+        &self,
+        file_id: i64,
+        model_id: &str,
+        embedding: &[f32],
+    ) -> Result<(), DatabaseError> {
+        if model_id.trim().is_empty() {
+            return Err(DatabaseError::BlankModelId);
+        }
+        if embedding.is_empty() {
+            return Err(DatabaseError::EmptyVector);
+        }
+        for &val in embedding {
+            if !val.is_finite() {
+                return Err(DatabaseError::NonFiniteVectorValue);
+            }
+        }
+        let mut sum_sq: f64 = 0.0;
+        for &val in embedding {
+            let vf = val as f64;
+            sum_sq += vf * vf;
+        }
+        let norm = sum_sq.sqrt();
+        if norm <= 0.0 || !norm.is_finite() {
+            return Err(DatabaseError::ZeroVectorNorm);
+        }
+
+        let dim_i64 =
+            i64::try_from(embedding.len()).map_err(|_| DatabaseError::InvalidStoredDimensions {
+                file_id,
+                dimensions: -1,
+            })?;
+        let expected_bytes = embedding
+            .len()
+            .checked_mul(std::mem::size_of::<f32>())
+            .ok_or(DatabaseError::InvalidStoredDimensions {
+                file_id,
+                dimensions: dim_i64,
+            })?;
+
+        let mut blob = Vec::with_capacity(expected_bytes);
+        for &val in embedding {
+            blob.extend_from_slice(&val.to_le_bytes());
+        }
+
+        let mut stmt = self.conn.prepare_cached(
+            "INSERT INTO file_embeddings (file_id, model_id, dimensions, embedding, updated_at)
+             VALUES (?1, ?2, ?3, ?4, strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+             ON CONFLICT(file_id, model_id) DO UPDATE SET
+                 dimensions = excluded.dimensions,
+                 embedding  = excluded.embedding,
+                 updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')",
+        )?;
+        stmt.execute(params![file_id, model_id, dim_i64, blob])?;
+        Ok(())
+    }
+
+    /// Remove an embedding record for a file and model.
+    ///
+    /// Returns `true` if a record was removed, or `false` if none existed.
+    pub fn remove_file_embedding(
+        &self,
+        file_id: i64,
+        model_id: &str,
+    ) -> Result<bool, DatabaseError> {
+        if model_id.trim().is_empty() {
+            return Err(DatabaseError::BlankModelId);
+        }
+        let mut stmt = self
+            .conn
+            .prepare_cached("DELETE FROM file_embeddings WHERE file_id = ?1 AND model_id = ?2")?;
+        let affected = stmt.execute(params![file_id, model_id])?;
+        Ok(affected > 0)
+    }
+
+    /// Search for files similar to `query` vector using cosine similarity.
+    ///
+    /// Only embeddings with the exact `model_id` are compared.
+    /// Similarity scores are computed with f64 accumulation and clamped to `[-1.0, 1.0]`.
+    /// Results are sorted descending by score, with ties broken deterministically by
+    /// ascending `file_id`, and truncated to `limit`.
+    pub fn search_similar_files(
+        &self,
+        model_id: &str,
+        query: &[f32],
+        limit: usize,
+    ) -> Result<Vec<SimilarityMatch>, DatabaseError> {
+        if model_id.trim().is_empty() {
+            return Err(DatabaseError::BlankModelId);
+        }
+        if limit == 0 {
+            return Err(DatabaseError::ZeroResultLimit);
+        }
+        if query.is_empty() {
+            return Err(DatabaseError::EmptyVector);
+        }
+        for &val in query {
+            if !val.is_finite() {
+                return Err(DatabaseError::NonFiniteVectorValue);
+            }
+        }
+        let mut query_sum_sq: f64 = 0.0;
+        for &val in query {
+            let qf = val as f64;
+            query_sum_sq += qf * qf;
+        }
+        let query_norm = query_sum_sq.sqrt();
+        if query_norm <= 0.0 || !query_norm.is_finite() {
+            return Err(DatabaseError::ZeroVectorNorm);
+        }
+
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT file_id, dimensions, embedding FROM file_embeddings WHERE model_id = ?1",
+        )?;
+        let mut rows = stmt.query([model_id])?;
+        let mut matches = Vec::new();
+
+        while let Some(row) = rows.next()? {
+            let file_id: i64 = row.get(0)?;
+            let stored_dim_i64: i64 = row.get(1)?;
+            let blob: Vec<u8> = row.get(2)?;
+
+            if stored_dim_i64 <= 0 {
+                return Err(DatabaseError::InvalidStoredDimensions {
+                    file_id,
+                    dimensions: stored_dim_i64,
+                });
+            }
+
+            let stored_dim = usize::try_from(stored_dim_i64).map_err(|_| {
+                DatabaseError::InvalidStoredDimensions {
+                    file_id,
+                    dimensions: stored_dim_i64,
+                }
+            })?;
+
+            let expected_bytes = stored_dim.checked_mul(std::mem::size_of::<f32>()).ok_or(
+                DatabaseError::InvalidStoredDimensions {
+                    file_id,
+                    dimensions: stored_dim_i64,
+                },
+            )?;
+
+            if blob.len() != expected_bytes {
+                return Err(DatabaseError::MalformedStoredBlob {
+                    file_id,
+                    dimensions: stored_dim,
+                    expected_bytes,
+                    actual_bytes: blob.len(),
+                });
+            }
+
+            if stored_dim != query.len() {
+                return Err(DatabaseError::DimensionMismatch {
+                    file_id,
+                    query: query.len(),
+                    stored: stored_dim,
+                });
+            }
+
+            let mut dot_product: f64 = 0.0;
+            let mut stored_sum_sq: f64 = 0.0;
+
+            for (i, chunk) in blob.chunks_exact(4).enumerate() {
+                let bytes: [u8; 4] =
+                    chunk
+                        .try_into()
+                        .map_err(|_| DatabaseError::MalformedStoredBlob {
+                            file_id,
+                            dimensions: stored_dim,
+                            expected_bytes,
+                            actual_bytes: blob.len(),
+                        })?;
+                let val = f32::from_le_bytes(bytes);
+                if !val.is_finite() {
+                    return Err(DatabaseError::CorruptStoredVectorValue { file_id });
+                }
+                let s_f64 = val as f64;
+                let q_f64 = query[i] as f64;
+                dot_product += q_f64 * s_f64;
+                stored_sum_sq += s_f64 * s_f64;
+            }
+
+            let stored_norm = stored_sum_sq.sqrt();
+            if stored_norm <= 0.0 || !stored_norm.is_finite() {
+                return Err(DatabaseError::CorruptStoredZeroNorm { file_id });
+            }
+
+            let denom = query_norm * stored_norm;
+            let cosine_sim = if denom <= 0.0 || !denom.is_finite() {
+                0.0
+            } else {
+                (dot_product / denom).clamp(-1.0, 1.0)
+            };
+
+            matches.push(SimilarityMatch {
+                file_id,
+                score: cosine_sim as f32,
+            });
+        }
+
+        matches.sort_by(|a, b| {
+            b.score
+                .total_cmp(&a.score)
+                .then_with(|| a.file_id.cmp(&b.file_id))
+        });
+        matches.truncate(limit);
+
+        Ok(matches)
+    }
+
+    /// Retrieve the stored embedding vector for a given file and model.
+    pub fn get_file_embedding(
+        &self,
+        file_id: i64,
+        model_id: &str,
+    ) -> Result<Option<Vec<f32>>, DatabaseError> {
+        if model_id.trim().is_empty() {
+            return Err(DatabaseError::BlankModelId);
+        }
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT dimensions, embedding FROM file_embeddings WHERE file_id = ?1 AND model_id = ?2 LIMIT 1",
+        )?;
+        let mut rows = stmt.query(params![file_id, model_id])?;
+        if let Some(row) = rows.next()? {
+            let stored_dim_i64: i64 = row.get(0)?;
+            let blob: Vec<u8> = row.get(1)?;
+
+            if stored_dim_i64 <= 0 {
+                return Err(DatabaseError::InvalidStoredDimensions {
+                    file_id,
+                    dimensions: stored_dim_i64,
+                });
+            }
+
+            let stored_dim = usize::try_from(stored_dim_i64).map_err(|_| {
+                DatabaseError::InvalidStoredDimensions {
+                    file_id,
+                    dimensions: stored_dim_i64,
+                }
+            })?;
+
+            let expected_bytes = stored_dim.checked_mul(std::mem::size_of::<f32>()).ok_or(
+                DatabaseError::InvalidStoredDimensions {
+                    file_id,
+                    dimensions: stored_dim_i64,
+                },
+            )?;
+
+            if blob.len() != expected_bytes {
+                return Err(DatabaseError::MalformedStoredBlob {
+                    file_id,
+                    dimensions: stored_dim,
+                    expected_bytes,
+                    actual_bytes: blob.len(),
+                });
+            }
+
+            let mut vec = Vec::with_capacity(stored_dim);
+            for chunk in blob.chunks_exact(4) {
+                let bytes: [u8; 4] =
+                    chunk
+                        .try_into()
+                        .map_err(|_| DatabaseError::MalformedStoredBlob {
+                            file_id,
+                            dimensions: stored_dim,
+                            expected_bytes,
+                            actual_bytes: blob.len(),
+                        })?;
+                let val = f32::from_le_bytes(bytes);
+                if !val.is_finite() {
+                    return Err(DatabaseError::CorruptStoredVectorValue { file_id });
+                }
+                vec.push(val);
+            }
+            Ok(Some(vec))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// List all model IDs for which embeddings exist for a given file.
+    pub fn get_file_embedding_models(&self, file_id: i64) -> Result<Vec<String>, DatabaseError> {
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT model_id FROM file_embeddings WHERE file_id = ?1 ORDER BY model_id ASC",
+        )?;
+        let rows = stmt.query_map([file_id], |r| r.get(0))?;
+        let mut models = Vec::new();
+        for m in rows {
+            models.push(m?);
+        }
+        Ok(models)
+    }
+
+    /// Find files visually similar to an existing indexed file.
+    ///
+    /// If `model_id` is provided, that model's embedding is used. If `None`, the first
+    /// available model embedding associated with `file_id` is used.
+    /// Returns up to `limit` matches, excluding the source file itself.
+    pub fn find_similar_to_file(
+        &self,
+        file_id: i64,
+        model_id: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<SimilarityMatch>, DatabaseError> {
+        if limit == 0 {
+            return Err(DatabaseError::ZeroResultLimit);
+        }
+
+        let model = match model_id {
+            Some(m) => {
+                if m.trim().is_empty() {
+                    return Err(DatabaseError::BlankModelId);
+                }
+                m.to_string()
+            }
+            None => {
+                let models = self.get_file_embedding_models(file_id)?;
+                if models.is_empty() {
+                    return Ok(vec![]);
+                }
+                models[0].clone()
+            }
+        };
+
+        let embedding = match self.get_file_embedding(file_id, &model)? {
+            Some(vec) => vec,
+            None => return Ok(vec![]),
+        };
+
+        // Query with limit + 1 so we can filter out the source file if returned
+        let search_limit = limit.saturating_add(1);
+        let mut matches = self.search_similar_files(&model, &embedding, search_limit)?;
+        matches.retain(|m| m.file_id != file_id);
+        matches.truncate(limit);
+
+        Ok(matches)
+    }
+
+    /// Returns the embedding index statistics for a given model:
+    /// `(indexed_count, total_count)` where `total_count` is the total number of images in `files`.
+    pub fn get_embedding_index_stats(
+        &self,
+        model_id: &str,
+    ) -> Result<(usize, usize), DatabaseError> {
+        if model_id.trim().is_empty() {
+            return Err(DatabaseError::BlankModelId);
+        }
+
+        let total_count: i64 = self
+            .conn
+            .query_row("SELECT COUNT(*) FROM files", [], |row| row.get(0))?;
+
+        let indexed_count: i64 = self.conn.query_row(
+            "SELECT COUNT(*) FROM file_embeddings WHERE model_id = ?1",
+            [model_id],
+            |row| row.get(0),
+        )?;
+
+        Ok((indexed_count as usize, total_count as usize))
+    }
+
+    /// Returns files that have not yet been indexed by `model_id`, up to `limit`.
+    pub fn get_unindexed_files(
+        &self,
+        model_id: &str,
+        limit: usize,
+    ) -> Result<Vec<ImageFile>, DatabaseError> {
+        if model_id.trim().is_empty() {
+            return Err(DatabaseError::BlankModelId);
+        }
+        if limit == 0 {
+            return Err(DatabaseError::ZeroResultLimit);
+        }
+
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT id, folder_id, path, container, size_bytes, modified_at, metadata, rating, aesthetic_score, is_favorite, is_nsfw
+             FROM files
+             WHERE id NOT IN (SELECT file_id FROM file_embeddings WHERE model_id = ?1)
+             ORDER BY id ASC
+             LIMIT ?2",
+        )?;
+
+        let rows = stmt.query_and_then(rusqlite::params![model_id, limit as i64], Self::map_row)?;
+
+        rows.collect()
     }
 }
 
@@ -2124,5 +2589,676 @@ mod tests {
         let backup_db = Database::connect(&backup_path).unwrap();
         let backup_stats = backup_db.get_database_stats().unwrap();
         assert_eq!(backup_stats.file_count, 1);
+    }
+
+    // --- File Embeddings and Similarity Search Tests ---
+
+    #[test]
+    fn migration_reaches_schema_version_7() {
+        let db = Database::connect_in_memory().unwrap();
+        assert_eq!(db.user_version().unwrap(), 7);
+        assert_eq!(LATEST_VERSION, 7);
+    }
+
+    #[test]
+    fn file_embeddings_table_and_model_index_exist() {
+        let db = Database::connect_in_memory().unwrap();
+        let table_exists: bool = db
+            .conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'file_embeddings')",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(table_exists);
+
+        let index_exists: bool = db
+            .conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = 'idx_file_embeddings_model')",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(index_exists);
+    }
+
+    #[test]
+    fn foreign_key_cascade_cleanup() {
+        let db = Database::connect_in_memory().unwrap();
+        let folder = db.add_folder("/test_folder").unwrap();
+        let file_id = db
+            .upsert_file(&image(folder.id, "/test_folder/img1.png"))
+            .unwrap();
+
+        db.upsert_file_embedding(file_id, "clip-vit-b32", &[1.0, 0.0, 0.0])
+            .unwrap();
+        db.upsert_file_embedding(file_id, "siglip-base", &[0.0, 1.0, 0.0])
+            .unwrap();
+
+        let count: i64 = db
+            .conn
+            .query_row(
+                "SELECT count(*) FROM file_embeddings WHERE file_id = ?1",
+                params![file_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 2);
+
+        // Deleting the file should cascade-delete all of its embeddings
+        db.delete_file_by_path("/test_folder/img1.png").unwrap();
+
+        let count_after: i64 = db
+            .conn
+            .query_row(
+                "SELECT count(*) FROM file_embeddings WHERE file_id = ?1",
+                params![file_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count_after, 0);
+
+        // Also test folder removal cascades through files to embeddings
+        let file2_id = db
+            .upsert_file(&image(folder.id, "/test_folder/img2.png"))
+            .unwrap();
+        db.upsert_file_embedding(file2_id, "clip-vit-b32", &[1.0, 1.0, 1.0])
+            .unwrap();
+        db.remove_folder(folder.id).unwrap();
+
+        let count_folder_after: i64 = db
+            .conn
+            .query_row(
+                "SELECT count(*) FROM file_embeddings WHERE file_id = ?1",
+                params![file2_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count_folder_after, 0);
+    }
+
+    #[test]
+    fn embedding_insertion() {
+        let db = Database::connect_in_memory().unwrap();
+        let folder = db.add_folder("/test_folder").unwrap();
+        let file_id = db
+            .upsert_file(&image(folder.id, "/test_folder/img.png"))
+            .unwrap();
+
+        let vec = [0.1f32, 0.2, 0.3, 0.4];
+        db.upsert_file_embedding(file_id, "test-model", &vec)
+            .unwrap();
+
+        let matches = db.search_similar_files("test-model", &vec, 10).unwrap();
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].file_id, file_id);
+        assert!((matches[0].score - 1.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn upsert_replacement() {
+        let db = Database::connect_in_memory().unwrap();
+        let folder = db.add_folder("/test_folder").unwrap();
+        let file_id = db
+            .upsert_file(&image(folder.id, "/test_folder/img.png"))
+            .unwrap();
+
+        db.upsert_file_embedding(file_id, "clip", &[1.0, 0.0])
+            .unwrap();
+
+        // Stored dimensions = 2
+        let (dim, blob, _updated_at_1): (i64, Vec<u8>, String) = db
+            .conn
+            .query_row(
+                "SELECT dimensions, embedding, updated_at FROM file_embeddings WHERE file_id = ?1 AND model_id = ?2",
+                params![file_id, "clip"],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(dim, 2);
+        assert_eq!(blob.len(), 8);
+
+        // Replace with 3-dimensional vector
+        // Update updated_at to a past timestamp first to ensure refreshed timestamp differs
+        db.conn
+            .execute(
+                "UPDATE file_embeddings SET updated_at = '2000-01-01T00:00:00.000Z' WHERE file_id = ?1 AND model_id = ?2",
+                params![file_id, "clip"],
+            )
+            .unwrap();
+
+        db.upsert_file_embedding(file_id, "clip", &[0.0, 1.0, 0.0])
+            .unwrap();
+
+        let (dim2, blob2, updated_at_2): (i64, Vec<u8>, String) = db
+            .conn
+            .query_row(
+                "SELECT dimensions, embedding, updated_at FROM file_embeddings WHERE file_id = ?1 AND model_id = ?2",
+                params![file_id, "clip"],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(dim2, 3);
+        assert_eq!(blob2.len(), 12);
+        assert_ne!(updated_at_2, "2000-01-01T00:00:00.000Z");
+
+        // Verify search with new vector matches score ~ 1.0
+        let matches = db
+            .search_similar_files("clip", &[0.0, 1.0, 0.0], 10)
+            .unwrap();
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].file_id, file_id);
+        assert!((matches[0].score - 1.0).abs() < 1e-5);
+    }
+
+    #[test]
+    fn independent_embeddings_for_different_models() {
+        let db = Database::connect_in_memory().unwrap();
+        let folder = db.add_folder("/test_folder").unwrap();
+        let file_id = db
+            .upsert_file(&image(folder.id, "/test_folder/img.png"))
+            .unwrap();
+
+        db.upsert_file_embedding(file_id, "model-a", &[1.0, 0.0])
+            .unwrap();
+        db.upsert_file_embedding(file_id, "model-b", &[0.0, 1.0])
+            .unwrap();
+
+        let matches_a = db.search_similar_files("model-a", &[1.0, 0.0], 10).unwrap();
+        assert_eq!(matches_a.len(), 1);
+        assert_eq!(matches_a[0].file_id, file_id);
+        assert!((matches_a[0].score - 1.0).abs() < 1e-5);
+
+        let matches_b = db.search_similar_files("model-b", &[0.0, 1.0], 10).unwrap();
+        assert_eq!(matches_b.len(), 1);
+        assert_eq!(matches_b[0].file_id, file_id);
+        assert!((matches_b[0].score - 1.0).abs() < 1e-5);
+
+        // Removing model-a leaves model-b intact
+        assert!(db.remove_file_embedding(file_id, "model-a").unwrap());
+        assert_eq!(
+            db.search_similar_files("model-a", &[1.0, 0.0], 10).unwrap(),
+            vec![]
+        );
+        let matches_b_still = db.search_similar_files("model-b", &[0.0, 1.0], 10).unwrap();
+        assert_eq!(matches_b_still.len(), 1);
+    }
+
+    #[test]
+    fn removal_and_removal_of_missing_row() {
+        let db = Database::connect_in_memory().unwrap();
+        let folder = db.add_folder("/test_folder").unwrap();
+        let file_id = db
+            .upsert_file(&image(folder.id, "/test_folder/img.png"))
+            .unwrap();
+
+        // Removing missing row returns Ok(false)
+        assert!(!db.remove_file_embedding(file_id, "clip").unwrap());
+        assert!(!db.remove_file_embedding(99999, "clip").unwrap());
+
+        // Insert and remove
+        db.upsert_file_embedding(file_id, "clip", &[1.0, 2.0])
+            .unwrap();
+        assert!(db.remove_file_embedding(file_id, "clip").unwrap());
+        // Removing again returns Ok(false)
+        assert!(!db.remove_file_embedding(file_id, "clip").unwrap());
+    }
+
+    #[test]
+    fn cosine_similarity_ranking() {
+        let db = Database::connect_in_memory().unwrap();
+        let folder = db.add_folder("/test_folder").unwrap();
+
+        let id1 = db
+            .upsert_file(&image(folder.id, "/test_folder/img1.png"))
+            .unwrap();
+        let id2 = db
+            .upsert_file(&image(folder.id, "/test_folder/img2.png"))
+            .unwrap();
+        let id3 = db
+            .upsert_file(&image(folder.id, "/test_folder/img3.png"))
+            .unwrap();
+        let id4 = db
+            .upsert_file(&image(folder.id, "/test_folder/img4.png"))
+            .unwrap();
+
+        // Vector 1: identical direction to query [1.0, 0.0] -> cosine = 1.0
+        db.upsert_file_embedding(id1, "clip", &[10.0, 0.0]).unwrap();
+        // Vector 2: 45 degrees [1.0, 1.0] -> cosine ~ 0.7071
+        db.upsert_file_embedding(id2, "clip", &[1.0, 1.0]).unwrap();
+        // Vector 3: orthogonal [0.0, 5.0] -> cosine = 0.0
+        db.upsert_file_embedding(id3, "clip", &[0.0, 5.0]).unwrap();
+        // Vector 4: opposite direction [-2.0, 0.0] -> cosine = -1.0
+        db.upsert_file_embedding(id4, "clip", &[-2.0, 0.0]).unwrap();
+
+        let matches = db.search_similar_files("clip", &[1.0, 0.0], 10).unwrap();
+        assert_eq!(matches.len(), 4);
+        assert_eq!(matches[0].file_id, id1);
+        assert!((matches[0].score - 1.0).abs() < 1e-5);
+        assert_eq!(matches[1].file_id, id2);
+        assert!((matches[1].score - (2.0f32.sqrt() / 2.0)).abs() < 1e-5);
+        assert_eq!(matches[2].file_id, id3);
+        assert!((matches[2].score - 0.0).abs() < 1e-5);
+        assert_eq!(matches[3].file_id, id4);
+        assert!((matches[3].score - (-1.0)).abs() < 1e-5);
+    }
+
+    #[test]
+    fn deterministic_tie_ordering_by_file_id() {
+        let db = Database::connect_in_memory().unwrap();
+        let folder = db.add_folder("/test_folder").unwrap();
+
+        let id_a = db
+            .upsert_file(&image(folder.id, "/test_folder/a.png"))
+            .unwrap();
+        let id_b = db
+            .upsert_file(&image(folder.id, "/test_folder/b.png"))
+            .unwrap();
+        let id_c = db
+            .upsert_file(&image(folder.id, "/test_folder/c.png"))
+            .unwrap();
+
+        // Ensure IDs are strictly increasing
+        assert!(id_a < id_b);
+        assert!(id_b < id_c);
+
+        // Insert identical vectors for all three
+        db.upsert_file_embedding(id_c, "clip", &[1.0, 0.0]).unwrap();
+        db.upsert_file_embedding(id_a, "clip", &[1.0, 0.0]).unwrap();
+        db.upsert_file_embedding(id_b, "clip", &[1.0, 0.0]).unwrap();
+
+        let matches = db.search_similar_files("clip", &[1.0, 0.0], 10).unwrap();
+        assert_eq!(matches.len(), 3);
+        assert_eq!(matches[0].file_id, id_a);
+        assert_eq!(matches[1].file_id, id_b);
+        assert_eq!(matches[2].file_id, id_c);
+    }
+
+    #[test]
+    fn result_limits() {
+        let db = Database::connect_in_memory().unwrap();
+        let folder = db.add_folder("/test_folder").unwrap();
+
+        for i in 1..=5 {
+            let id = db
+                .upsert_file(&image(folder.id, &format!("/test_folder/img{i}.png")))
+                .unwrap();
+            db.upsert_file_embedding(id, "clip", &[i as f32, 1.0])
+                .unwrap();
+        }
+
+        let matches = db.search_similar_files("clip", &[1.0, 0.0], 2).unwrap();
+        assert_eq!(matches.len(), 2);
+    }
+
+    #[test]
+    fn dimension_mismatch() {
+        let db = Database::connect_in_memory().unwrap();
+        let folder = db.add_folder("/test_folder").unwrap();
+        let file_id = db
+            .upsert_file(&image(folder.id, "/test_folder/img.png"))
+            .unwrap();
+
+        db.upsert_file_embedding(file_id, "clip", &[1.0, 2.0, 3.0])
+            .unwrap();
+
+        let err = db
+            .search_similar_files("clip", &[1.0, 2.0], 10)
+            .unwrap_err();
+        match err {
+            DatabaseError::DimensionMismatch {
+                file_id: matched_id,
+                query,
+                stored,
+            } => {
+                assert_eq!(matched_id, file_id);
+                assert_eq!(query, 2);
+                assert_eq!(stored, 3);
+            }
+            other => panic!("expected DimensionMismatch, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn blank_model_ids() {
+        let db = Database::connect_in_memory().unwrap();
+        let folder = db.add_folder("/test_folder").unwrap();
+        let file_id = db
+            .upsert_file(&image(folder.id, "/test_folder/img.png"))
+            .unwrap();
+
+        for blank in ["", "   ", "\t\n"] {
+            assert!(matches!(
+                db.upsert_file_embedding(file_id, blank, &[1.0]),
+                Err(DatabaseError::BlankModelId)
+            ));
+            assert!(matches!(
+                db.remove_file_embedding(file_id, blank),
+                Err(DatabaseError::BlankModelId)
+            ));
+            assert!(matches!(
+                db.search_similar_files(blank, &[1.0], 10),
+                Err(DatabaseError::BlankModelId)
+            ));
+        }
+    }
+
+    #[test]
+    fn empty_non_finite_and_zero_norm_vectors() {
+        let db = Database::connect_in_memory().unwrap();
+        let folder = db.add_folder("/test_folder").unwrap();
+        let file_id = db
+            .upsert_file(&image(folder.id, "/test_folder/img.png"))
+            .unwrap();
+
+        // Empty vector
+        assert!(matches!(
+            db.upsert_file_embedding(file_id, "clip", &[]),
+            Err(DatabaseError::EmptyVector)
+        ));
+        assert!(matches!(
+            db.search_similar_files("clip", &[], 10),
+            Err(DatabaseError::EmptyVector)
+        ));
+
+        // Non-finite values
+        assert!(matches!(
+            db.upsert_file_embedding(file_id, "clip", &[1.0, f32::NAN]),
+            Err(DatabaseError::NonFiniteVectorValue)
+        ));
+        assert!(matches!(
+            db.upsert_file_embedding(file_id, "clip", &[1.0, f32::INFINITY]),
+            Err(DatabaseError::NonFiniteVectorValue)
+        ));
+        assert!(matches!(
+            db.upsert_file_embedding(file_id, "clip", &[1.0, f32::NEG_INFINITY]),
+            Err(DatabaseError::NonFiniteVectorValue)
+        ));
+        assert!(matches!(
+            db.search_similar_files("clip", &[1.0, f32::NAN], 10),
+            Err(DatabaseError::NonFiniteVectorValue)
+        ));
+        assert!(matches!(
+            db.search_similar_files("clip", &[1.0, f32::INFINITY], 10),
+            Err(DatabaseError::NonFiniteVectorValue)
+        ));
+
+        // Zero-norm vector
+        assert!(matches!(
+            db.upsert_file_embedding(file_id, "clip", &[0.0, 0.0]),
+            Err(DatabaseError::ZeroVectorNorm)
+        ));
+        assert!(matches!(
+            db.search_similar_files("clip", &[0.0, 0.0], 10),
+            Err(DatabaseError::ZeroVectorNorm)
+        ));
+    }
+
+    #[test]
+    fn zero_limit() {
+        let db = Database::connect_in_memory().unwrap();
+        let err = db.search_similar_files("clip", &[1.0, 2.0], 0).unwrap_err();
+        assert!(matches!(err, DatabaseError::ZeroResultLimit));
+    }
+
+    #[test]
+    fn malformed_stored_blob_data() {
+        let db = Database::connect_in_memory().unwrap();
+        let folder = db.add_folder("/test_folder").unwrap();
+        let file_id = db
+            .upsert_file(&image(folder.id, "/test_folder/img.png"))
+            .unwrap();
+
+        // Insert row with dimensions = 2 (expected 8 bytes), but blob has only 5 bytes
+        let malformed_blob = vec![1u8, 2, 3, 4, 5];
+        db.conn
+            .execute(
+                "INSERT INTO file_embeddings (file_id, model_id, dimensions, embedding) VALUES (?1, ?2, ?3, ?4)",
+                params![file_id, "clip", 2i64, malformed_blob],
+            )
+            .unwrap();
+
+        let err = db
+            .search_similar_files("clip", &[1.0, 0.0], 10)
+            .unwrap_err();
+        match err {
+            DatabaseError::MalformedStoredBlob {
+                file_id: err_file_id,
+                dimensions,
+                expected_bytes,
+                actual_bytes,
+            } => {
+                assert_eq!(err_file_id, file_id);
+                assert_eq!(dimensions, 2);
+                assert_eq!(expected_bytes, 8);
+                assert_eq!(actual_bytes, 5);
+            }
+            other => panic!("expected MalformedStoredBlob, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn corrupt_stored_dimensions_or_values() {
+        let db = Database::connect_in_memory().unwrap();
+        let folder = db.add_folder("/test_folder").unwrap();
+        let file_id = db
+            .upsert_file(&image(folder.id, "/test_folder/img.png"))
+            .unwrap();
+
+        // Test 1: Corrupt stored dimensions <= 0 (disable check constraints temporarily)
+        db.conn
+            .execute("PRAGMA ignore_check_constraints = ON", [])
+            .unwrap();
+        db.conn
+            .execute(
+                "INSERT INTO file_embeddings (file_id, model_id, dimensions, embedding) VALUES (?1, ?2, ?3, ?4)",
+                params![file_id, "corrupt-dim", 0i64, vec![]],
+            )
+            .unwrap();
+        db.conn
+            .execute("PRAGMA ignore_check_constraints = OFF", [])
+            .unwrap();
+
+        let err_dim = db
+            .search_similar_files("corrupt-dim", &[1.0, 0.0], 10)
+            .unwrap_err();
+        assert!(matches!(
+            err_dim,
+            DatabaseError::InvalidStoredDimensions {
+                file_id: f_id,
+                dimensions: 0,
+            } if f_id == file_id
+        ));
+
+        // Test 2: Corrupt stored non-finite float value (NaN)
+        let mut nan_blob = Vec::new();
+        nan_blob.extend_from_slice(&f32::NAN.to_le_bytes());
+        nan_blob.extend_from_slice(&1.0f32.to_le_bytes());
+        db.conn
+            .execute(
+                "INSERT INTO file_embeddings (file_id, model_id, dimensions, embedding) VALUES (?1, ?2, ?3, ?4)",
+                params![file_id, "corrupt-val", 2i64, nan_blob],
+            )
+            .unwrap();
+
+        let err_val = db
+            .search_similar_files("corrupt-val", &[1.0, 0.0], 10)
+            .unwrap_err();
+        assert!(matches!(
+            err_val,
+            DatabaseError::CorruptStoredVectorValue { file_id: f_id } if f_id == file_id
+        ));
+
+        // Test 3: Corrupt stored zero-norm vector
+        let mut zero_blob = Vec::new();
+        zero_blob.extend_from_slice(&0.0f32.to_le_bytes());
+        zero_blob.extend_from_slice(&0.0f32.to_le_bytes());
+        db.conn
+            .execute(
+                "INSERT INTO file_embeddings (file_id, model_id, dimensions, embedding) VALUES (?1, ?2, ?3, ?4)",
+                params![file_id, "zero-norm", 2i64, zero_blob],
+            )
+            .unwrap();
+
+        let err_norm = db
+            .search_similar_files("zero-norm", &[1.0, 0.0], 10)
+            .unwrap_err();
+        assert!(matches!(
+            err_norm,
+            DatabaseError::CorruptStoredZeroNorm { file_id: f_id } if f_id == file_id
+        ));
+    }
+
+    #[test]
+    fn get_file_by_id_works() {
+        let db = Database::connect_in_memory().unwrap();
+        let folder = db.add_folder("/test_folder").unwrap();
+        let file_id = db
+            .upsert_file(&image(folder.id, "/test_folder/img1.png"))
+            .unwrap();
+
+        let file = db.get_file_by_id(file_id).unwrap().expect("file exists");
+        assert_eq!(file.id, Some(file_id));
+        assert_eq!(file.path, "/test_folder/img1.png");
+
+        assert!(db.get_file_by_id(9999).unwrap().is_none());
+    }
+
+    #[test]
+    fn get_file_embedding_and_models_and_find_similar_to_file() {
+        let db = Database::connect_in_memory().unwrap();
+        let folder = db.add_folder("/test_folder").unwrap();
+
+        let id1 = db
+            .upsert_file(&image(folder.id, "/test_folder/img1.png"))
+            .unwrap();
+        let id2 = db
+            .upsert_file(&image(folder.id, "/test_folder/img2.png"))
+            .unwrap();
+        let id3 = db
+            .upsert_file(&image(folder.id, "/test_folder/img3.png"))
+            .unwrap();
+
+        db.upsert_file_embedding(id1, "clip-vit-b32", &[1.0, 0.0])
+            .unwrap();
+        db.upsert_file_embedding(id1, "siglip-base", &[0.0, 1.0])
+            .unwrap();
+        db.upsert_file_embedding(id2, "clip-vit-b32", &[0.9, 0.1])
+            .unwrap();
+        db.upsert_file_embedding(id3, "clip-vit-b32", &[0.0, 1.0])
+            .unwrap();
+
+        // Check get_file_embedding
+        let emb1 = db
+            .get_file_embedding(id1, "clip-vit-b32")
+            .unwrap()
+            .expect("embedding exists");
+        assert_eq!(emb1, vec![1.0, 0.0]);
+        assert!(db
+            .get_file_embedding(id1, "nonexistent-model")
+            .unwrap()
+            .is_none());
+        assert!(db
+            .get_file_embedding(9999, "clip-vit-b32")
+            .unwrap()
+            .is_none());
+
+        // Check get_file_embedding_models
+        let models1 = db.get_file_embedding_models(id1).unwrap();
+        assert_eq!(models1, vec!["clip-vit-b32", "siglip-base"]);
+        let models_none = db.get_file_embedding_models(9999).unwrap();
+        assert!(models_none.is_empty());
+
+        // Check find_similar_to_file: id1 should find id2 (high score) and id3 (orthogonal), but NOT id1 itself
+        let similar = db
+            .find_similar_to_file(id1, Some("clip-vit-b32"), 10)
+            .unwrap();
+        assert_eq!(similar.len(), 2);
+        assert_eq!(similar[0].file_id, id2);
+        assert_eq!(similar[1].file_id, id3);
+        assert!(similar.iter().all(|m| m.file_id != id1));
+
+        // When model_id is None, it defaults to the first available model
+        let similar_auto = db.find_similar_to_file(id1, None, 10).unwrap();
+        assert_eq!(similar_auto.len(), 2);
+        assert_eq!(similar_auto[0].file_id, id2);
+
+        // Limit works
+        let similar_limited = db
+            .find_similar_to_file(id1, Some("clip-vit-b32"), 1)
+            .unwrap();
+        assert_eq!(similar_limited.len(), 1);
+        assert_eq!(similar_limited[0].file_id, id2);
+
+        // When file has no embeddings
+        let id_empty = db
+            .upsert_file(&image(folder.id, "/test_folder/no_emb.png"))
+            .unwrap();
+        let similar_empty = db.find_similar_to_file(id_empty, None, 10).unwrap();
+        assert!(similar_empty.is_empty());
+    }
+
+    #[test]
+    fn get_or_create_tag_works() {
+        let db = Database::connect_in_memory().unwrap();
+        let tag1 = db.get_or_create_tag("1girl", Some("#ff00ff")).unwrap();
+        assert_eq!(tag1.name, "1girl");
+        assert_eq!(tag1.color.as_deref(), Some("#ff00ff"));
+
+        // Second call should return existing tag without duplicate error
+        let tag2 = db.get_or_create_tag("1girl", None).unwrap();
+        assert_eq!(tag1.id, tag2.id);
+        assert_eq!(tag2.name, "1girl");
+
+        // Case-insensitive match
+        let tag3 = db.get_or_create_tag("1GIRL", None).unwrap();
+        assert_eq!(tag1.id, tag3.id);
+    }
+
+    #[test]
+    fn get_embedding_index_stats_and_unindexed_files_works() {
+        let db = Database::connect_in_memory().unwrap();
+        let folder = db.add_folder("/test_folder").unwrap();
+
+        let id1 = db
+            .upsert_file(&image(folder.id, "/test_folder/img1.png"))
+            .unwrap();
+        let id2 = db
+            .upsert_file(&image(folder.id, "/test_folder/img2.png"))
+            .unwrap();
+        let id3 = db
+            .upsert_file(&image(folder.id, "/test_folder/img3.png"))
+            .unwrap();
+
+        let (indexed, total) = db.get_embedding_index_stats("clip-vit-b32").unwrap();
+        assert_eq!(total, 3);
+        assert_eq!(indexed, 0);
+
+        let unindexed = db.get_unindexed_files("clip-vit-b32", 10).unwrap();
+        assert_eq!(unindexed.len(), 3);
+        assert_eq!(unindexed[0].id, Some(id1));
+        assert_eq!(unindexed[1].id, Some(id2));
+        assert_eq!(unindexed[2].id, Some(id3));
+
+        // Index 2 of them
+        db.upsert_file_embedding(id1, "clip-vit-b32", &[1.0, 0.0])
+            .unwrap();
+        db.upsert_file_embedding(id3, "clip-vit-b32", &[0.0, 1.0])
+            .unwrap();
+
+        let (indexed, total) = db.get_embedding_index_stats("clip-vit-b32").unwrap();
+        assert_eq!(total, 3);
+        assert_eq!(indexed, 2);
+
+        let unindexed_after = db.get_unindexed_files("clip-vit-b32", 10).unwrap();
+        assert_eq!(unindexed_after.len(), 1);
+        assert_eq!(unindexed_after[0].id, Some(id2));
+
+        // Limit works
+        let unindexed_limit = db.get_unindexed_files("clip-vit-b32", 1).unwrap();
+        assert_eq!(unindexed_limit.len(), 1);
+        assert_eq!(unindexed_limit[0].id, Some(id2));
     }
 }

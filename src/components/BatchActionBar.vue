@@ -14,6 +14,7 @@ const emit = defineEmits<{
   (e: "rateSelected", rating: number | null): void;
   (e: "addToAlbum"): void;
   (e: "tagSelected"): void;
+  (e: "autoTagSelected"): void;
   (e: "toggleFavorite", isFavorite: boolean): void;
   (e: "toggleNsfw", isNsfw: boolean): void;
   (e: "moveSelected"): void;
@@ -133,6 +134,16 @@ function onSetRating(rating: number | null) {
           @click="emit('tagSelected')"
         >
           🏷 {{ t.batch.tag }}
+        </button>
+
+        <!-- Auto-Tag (WD14) -->
+        <button
+          type="button"
+          class="action-btn"
+          title="Auto-tag selected images with WD14"
+          @click="emit('autoTagSelected')"
+        >
+          🤖 {{ t.batch.batchAutoTag }}
         </button>
 
         <!-- Favorite -->
