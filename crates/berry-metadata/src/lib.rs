@@ -16,6 +16,7 @@ pub mod easydiffusion;
 pub mod exif;
 pub mod fooocus;
 pub mod invokeai;
+pub mod lora;
 pub mod novelai;
 pub mod parameters;
 pub mod pnginfo;
