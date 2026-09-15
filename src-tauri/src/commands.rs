@@ -10,8 +10,8 @@ use std::sync::MutexGuard;
 
 use berry_clip::{ClipEngine, ClipModelInfo};
 use berry_domain::{
-    Album, CheckpointModelStat, DatabaseStats, FileSortField, Folder, ImageFile, ModelCacheEntry,
-    PromptStat, SearchCriteria, SimilarityMatch, SortDirection, Tag,
+    Album, CheckpointModelStat, DatabaseStats, DetectedLora, FileSortField, Folder, ImageFile,
+    LoraModel, ModelCacheEntry, PromptStat, SearchCriteria, SimilarityMatch, SortDirection, Tag,
 };
 use berry_scan::{ScanStats, Scanner};
 use berry_storage::Database;
@@ -1605,4 +1605,250 @@ pub fn search_by_text_prompt(
         .map_err(|e| e.to_string())?;
 
     Ok(results)
+}
+
+/// Helper to strip basic HTML tags from descriptions (e.g. Civitai info).
+fn strip_html_tags(input: &str) -> String {
+    let mut result = String::with_capacity(input.len());
+    let mut inside = false;
+    for c in input.chars() {
+        match c {
+            '<' => inside = true,
+            '>' => inside = false,
+            _ if !inside => result.push(c),
+            _ => {}
+        }
+    }
+    result
+        .replace("&nbsp;", " ")
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .trim()
+        .to_string()
+}
+
+/// List all saved LoRAs from the database catalog.
+#[tauri::command]
+pub fn list_loras(state: State<'_, AppState>) -> Result<Vec<LoraModel>, String> {
+    let database = db(&state)?;
+    database.list_loras().map_err(|e| e.to_string())
+}
+
+/// Retrieve a single LoRA by its ID.
+#[tauri::command]
+pub fn get_lora(id: i64, state: State<'_, AppState>) -> Result<Option<LoraModel>, String> {
+    let database = db(&state)?;
+    database.get_lora(id).map_err(|e| e.to_string())
+}
+
+/// Save (create or update) a LoRA entry in the catalog.
+#[tauri::command]
+pub fn save_lora(lora: LoraModel, state: State<'_, AppState>) -> Result<LoraModel, String> {
+    let database = db(&state)?;
+    database.save_lora(&lora).map_err(|e| e.to_string())
+}
+
+/// Delete a LoRA entry by ID.
+#[tauri::command]
+pub fn delete_lora(id: i64, state: State<'_, AppState>) -> Result<bool, String> {
+    let database = db(&state)?;
+    database.delete_lora(id).map_err(|e| e.to_string())
+}
+
+/// Extract all LoRAs detected in an image's prompt or ComfyUI workflow graph,
+/// resolving any known trigger words and details from the local LoRA database.
+#[tauri::command]
+pub fn get_image_detected_loras(
+    file_id: i64,
+    state: State<'_, AppState>,
+) -> Result<Vec<DetectedLora>, String> {
+    let database = db(&state)?;
+    let file = database
+        .get_file_by_id(file_id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| format!("File not found with id {file_id}"))?;
+
+    let mut detected = Vec::new();
+    if let Some(ref meta) = file.metadata {
+        detected = berry_metadata::lora::extract_loras(
+            meta.prompt.as_deref(),
+            meta.raw.as_deref().or(meta.parameters.as_deref()),
+        );
+        for l in &mut detected {
+            if let Ok(Some(m)) = database.find_lora_by_name_or_hash(&l.name) {
+                l.model = Some(m);
+            }
+        }
+    }
+    Ok(detected)
+}
+
+/// Parse a `.civitai.info` or JSON metadata sidecar file and save it to the LoRA database.
+#[tauri::command]
+pub fn import_lora_civitai_info(
+    file_path: String,
+    state: State<'_, AppState>,
+) -> Result<LoraModel, String> {
+    let path = Path::new(&file_path);
+    if !path.is_file() {
+        return Err(format!("File does not exist: {file_path}"));
+    }
+
+    let content = std::fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read LoRA metadata file: {e}"))?;
+
+    let root: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("Invalid JSON in LoRA metadata file: {e}"))?;
+
+    // Model name resolution
+    let name = root
+        .get("model")
+        .and_then(|m| m.get("name"))
+        .and_then(|v| v.as_str())
+        .or_else(|| {
+            root.get("files")
+                .and_then(|f| f.as_array())
+                .and_then(|arr| arr.first())
+                .and_then(|f0| f0.get("name"))
+                .and_then(|v| v.as_str())
+        })
+        .or_else(|| root.get("name").and_then(|v| v.as_str()))
+        .map(berry_metadata::lora::clean_lora_name)
+        .unwrap_or_else(|| {
+            let stem = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unknown_lora");
+            berry_metadata::lora::clean_lora_name(stem)
+        });
+
+    if name.is_empty() {
+        return Err("Could not resolve a valid LoRA name from metadata".to_string());
+    }
+
+    // Trigger words / activation tags
+    let mut trigger_words: Vec<String> = Vec::new();
+    if let Some(words) = root.get("trainedWords").and_then(|v| v.as_array()) {
+        for w in words {
+            if let Some(s) = w.as_str() {
+                let trimmed = s.trim();
+                if !trimmed.is_empty()
+                    && !trigger_words
+                        .iter()
+                        .any(|t| t.eq_ignore_ascii_case(trimmed))
+                {
+                    trigger_words.push(trimmed.to_string());
+                }
+            }
+        }
+    } else if let Some(act_text) = root
+        .get("activation text")
+        .or_else(|| root.get("trigger_words"))
+        .and_then(|v| v.as_str())
+    {
+        for part in act_text.split(',') {
+            let trimmed = part.trim();
+            if !trimmed.is_empty()
+                && !trigger_words
+                    .iter()
+                    .any(|t| t.eq_ignore_ascii_case(trimmed))
+            {
+                trigger_words.push(trimmed.to_string());
+            }
+        }
+    }
+
+    // Hash resolution
+    let hash = root
+        .get("files")
+        .and_then(|f| f.as_array())
+        .and_then(|arr| arr.first())
+        .and_then(|f0| f0.get("hashes"))
+        .and_then(|h| {
+            h.get("AutoV2")
+                .or_else(|| h.get("SHA256"))
+                .and_then(|v| v.as_str())
+        })
+        .or_else(|| {
+            root.get("hashes")
+                .and_then(|h| h.get("AutoV2").and_then(|v| v.as_str()))
+        })
+        .or_else(|| root.get("sha256").and_then(|v| v.as_str()))
+        .map(|s| s.trim().to_string());
+
+    // Description
+    let description = root
+        .get("description")
+        .and_then(|v| v.as_str())
+        .map(strip_html_tags);
+
+    // Recommended / preferred weight
+    let weight_default = root
+        .get("preferred weight")
+        .or_else(|| root.get("weight"))
+        .and_then(|v| v.as_f64())
+        .unwrap_or(1.0);
+
+    // Preview URL
+    let preview_url = root
+        .get("images")
+        .and_then(|arr| arr.as_array())
+        .and_then(|a| a.first())
+        .and_then(|img| img.get("url"))
+        .and_then(|u| u.as_str())
+        .map(|s| s.to_string());
+
+    let lora = LoraModel {
+        id: 0,
+        name,
+        hash,
+        trigger_words,
+        preview_url,
+        description,
+        weight_default,
+        created_at: String::new(),
+        updated_at: String::new(),
+    };
+
+    let database = db(&state)?;
+    database.save_lora(&lora).map_err(|e| e.to_string())
+}
+
+/// Recursively scan a directory for LoRA `.civitai.info` or metadata `.json` files
+/// and import all found entries into the local LoRA database.
+#[tauri::command]
+pub fn scan_loras_directory(dir_path: String, state: State<'_, AppState>) -> Result<usize, String> {
+    let root = Path::new(&dir_path);
+    if !root.is_dir() {
+        return Err(format!("Not a directory: {dir_path}"));
+    }
+
+    let mut count = 0;
+    let mut stack = vec![root.to_path_buf()];
+
+    while let Some(dir) = stack.pop() {
+        let entries = match std::fs::read_dir(&dir) {
+            Ok(e) => e,
+            Err(_) => continue,
+        };
+
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if path.is_file() {
+                let fname = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                if (fname.ends_with(".civitai.info") || fname.ends_with(".info"))
+                    && import_lora_civitai_info(path.to_string_lossy().to_string(), state.clone())
+                        .is_ok()
+                {
+                    count += 1;
+                }
+            }
+        }
+    }
+
+    Ok(count)
 }

@@ -107,6 +107,13 @@ pub fn run() {
             commands::get_clip_index_status,
             commands::index_clip_images_batch,
             commands::search_by_text_prompt,
+            commands::list_loras,
+            commands::get_lora,
+            commands::save_lora,
+            commands::delete_lora,
+            commands::get_image_detected_loras,
+            commands::import_lora_civitai_info,
+            commands::scan_loras_directory,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
