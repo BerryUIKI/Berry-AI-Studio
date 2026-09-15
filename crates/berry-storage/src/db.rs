@@ -5,7 +5,8 @@ use std::path::{Path, PathBuf};
 
 use berry_domain::{
     Album, CheckpointModelStat, Container, DatabaseStats, ExtractedMetadata, FileSortField, Folder,
-    ImageFile, ModelCacheEntry, PromptStat, SearchCriteria, SimilarityMatch, SortDirection, Tag,
+    ImageFile, LoraModel, ModelCacheEntry, PromptStat, SearchCriteria, SimilarityMatch,
+    SortDirection, Tag,
 };
 use rusqlite::{params, Connection, OpenFlags};
 
@@ -30,6 +31,8 @@ pub enum DatabaseError {
     AlbumNotFound(i64),
     #[error("no tag with id {0}")]
     TagNotFound(i64),
+    #[error("no lora with id {0}")]
+    LoraNotFound(i64),
     #[error("rating must be between 1 and 10, got {0}")]
     InvalidRating(u8),
     #[error("failed to open database at {path}: {source}")]
@@ -1336,6 +1339,179 @@ impl Database {
         Ok(results)
     }
 
+    /// List all saved LoRAs ordered alphabetically by name.
+    pub fn list_loras(&self) -> Result<Vec<LoraModel>, DatabaseError> {
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT id, name, hash, trigger_words, preview_url, description, weight_default, created_at, updated_at
+             FROM loras
+             ORDER BY name COLLATE NOCASE ASC",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            let triggers_json: String = row.get(3)?;
+            let trigger_words: Vec<String> =
+                serde_json::from_str(&triggers_json).unwrap_or_default();
+            Ok(LoraModel {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                hash: row.get(2)?,
+                trigger_words,
+                preview_url: row.get(4)?,
+                description: row.get(5)?,
+                weight_default: row.get(6)?,
+                created_at: row.get(7)?,
+                updated_at: row.get(8)?,
+            })
+        })?;
+        let mut results = Vec::new();
+        for r in rows {
+            results.push(r?);
+        }
+        Ok(results)
+    }
+
+    /// Retrieve a single LoRA by its ID.
+    pub fn get_lora(&self, id: i64) -> Result<Option<LoraModel>, DatabaseError> {
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT id, name, hash, trigger_words, preview_url, description, weight_default, created_at, updated_at
+             FROM loras
+             WHERE id = ?1",
+        )?;
+        let mut rows = stmt.query_map([id], |row| {
+            let triggers_json: String = row.get(3)?;
+            let trigger_words: Vec<String> =
+                serde_json::from_str(&triggers_json).unwrap_or_default();
+            Ok(LoraModel {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                hash: row.get(2)?,
+                trigger_words,
+                preview_url: row.get(4)?,
+                description: row.get(5)?,
+                weight_default: row.get(6)?,
+                created_at: row.get(7)?,
+                updated_at: row.get(8)?,
+            })
+        })?;
+        match rows.next() {
+            Some(r) => Ok(Some(r?)),
+            None => Ok(None),
+        }
+    }
+
+    /// Lookup a LoRA by model name or hash (case-insensitive prefix / exact match).
+    pub fn find_lora_by_name_or_hash(
+        &self,
+        query: &str,
+    ) -> Result<Option<LoraModel>, DatabaseError> {
+        let clean = query.trim();
+        if clean.is_empty() {
+            return Ok(None);
+        }
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT id, name, hash, trigger_words, preview_url, description, weight_default, created_at, updated_at
+             FROM loras
+             WHERE name = ?1 COLLATE NOCASE
+                OR hash = ?1 COLLATE NOCASE
+                OR hash LIKE (?1 || '%')
+             LIMIT 1",
+        )?;
+        let mut rows = stmt.query_map([clean], |row| {
+            let triggers_json: String = row.get(3)?;
+            let trigger_words: Vec<String> =
+                serde_json::from_str(&triggers_json).unwrap_or_default();
+            Ok(LoraModel {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                hash: row.get(2)?,
+                trigger_words,
+                preview_url: row.get(4)?,
+                description: row.get(5)?,
+                weight_default: row.get(6)?,
+                created_at: row.get(7)?,
+                updated_at: row.get(8)?,
+            })
+        })?;
+        match rows.next() {
+            Some(r) => Ok(Some(r?)),
+            None => Ok(None),
+        }
+    }
+
+    /// Save (insert or update) a LoRA model in the catalog.
+    pub fn save_lora(&self, lora: &LoraModel) -> Result<LoraModel, DatabaseError> {
+        let clean_name = lora.name.trim();
+        let triggers_json = serde_json::to_string(&lora.trigger_words)?;
+
+        if lora.id > 0 {
+            let mut stmt = self.conn.prepare_cached(
+                "UPDATE loras
+                 SET name = ?1, hash = ?2, trigger_words = ?3, preview_url = ?4, description = ?5, weight_default = ?6, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
+                 WHERE id = ?7",
+            )?;
+            let rows_affected = stmt.execute(params![
+                clean_name,
+                lora.hash.as_deref().map(|h| h.trim()),
+                triggers_json,
+                lora.preview_url.as_deref().map(|p| p.trim()),
+                lora.description.as_deref().map(|d| d.trim()),
+                lora.weight_default,
+                lora.id,
+            ])?;
+            if rows_affected > 0 {
+                return self
+                    .get_lora(lora.id)?
+                    .ok_or(DatabaseError::LoraNotFound(lora.id));
+            }
+        }
+
+        let mut stmt = self.conn.prepare_cached(
+            "INSERT INTO loras (name, hash, trigger_words, preview_url, description, weight_default, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, strftime('%Y-%m-%dT%H:%M:%fZ','now'), strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+             ON CONFLICT(name) DO UPDATE SET
+                hash = COALESCE(excluded.hash, loras.hash),
+                trigger_words = excluded.trigger_words,
+                preview_url = COALESCE(excluded.preview_url, loras.preview_url),
+                description = COALESCE(excluded.description, loras.description),
+                weight_default = excluded.weight_default,
+                updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')",
+        )?;
+        stmt.execute(params![
+            clean_name,
+            lora.hash.as_deref().map(|h| h.trim()),
+            triggers_json,
+            lora.preview_url.as_deref().map(|p| p.trim()),
+            lora.description.as_deref().map(|d| d.trim()),
+            lora.weight_default,
+        ])?;
+
+        let id = self.conn.last_insert_rowid();
+        if let Some(created) = self.get_lora(id)? {
+            Ok(created)
+        } else {
+            self.find_lora_by_name_or_hash(clean_name)?
+                .ok_or(DatabaseError::LoraNotFound(id))
+        }
+    }
+
+    /// Delete a LoRA by ID.
+    pub fn delete_lora(&self, id: i64) -> Result<bool, DatabaseError> {
+        let mut stmt = self
+            .conn
+            .prepare_cached("DELETE FROM loras WHERE id = ?1")?;
+        let affected = stmt.execute([id])?;
+        Ok(affected > 0)
+    }
+
+    /// Import multiple LoRAs into catalog.
+    pub fn import_loras(&self, loras: &[LoraModel]) -> Result<usize, DatabaseError> {
+        let mut count = 0;
+        for l in loras {
+            self.save_lora(l)?;
+            count += 1;
+        }
+        Ok(count)
+    }
+
     /// Returns `(path, size_bytes, modified_at, has_metadata)` tuples for all
     /// files in a folder — lightweight version of `list_files` that avoids
     /// deserializing the JSON `metadata` column.
@@ -2594,10 +2770,10 @@ mod tests {
     // --- File Embeddings and Similarity Search Tests ---
 
     #[test]
-    fn migration_reaches_schema_version_7() {
+    fn migration_reaches_schema_version_8() {
         let db = Database::connect_in_memory().unwrap();
-        assert_eq!(db.user_version().unwrap(), 7);
-        assert_eq!(LATEST_VERSION, 7);
+        assert_eq!(db.user_version().unwrap(), 8);
+        assert_eq!(LATEST_VERSION, 8);
     }
 
     #[test]
@@ -2611,6 +2787,17 @@ mod tests {
                 |row| row.get(0),
             )
             .unwrap();
+        assert!(table_exists);
+
+        let loras_exists: bool = db
+            .conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'loras')",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(loras_exists);
         assert!(table_exists);
 
         let index_exists: bool = db
@@ -3260,5 +3447,56 @@ mod tests {
         let unindexed_limit = db.get_unindexed_files("clip-vit-b32", 1).unwrap();
         assert_eq!(unindexed_limit.len(), 1);
         assert_eq!(unindexed_limit[0].id, Some(id2));
+    }
+
+    #[test]
+    fn lora_storage_crud_works() {
+        let db = Database::connect_in_memory().unwrap();
+
+        // 1. Initial list is empty
+        let initial = db.list_loras().unwrap();
+        assert!(initial.is_empty());
+
+        // 2. Save a new LoRA
+        let lora_to_save = LoraModel {
+            id: 0,
+            name: "detail_tweaker_v1".to_string(),
+            hash: Some("9b42e7".to_string()),
+            trigger_words: vec!["highly detailed".to_string(), "sharp focus".to_string()],
+            preview_url: None,
+            description: Some("Enhances details and textures".to_string()),
+            weight_default: 0.8,
+            created_at: String::new(),
+            updated_at: String::new(),
+        };
+        let saved = db.save_lora(&lora_to_save).unwrap();
+        assert!(saved.id > 0);
+        assert_eq!(saved.name, "detail_tweaker_v1");
+        assert_eq!(saved.trigger_words.len(), 2);
+        assert_eq!(saved.weight_default, 0.8);
+
+        // 3. Find by name (case-insensitive)
+        let found_name = db.find_lora_by_name_or_hash("DETAIL_TWEAKER_V1").unwrap();
+        assert!(found_name.is_some());
+        assert_eq!(found_name.unwrap().id, saved.id);
+
+        // 4. Find by hash prefix
+        let found_hash = db.find_lora_by_name_or_hash("9b42").unwrap();
+        assert!(found_hash.is_some());
+        assert_eq!(found_hash.unwrap().id, saved.id);
+
+        // 5. Update LoRA
+        let mut updated_data = saved.clone();
+        updated_data.weight_default = 0.65;
+        updated_data.trigger_words.push("masterpiece".to_string());
+        let updated = db.save_lora(&updated_data).unwrap();
+        assert_eq!(updated.id, saved.id);
+        assert_eq!(updated.weight_default, 0.65);
+        assert_eq!(updated.trigger_words.len(), 3);
+
+        // 6. Delete LoRA
+        let deleted = db.delete_lora(saved.id).unwrap();
+        assert!(deleted);
+        assert!(db.get_lora(saved.id).unwrap().is_none());
     }
 }
