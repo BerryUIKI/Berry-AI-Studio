@@ -239,4 +239,23 @@ export interface ClipModelInfo {
   embedding_dim: number;
 }
 
+export interface LoraModel {
+  id: number;
+  name: string;
+  hash?: string | null;
+  trigger_words: string[];
+  preview_url?: string | null;
+  description?: string | null;
+  weight_default: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DetectedLora {
+  name: string;
+  weight: number;
+  model?: LoraModel | null;
+}
+
+
 

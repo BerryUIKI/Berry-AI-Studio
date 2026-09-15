@@ -41,6 +41,7 @@ import SettingsModal from "./components/SettingsModal.vue";
 import UpdateModal from "./components/UpdateModal.vue";
 import AutoTagModal from "./components/AutoTagModal.vue";
 import ClipManagerModal from "./components/ClipManagerModal.vue";
+import LoraManagerModal from "./components/LoraManagerModal.vue";
 import { t } from "./i18n";
 import { countActiveFilters, criteriaToQuery } from "./utils/search";
 import { requestBatchThumbnails } from "./utils/thumbnail";
@@ -57,6 +58,7 @@ const filesLoading = ref(false);
 const searchQuery = ref("");
 const isSemanticSearch = ref(false);
 const clipModalOpen = ref(false);
+const loraModalOpen = ref(false);
 const gridItemWidth = ref(200);
 const similaritySourceFile = ref<ImageFile | null>(null);
 const rawSimilarityFiles = shallowRef<ImageFile[]>([]);
@@ -249,6 +251,10 @@ function handleWindowKeyDown(e: KeyboardEvent) {
     }
     if (clipModalOpen.value) {
       clipModalOpen.value = false;
+      return;
+    }
+    if (loraModalOpen.value) {
+      loraModalOpen.value = false;
       return;
     }
     if (selectedFilePaths.value.size > 0) {
@@ -753,6 +759,14 @@ async function loadFiles() {
   }
 }
 
+function onInjectPrompt(text: string) {
+  if (searchQuery.value.trim()) {
+    searchQuery.value = `${searchQuery.value.trim()}, ${text}`;
+  } else {
+    searchQuery.value = text;
+  }
+}
+
 function applySimilarityFilter() {
   const minScore = similarityThreshold.value / 100;
   const filtered = rawSimilarityFiles.value
@@ -1009,6 +1023,7 @@ function onResetZoom() {
           @open-prompt-stats="promptStatsModalOpen = true"
           @open-model-manager="modelManagerModalOpen = true"
           @open-clip-manager="clipModalOpen = true"
+          @open-lora-manager="loraModalOpen = true"
           @open-shortcuts-help="shortcutsHelpModalOpen = true"
           @open-updater="updateModalOpen = true"
           @open-about="settingsModalOpen = true"
@@ -1261,6 +1276,8 @@ function onResetZoom() {
         @filter-by-model="onFilterByModel"
         @filter-by-hash="onFilterByHash"
         @find-similar="handleFindSimilar"
+        @open-lora-manager="loraModalOpen = true"
+        @register-lora="() => { loraModalOpen = true; }"
       />
     </div>
 
@@ -1365,6 +1382,13 @@ function onResetZoom() {
       :show="clipModalOpen"
       @close="clipModalOpen = false"
       @indexed="loadFiles"
+    />
+
+    <!-- LoRA Trigger Words Manager Modal -->
+    <LoraManagerModal
+      :show="loraModalOpen"
+      @close="loraModalOpen = false"
+      @inject-prompt="onInjectPrompt"
     />
 
     <!-- Settings Modal -->
