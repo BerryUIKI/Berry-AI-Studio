@@ -4,6 +4,9 @@
 //! migrations tracked by SQLite's `PRAGMA user_version`. All schema changes
 //! go through `migrations`, never through ad-hoc DDL.
 
+#![allow(unknown_lints)]
+#![allow(clippy::chunks_exact_to_as_chunks)]
+
 mod db;
 mod migrations;
 
