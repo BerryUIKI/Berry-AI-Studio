@@ -27,6 +27,7 @@ const emit = defineEmits<{
   openPromptStats: [];
   openModelManager: [];
   openClipManager: [];
+  openLoraManager: [];
   openShortcutsHelp: [];
   openUpdater: [];
   openAbout: [];
@@ -258,6 +259,10 @@ onUnmounted(() => {
         <button type="button" class="dropdown-item" @click="handleAction(() => emit('openClipManager'))">
           <span class="item-icon">🔎</span>
           <span class="item-title">{{ t.clipModal.title }}</span>
+        </button>
+        <button type="button" class="dropdown-item" @click="handleAction(() => emit('openLoraManager'))">
+          <span class="item-icon">🎨</span>
+          <span class="item-title">{{ t.loraModal.title }}</span>
         </button>
       </div>
     </div>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
-import type { ImageFile, Tag } from "../types";
+import type { DetectedLora, ImageFile, Tag } from "../types";
 import { assetUrl, formatBytes, formatPlatformName, getFileName, normalizePath } from "../utils/image";
 import { getThumbnailUrl } from "../utils/thumbnail";
 import { t } from "../i18n";
@@ -21,13 +21,18 @@ const emit = defineEmits<{
   filterByHash: [hash: string];
   findSimilar: [file: ImageFile];
   openAutoTagModal: [file: ImageFile];
+  openLoraManager: [];
+  registerLora: [name: string, weight: number];
 }>();
 
 defineExpose({
   loadTags,
+  loadDetectedLoras,
 });
 
 const fileTags = ref<Tag[]>([]);
+const detectedLoras = ref<DetectedLora[]>([]);
+const triggerCopied = ref<string | null>(null);
 const promptCopied = ref(false);
 const negativePromptCopied = ref(false);
 const seedCopied = ref(false);
@@ -46,10 +51,39 @@ watch(
     } else {
       thumbUrl.value = "";
     }
-    await loadTags();
+    await Promise.all([loadTags(), loadDetectedLoras()]);
   },
   { immediate: true },
 );
+
+let triggerCopyTimeout: any = null;
+async function copyTriggerText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    triggerCopied.value = text;
+    if (triggerCopyTimeout) clearTimeout(triggerCopyTimeout);
+    triggerCopyTimeout = setTimeout(() => {
+      triggerCopied.value = null;
+    }, 2000);
+  } catch {
+    //
+  }
+}
+
+async function loadDetectedLoras() {
+  if (!props.file?.id) {
+    detectedLoras.value = [];
+    return;
+  }
+  try {
+    detectedLoras.value = await invoke<DetectedLora[]>("get_image_detected_loras", {
+      fileId: props.file.id,
+    });
+  } catch (e) {
+    console.error("Failed to load detected loras:", e);
+    detectedLoras.value = [];
+  }
+}
 
 async function loadTags() {
   if (!props.file?.id) {
@@ -356,6 +390,58 @@ const promptTokens = computed(() => {
           <p class="prompt-text">{{ file.metadata.negative_prompt }}</p>
         </div>
         <p v-else class="empty-field">—</p>
+      </div>
+
+      <!-- LoRA Models & Trigger Words Section -->
+      <div v-if="detectedLoras.length > 0" class="section lora-section">
+        <div class="section-header">
+          <div class="section-title-wrap">
+            <span class="lora-header-icon">🎨</span>
+            <span class="section-title">{{ t.loraModal.sectionTitle }}</span>
+            <span class="badge-count-sm">{{ detectedLoras.length }}</span>
+          </div>
+          <button
+            type="button"
+            class="text-action-btn"
+            @click="emit('openLoraManager')"
+          >
+            {{ t.loraModal.manageLibrary }}
+          </button>
+        </div>
+
+        <div class="detected-lora-list">
+          <div v-for="(lora, idx) in detectedLoras" :key="idx" class="detected-lora-item">
+            <div class="detected-lora-header">
+              <span class="detected-name" :title="lora.name">{{ lora.name }}</span>
+              <span class="detected-weight">×{{ lora.weight }}</span>
+            </div>
+
+            <!-- Trigger words if known in model catalog -->
+            <div v-if="lora.model?.trigger_words && lora.model.trigger_words.length > 0" class="detected-triggers">
+              <span
+                v-for="(tw, twIdx) in lora.model.trigger_words"
+                :key="twIdx"
+                class="detected-trigger-chip"
+                :class="{ active: triggerCopied === tw }"
+                :title="t.loraModal.clickToCopy"
+                @click="copyTriggerText(tw)"
+              >
+                {{ tw }}
+                <span class="copy-hint">📋</span>
+              </span>
+            </div>
+            <div v-else class="detected-unknown">
+              <span class="unregistered-text">{{ t.loraModal.notInLibrary }}</span>
+              <button
+                type="button"
+                class="quick-register-btn"
+                @click="emit('registerLora', lora.name, lora.weight)"
+              >
+                + {{ t.loraModal.quickAdd }}
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Generation Parameters Section -->
@@ -966,5 +1052,156 @@ const promptTokens = computed(() => {
   white-space: pre-wrap;
   word-break: break-all;
   user-select: text;
+}
+
+/* LoRA Section in Inspector */
+.lora-section {
+  background: rgba(236, 72, 153, 0.03);
+  border: 1px solid rgba(236, 72, 153, 0.15);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.section-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lora-header-icon {
+  font-size: 0.85rem;
+}
+
+.badge-count-sm {
+  background: rgba(236, 72, 153, 0.2);
+  color: #f472b6;
+  font-size: 0.65rem;
+  padding: 1px 5px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.text-action-btn {
+  background: none;
+  border: none;
+  color: #ec4899;
+  font-size: 0.72rem;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+
+.text-action-btn:hover {
+  background: rgba(236, 72, 153, 0.1);
+  text-decoration: underline;
+}
+
+.detected-lora-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.detected-lora-item {
+  background: #1e1e26;
+  border: 1px solid #333342;
+  border-radius: 6px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detected-lora-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.detected-name {
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: #f1f5f9;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 170px;
+}
+
+.detected-weight {
+  font-size: 0.72rem;
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.12);
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-family: monospace;
+}
+
+.detected-triggers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.detected-trigger-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: #16161e;
+  border: 1px solid #3a3a4c;
+  color: #cbd5e1;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.detected-trigger-chip:hover {
+  background: #272738;
+  border-color: #ec4899;
+  color: #f472b6;
+}
+
+.detected-trigger-chip.active {
+  background: #ec4899;
+  color: #fff;
+  border-color: #ec4899;
+}
+
+.copy-hint {
+  font-size: 0.65rem;
+  opacity: 0.5;
+}
+
+.detected-trigger-chip:hover .copy-hint {
+  opacity: 1;
+}
+
+.detected-unknown {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.7rem;
+}
+
+.unregistered-text {
+  color: #71717a;
+  font-style: italic;
+}
+
+.quick-register-btn {
+  background: rgba(236, 72, 153, 0.12);
+  border: 1px solid rgba(236, 72, 153, 0.3);
+  color: #f472b6;
+  font-size: 0.68rem;
+  border-radius: 4px;
+  padding: 2px 6px;
+  cursor: pointer;
+}
+
+.quick-register-btn:hover {
+  background: rgba(236, 72, 153, 0.25);
 }
 </style>

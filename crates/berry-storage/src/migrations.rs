@@ -113,6 +113,23 @@ pub const MIGRATIONS: &[&str] = &[
 
     CREATE INDEX idx_file_embeddings_model ON file_embeddings(model_id);
     "#,
+    // v8: loras table for trigger words and catalog.
+    r#"
+    CREATE TABLE loras (
+        id              INTEGER PRIMARY KEY,
+        name            TEXT NOT NULL UNIQUE,
+        hash            TEXT,
+        trigger_words   TEXT NOT NULL,
+        preview_url     TEXT,
+        description     TEXT,
+        weight_default  REAL NOT NULL DEFAULT 1.0,
+        created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+    ) STRICT;
+
+    CREATE INDEX idx_loras_name ON loras(name);
+    CREATE INDEX idx_loras_hash ON loras(hash);
+    "#,
 ];
 
 /// The schema version the current code migrates databases to.

@@ -20,6 +20,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 berry-domain = { path = "../crates/berry-domain" }
+berry-metadata = { path = "../crates/berry-metadata" }
 berry-scan = { path = "../crates/berry-scan" }
 berry-storage = { path = "../crates/berry-storage" }
 berry-tagger = { path = "../crates/berry-tagger" }
