@@ -73,7 +73,7 @@ Full details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 Read [BRANCH_POLICY.md](BRANCH_POLICY.md) before branching:
 
-- **`rewrite`** is the default, **protected** branch — official releases only,
+- **`main`** is the default, **protected** branch — official releases only,
   direct pushes forbidden, PR-only. It accepts release PRs **from `dev` only**.
 - **`dev`** is the development integration branch — **all** feature/fix/chore/
   docs PRs target `dev`.
@@ -81,14 +81,14 @@ Read [BRANCH_POLICY.md](BRANCH_POLICY.md) before branching:
   `chore/<name>`, or `docs/<name>`.
 - Conventional commits (`feat:`, `fix:`, `chore:`, `docs:`).
 
-**Practical implication for Claude:** never create branches off `rewrite`, never
-commit directly to `rewrite`, and point PRs at `dev` — not the default branch.
+**Practical implication for Claude:** never create branches off `main`, never
+commit directly to `main`, and point PRs at `dev` — not the default branch.
 
 ## Development Workflow
 
 1. `git checkout dev && git pull origin dev && git checkout -b feature/your-feature`
 2. Implement with tests (unit tests live next to the code, `#[cfg(test)]`)
 3. Push and open a PR targeting `dev`
-4. `dev` → `rewrite` release PRs happen only when `dev` is release-ready
+4. `dev` → `main` release PRs happen only when `dev` is release-ready
 
 Prerequisites: stable Rust, Node.js LTS, pnpm, Tauri 2 platform prerequisites.

@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.2.0] - 2026-09-16
+
+### AI Semantic Search, LoRA Catalog, Multi-Mode Pipelines & Advanced Stacking
+
+Version 0.2.0 is a major milestone release delivering AI-assisted tagging, local CLIP semantic search, a LoRA trigger word library, multi-mode ingestion pipelines, burst image stacking, stack merge safety, and a virtualized waterfall gallery:
+
+#### 🧠 Local CLIP Semantic Search & AI Tagging (Milestone 8)
+- **Local CLIP Vision & Text Embeddings**: Integrated ONNX-powered CLIP/SigLIP embedding pipeline with tokenization and batch indexing dashboard (`ClipManagerModal.vue`).
+- **Natural Language Semantic Search**: Direct text-to-image semantic search in the main search bar with similarity scoring.
+- **Visual Similarity Search**: Find similar compositions and styles from the context menu with threshold tuning and limit controls.
+- **WD14 / Danbooru Anime Tagger**: Automated anime and realistic tag extraction with confidence score thresholds and batch tagging.
+- **Persistent Embedding Storage**: SQLite schema v7 `file_embeddings` table with fast cosine similarity ranking.
+
+#### 🔮 LoRA Trigger Library & Parameter Extraction (Milestone 9)
+- **LoRA Detection**: Extracted `<lora:name:weight>` from prompts and parsed ComfyUI `LoraLoader` / `LoraLoaderModelOnly` graph nodes.
+- **LoRA Trigger Manager**: Manage Civitai trigger words, copy triggers on click, and inspect detected LoRAs in the Property Inspector.
+- **Batch Civitai Metadata Sync**: Scan LoRA directories, match model hashes with Civitai cache, and fetch trigger words.
+
+#### 🗃️ Multi-Mode Ingestion Pipelines & Burst Stacking (Milestone 10)
+- **Multi-Mode Folder Architecture**:
+  - *External Link Mode*: Reference in-place with zero-copy, read-only watch.
+  - *Managed Vault Mode*: Dedicated app storage with automated copy/move file management.
+  - *AIGC Pipeline Mode*: Automated harvest from WebUI/ComfyUI output folders with debounced ingestion and delayed trash cleanup.
+- **Automated Burst Stacking**: Automatically groups generations produced with similar prompts within a short time window.
+- **Poker Deck Stack Cards**: Stack cards with count badges, inline click expand/collapse, and Hero Cover designation (`Alt+S`).
+- **Side-by-Side Compare Mode**: Compare stack members side-by-side with synchronized zoom and panning (`C`).
+- **Flat Stack Merge Safety**: Safe transactional merging of stacks with pre-merge confirmation dialog and user warning suppression preferences.
+- **Authoritative Hero Selection**: Eliminates duplicate zero-order stack members, ensuring consistent hero representation across loading, collapse, and card interactions.
+
+#### ▦ Virtualized Waterfall Gallery & Selection Polish
+- **Virtualized Waterfall Layout**: New masonry waterfall view alongside the standard grid view, supporting varying image aspect ratios with high-performance virtual rendering.
+- **Robust Range Selection**: Predictable Shift-click range selection starting on the very first click, respecting anchor items.
+- **Gallery Stability**: Maintains gallery mount state during stack operations to prevent layout jumps.
+- **Settings Redesign**: Reorganized settings modal with dedicated Display, Stacking, and Parsers workflow sections.
+
+---
+
+## [0.1.3] - 2026-09-06
+
+### macOS Universal Build & Retina Icon Polish
+- Built universal macOS binaries supporting both Apple Silicon (ARM64) and Intel (x86_64).
+- Added high-resolution 1024x1024 retina icon assets to `.icns` bundle for Mac App Store compatibility.
+- Hardened CI release packaging, Gatekeeper notarization, and bundle discovery scripts.
+
+---
+
+## [0.1.2] - 2026-09-01
+
+### Cross-Platform Packaging & Updater Fixes
+- Added automated GitHub Releases updater with SemVer comparison and multi-state feedback.
+- Standardized cross-platform release package naming convention across Windows (NSIS, portable zip), macOS (DMG), and Linux (AppImage, deb, rpm).
+- Improved SQLite database compaction and backup export workflows.
+
+---
+
 ## [0.1.1] - 2026-08-31
 
 ### Eagle-Style Studio Workspace & Frameless Window Upgrade
