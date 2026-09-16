@@ -409,6 +409,11 @@ export const ja: typeof en = {
     stackThresholdDesc: "同一スタックにグループ化するために必要な最小類似度",
     stackTimeWindow: "生成間の最大時間枠",
     stackTimeWindowDesc: "この時間内に生成された画像のみをスタックにまとめます",
+    suppressedWarnings: "非表示の警告ダイアログ",
+    suppressedWarningsDesc: "「今後表示しない」で非表示にしたすべての警告を再度有効にします",
+    resetWarnings: "非表示の警告をリセット",
+    warningsReset: "非表示の警告ダイアログをリセットしました。",
+    noSuppressedWarnings: "現在、非表示の警告ダイアログはありません。",
   },
   addFolder: {
     title: "フォルダをライブラリに追加",

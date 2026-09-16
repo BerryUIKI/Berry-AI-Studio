@@ -409,6 +409,11 @@ export const fr: typeof en = {
     stackThresholdDesc: "Similarité minimale de tokens de prompt requise pour regrouper des images dans une même pile",
     stackTimeWindow: "Fenêtre temporelle maximale entre générations",
     stackTimeWindowDesc: "Regrouper les images uniquement si elles ont été générées dans cet intervalle de temps",
+    suppressedWarnings: "Avertissements masqués",
+    suppressedWarningsDesc: "Réactiver tous les avertissements masqués avec « Ne plus afficher »",
+    resetWarnings: "Réinitialiser les avertissements",
+    warningsReset: "Les avertissements masqués ont été réinitialisés.",
+    noSuppressedWarnings: "Aucun avertissement n’est actuellement masqué.",
   },
   addFolder: {
     title: "Ajouter un dossier à la bibliothèque",

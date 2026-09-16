@@ -409,6 +409,11 @@ export const zhCN: typeof en = {
     stackThresholdDesc: "合并为同一堆栈所需的最低提示词分词相似度",
     stackTimeWindow: "生成批次最大时间窗口",
     stackTimeWindowDesc: "仅将在此时间范围内生成的连续图片聚合为堆栈",
+    suppressedWarnings: "已隐藏的警告对话框",
+    suppressedWarningsDesc: "重新启用所有通过“不再显示”隐藏的警告对话框",
+    resetWarnings: "重置已隐藏的警告",
+    warningsReset: "已重置隐藏的警告对话框。",
+    noSuppressedWarnings: "当前没有隐藏的警告对话框。",
   },
   addFolder: {
     title: "添加文件夹至媒体库",

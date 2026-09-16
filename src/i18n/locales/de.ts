@@ -409,6 +409,11 @@ export const de: typeof en = {
     stackThresholdDesc: "Minimale Token-Ähnlichkeit zum Zusammenfassen in einen Stapel",
     stackTimeWindow: "Maximales Zeitfenster zwischen Generationen",
     stackTimeWindowDesc: "Bilder nur zusammenfassen, wenn sie innerhalb dieser Zeitspanne erzeugt wurden",
+    suppressedWarnings: "Unterdrückte Warnmeldungen",
+    suppressedWarningsDesc: "Alle mit „Nicht mehr anzeigen“ ausgeblendeten Warnungen wieder aktivieren",
+    resetWarnings: "Warnmeldungen zurücksetzen",
+    warningsReset: "Unterdrückte Warnmeldungen wurden zurückgesetzt.",
+    noSuppressedWarnings: "Derzeit sind keine Warnmeldungen unterdrückt.",
   },
   addFolder: {
     title: "Ordner zur Bibliothek hinzufügen",
