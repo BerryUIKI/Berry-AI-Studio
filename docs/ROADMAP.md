@@ -48,7 +48,7 @@ This roadmap documents completed milestones and future engineering goals for **B
 
 ---
 
-## 🔮 Upcoming Milestones (v0.2.0+)
+## 🏆 Completed Milestones (v0.2.0)
 
 ### ✅ Milestone 8: AI-Assisted Tagging & Local CLIP Semantic Search
 - [x] Persistent image embedding storage (schema v7 `file_embeddings`) and high-performance local cosine similarity ranking.
@@ -60,24 +60,33 @@ This roadmap documents completed milestones and future engineering goals for **B
 ### ✅ Milestone 9: Advanced Generation Workflows & LoRA Catalog
 - [x] LoRA trigger word library with Civitai info extraction and automatic prompt copy injection (`LoraManagerModal.vue`).
 - [x] Full ComfyUI workflow node graph reconstruction and LoRA loader detection.
-- [ ] Drag-and-drop workflow send-to-WebUI / send-to-ComfyUI via WebSocket or Local HTTP API.
+- [x] Detected LoRA chips in Inspector pane with one-click trigger injection.
 
-### 🎯 Milestone 10: Multi-Mode Folders, AIGC Ingest Pipeline & Image Stacking
-- [ ] **Multi-Mode Folder Architecture**:
+### ✅ Milestone 10: Multi-Mode Folders, AIGC Ingest Pipeline & Image Stacking
+- [x] **Multi-Mode Folder Architecture**:
   - Mode A: External Link mode (reference in-place, zero-copy, read-only watch).
   - Mode B: Managed Project Vaults (dedicated storage with drag-and-drop Copy/Move ingestion).
   - Mode C: AIGC Ingestion Pipeline (monitors WebUI / ComfyUI outputs, debounced harvest, and delayed recycle bin cleanup).
-- [ ] **WebUI & ComfyUI Autodetection & Onboarding Wizard**:
+- [x] **WebUI & ComfyUI Autodetection & Onboarding Wizard**:
   - Heuristic auto-scan for local A1111/ComfyUI/Fooocus output directories.
   - Interactive First-Run Onboarding Wizard for instant setup.
-  - Folder Creation Mode Wizard modal.
-- [ ] **AIGC Image Stacking Engine**:
+  - Folder Creation Mode Wizard modal (`AddFolderModal.vue`).
+- [x] **AIGC Image Stacking & Gallery Engine**:
   - Auto-stacking based on prompt similarity threshold and generation time window.
   - Manual grouping (`Ctrl+G`), unstacking (`Ctrl+Shift+G`), and hero cover selection (`Alt+S`).
   - Poker deck visual cards with badge counts, inline expand/collapse, and side-by-side compare mode (`C`).
-  - One-click batch cull (keep hero/top-rated images and trash remaining drafts).
+  - Flat stack merge safety with warning confirmation dialog and suppressible settings.
+  - Virtualized Waterfall gallery layout mode alongside standard grid.
 
-### 🎯 Milestone 11: Cloud Sync & Export Utilities
+---
+
+## 🔮 Upcoming Milestones (v0.3.0+)
+
+### 🎯 Milestone 11: Generation Interop & Workflows
+- [ ] Drag-and-drop workflow send-to-WebUI / send-to-ComfyUI via WebSocket or Local HTTP API.
+- [ ] One-click batch cull (keep hero/top-rated images and trash remaining drafts).
+
+### 🎯 Milestone 12: Cloud Sync & Export Utilities
 - [ ] Encrypted WebDAV / S3 / LAN database synchronization.
 - [ ] Batch format conversion (WebP lossless / JPG) and metadata stripping for publishing.
 - [ ] Export curated collections into HTML galleries and ZIP archives.

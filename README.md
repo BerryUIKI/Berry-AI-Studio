@@ -38,25 +38,28 @@
 ### 🎨 All-in-One 3-Pane Studio Workspace
 - **Frameless Window with Native Quality**: Custom frameless title bar with integrated desktop menu bar (`File`, `Edit`, `View`, `Tools`, `Help`), drag region, and window controls.
 - **Left Navigation Sidebar**: Quick filters (All Images, Favorites, Sensitive 18+), hierarchical folder tree with real-time scan indicators, color-coded tags, and smart albums.
-- **Center Canvas & Virtual Grid**: Ultra-fast virtual scrolling rendering tens of thousands of images, smooth thumbnail zoom slider (130px–360px), and Grid (⊞) / Table (☰) view switcher.
-- **Right Property Inspector**: Dedicated inspector pane displaying large preview cards, star ratings (0–5), favorite toggle, tokenized prompt chips with one-click copy, generation specs, and collapsible raw workflow JSON.
+- **Center Canvas, Virtual Grid & Waterfall**: Ultra-fast virtual scrolling rendering tens of thousands of images, masonry Waterfall view mode, smooth thumbnail zoom slider (130px–360px), and Grid (⊞) / Waterfall (▦) / Table (☰) view switcher.
+- **Right Property Inspector**: Dedicated inspector pane displaying large preview cards, star ratings (0–5), favorite toggle, tokenized prompt chips with one-click copy, detected LoRA tags, generation specs, and collapsible raw workflow JSON.
 - **Immersive Quick Look (Lightbox)**: Full-screen viewer (`Space` / `Enter`) with smooth mouse-wheel zoom, pan, and keyboard navigation.
 
 ### 🔍 Lossless AIGC Metadata Parsers
 Automatically extracts and indexes generation parameters (Prompt, Negative Prompt, Model Name, Model Hash, Sampler, Steps, CFG Scale, Seed, Dimensions, Workflow JSON):
 - **WebUI (AUTOMATIC1111 / SD.Next)**: PNG `tEXt`/`iTXt` parameters chunks, WebP EXIF.
-- **ComfyUI**: Full prompt and workflow graph JSON parsing.
+- **ComfyUI**: Full prompt and workflow graph JSON parsing with LoRA loader detection.
 - **NovelAI**: Comment and description signature decoding.
 - **Fooocus / Fooocus-MRE**: Parameter parsing and model resolution.
 - **InvokeAI & EasyDiffusion**: Embedded metadata & JSON sidecars.
 - **Supported Formats**: PNG, JPG/JPEG, WebP, MP4, and `.txt` sidecar metadata.
 
-### 🏷️ Organization & Batch Operations
-- **Smart Albums & Color Tags**: Drag-and-drop multiple images to tag or catalog them instantly.
-- **Bottom Floating Batch Action Bar**: Appears on multi-selection to batch rate, tag, add to albums, move, copy, or trash.
-- **Safety & Privacy**: Built-in 18+ sensitive content protection with blur overlay and click-to-reveal.
+### 🗃️ Multi-Mode Ingestion & Smart Stacking
+- **Multi-Mode Folders**: External Link mode (reference in-place), Managed Vaults (dedicated storage), and AIGC Pipeline mode (automatic background harvest from WebUI/ComfyUI output folders).
+- **Intelligent Burst Stacking**: Automatically detects and groups sequential generations with similar prompts.
+- **Interactive Stack Cards**: Poker deck visual cards with badge counts, inline expand/collapse, cover selection (`Alt+S`), side-by-side compare mode (`C`), and transactional stack flattening with safety confirmation.
 
-### 🧠 Model & Prompt Intelligence
+### 🧠 Model, Prompt & AI Intelligence
+- **Local CLIP Semantic Search**: Search images using natural language prompts powered by local ONNX CLIP/SigLIP models.
+- **AI Tagging & Visual Similarity**: Automated WD14 / Danbooru anime tagging and reverse image similarity search.
+- **LoRA Trigger Word Library**: Scan LoRA directories, match Civitai metadata, and auto-inject trigger words into prompts.
 - **Prompt Keyword Insights**: Statistical frequency analysis of prompt tokens with average rating correlations.
 - **Checkpoint Model Manager**: Civitai SHA256 cache synchronization, reverse hash lookup, and one-click filtering by model.
 - **Database Maintenance**: Built-in SQLite VACUUM optimization, backup export, and restoration.
