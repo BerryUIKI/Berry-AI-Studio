@@ -46,6 +46,7 @@ export const en = {
   },
   view: {
     grid: "Grid",
+    masonry: "Waterfall",
     table: "Table",
     files: "Files",
     selectAll: "Select All",
@@ -363,6 +364,9 @@ export const en = {
     defaultView: "Default Gallery View",
     defaultViewDesc: "Choose default image view mode at startup",
     viewGrid: "Grid Waterfall (Grid)",
+    viewMasonry: "Waterfall (Original Aspect Ratio)",
+    allowMultipleStacks: "Allow Multiple Stacks Open",
+    allowMultipleStacksDesc: "Keep existing stacks expanded when another stack is opened",
     viewTable: "Detailed List (Table)",
     autoScan: "Auto-Scan on Startup",
     autoScanDesc: "Automatically check for added/changed images in indexed folders at startup",

@@ -37,9 +37,10 @@ const emit = defineEmits<{
     autoScan: boolean;
     blurNsfw: boolean;
     showCardBadges: boolean;
-    defaultView: "grid" | "table";
+    defaultView: "grid" | "masonry" | "table";
     thumbnailMaxEdge: number;
     autoCheckUpdate: boolean;
+    allowMultipleStacksOpen: boolean;
   }): void;
 }>();
 
@@ -51,11 +52,12 @@ const autoScanOnStartup = ref(true);
 const autoCheckUpdate = ref(true);
 const blurNsfwDefault = ref(true);
 const showCardBadges = ref(true);
-const defaultView = ref<"grid" | "table">("grid");
+const defaultView = ref<"grid" | "masonry" | "table">("grid");
 const thumbnailMaxEdge = ref(getThumbnailMaxEdge());
 const autoStack = ref(false);
 const stackSimilarityThreshold = ref(0.85);
 const stackTimeWindowMinutes = ref(180);
+const allowMultipleStacksOpen = ref(false);
 const suppressedWarningCount = ref(0);
 const resettingWarnings = ref(false);
 const warningResetMessage = ref("");
@@ -89,6 +91,7 @@ async function loadSettingsAndPaths() {
     autoStack.value = config.auto_stack ?? false;
     stackSimilarityThreshold.value = config.stack_similarity_threshold ?? 0.85;
     stackTimeWindowMinutes.value = config.stack_time_window_minutes ?? 180;
+    allowMultipleStacksOpen.value = config.allow_multiple_open_stacks ?? false;
     suppressedWarningCount.value = config.suppressed_warnings.length;
     warningResetMessage.value = "";
 
@@ -170,6 +173,7 @@ async function saveSettings() {
       auto_stack: autoStack.value,
       stack_similarity_threshold: stackSimilarityThreshold.value,
       stack_time_window_minutes: stackTimeWindowMinutes.value,
+      allow_multiple_open_stacks: allowMultipleStacksOpen.value,
     });
   } catch (e) {
     console.error("Failed to save config.json:", e);
@@ -180,9 +184,10 @@ async function saveSettings() {
     autoScan: autoScanOnStartup.value,
     blurNsfw: blurNsfwDefault.value,
     showCardBadges: showCardBadges.value,
-    defaultView: (defaultView.value === "table" ? "table" : "grid"),
+    defaultView: defaultView.value,
     thumbnailMaxEdge: thumbnailMaxEdge.value,
     autoCheckUpdate: autoCheckUpdate.value,
+    allowMultipleStacksOpen: allowMultipleStacksOpen.value,
   });
   emit("close");
 }
@@ -274,6 +279,7 @@ async function saveSettings() {
               </div>
               <select v-model="defaultView" class="select-input">
                 <option value="grid">{{ t.settings.viewGrid }}</option>
+                <option value="masonry">{{ t.settings.viewMasonry }}</option>
                 <option value="table">{{ t.settings.viewTable }}</option>
               </select>
             </div>
@@ -371,6 +377,14 @@ async function saveSettings() {
           <!-- Tab: Stacking & Bursts -->
           <div v-if="activeTab === 'stacking'" class="settings-panel">
             <h4 class="panel-title">{{ t.settings.stackingTitle || 'Image Stacking & Burst Grouping' }}</h4>
+
+            <div class="setting-row">
+              <div class="row-info">
+                <span class="row-label">{{ t.settings.allowMultipleStacks }}</span>
+                <span class="row-desc">{{ t.settings.allowMultipleStacksDesc }}</span>
+              </div>
+              <input v-model="allowMultipleStacksOpen" type="checkbox" class="toggle-checkbox" />
+            </div>
 
             <div class="setting-row">
               <div class="row-info">

@@ -48,6 +48,7 @@ export const es: typeof en = {
   },
   view: {
     grid: "Cuadrícula",
+    masonry: "Cascada",
     table: "Lista",
     files: "Archivos",
     selectAll: "Seleccionar todo",
@@ -365,6 +366,9 @@ export const es: typeof en = {
     defaultView: "Vista predeterminada de galería",
     defaultViewDesc: "Seleccione el modo de visualización al iniciar la aplicación",
     viewGrid: "Cuadrícula en cascada (Grid)",
+    viewMasonry: "Cascada (Proporción original)",
+    allowMultipleStacks: "Permitir varias pilas abiertas",
+    allowMultipleStacksDesc: "Mantener las pilas abiertas al abrir otra pila",
     viewTable: "Lista detallada (Table)",
     autoScan: "Escanear automáticamente al inicio",
     autoScanDesc: "Comprobar automáticamente imágenes nuevas o modificadas en carpetas al inicio",

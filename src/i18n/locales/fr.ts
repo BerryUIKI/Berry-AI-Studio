@@ -48,6 +48,7 @@ export const fr: typeof en = {
   },
   view: {
     grid: "Grille",
+    masonry: "Mosaïque",
     table: "Tableau",
     files: "Fichiers",
     selectAll: "Tout sélectionner",
@@ -365,6 +366,9 @@ export const fr: typeof en = {
     defaultView: "Vue par défaut de la galerie",
     defaultViewDesc: "Choisir le mode d'affichage des images au démarrage",
     viewGrid: "Grille en cascade (Grid)",
+    viewMasonry: "Mosaïque (Proportions d’origine)",
+    allowMultipleStacks: "Autoriser plusieurs piles ouvertes",
+    allowMultipleStacksDesc: "Conserver les piles ouvertes lors de l’ouverture d’une autre pile",
     viewTable: "Liste détaillée (Table)",
     autoScan: "Analyse automatique au démarrage",
     autoScanDesc: "Vérifier automatiquement les nouvelles images dans les dossiers au démarrage",
