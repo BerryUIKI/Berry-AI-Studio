@@ -14,7 +14,10 @@ export interface AppConfig {
   auto_stack: boolean;
   stack_similarity_threshold: number;
   stack_time_window_minutes: number;
+  suppressed_warnings: string[];
 }
+
+export const STACK_MERGE_WARNING_ID = "stack_merge";
 
 export interface StoragePaths {
   data_dir: string;
@@ -39,6 +42,7 @@ const DEFAULT_CONFIG: AppConfig = {
   auto_stack: false,
   stack_similarity_threshold: 0.85,
   stack_time_window_minutes: 180,
+  suppressed_warnings: [],
 };
 
 /**
@@ -119,6 +123,28 @@ export async function saveAppConfig(config: AppConfig): Promise<void> {
     syncConfigToLocalStorage(config);
     throw err;
   }
+}
+
+export function isWarningSuppressed(config: AppConfig, warningId: string): boolean {
+  return config.suppressed_warnings.includes(warningId);
+}
+
+export async function suppressWarning(warningId: string): Promise<void> {
+  const config = await loadAppConfig();
+  if (isWarningSuppressed(config, warningId)) return;
+  await saveAppConfig({
+    ...config,
+    suppressed_warnings: [...config.suppressed_warnings, warningId],
+  });
+}
+
+export async function resetSuppressedWarnings(): Promise<number> {
+  const config = await loadAppConfig();
+  const resetCount = config.suppressed_warnings.length;
+  if (resetCount > 0) {
+    await saveAppConfig({ ...config, suppressed_warnings: [] });
+  }
+  return resetCount;
 }
 
 /**

@@ -407,6 +407,11 @@ export const en = {
     stackThresholdDesc: "Minimum tokenized prompt similarity to group images into a single stack",
     stackTimeWindow: "Max Time Window Between Generations",
     stackTimeWindowDesc: "Group images only if generated within this time range",
+    suppressedWarnings: "Suppressed Warning Dialogs",
+    suppressedWarningsDesc: "Re-enable every warning dialog hidden with “Do not show again”",
+    resetWarnings: "Reset Suppressed Warnings",
+    warningsReset: "Suppressed warning dialogs were reset.",
+    noSuppressedWarnings: "No warning dialogs are currently suppressed.",
   },
   addFolder: {
     title: "Add Folder to Library",

@@ -409,6 +409,11 @@ export const es: typeof en = {
     stackThresholdDesc: "Similitud mínima de tokens de prompt requerida para agrupar imágenes en una misma pila",
     stackTimeWindow: "Ventana de tiempo máxima entre generaciones",
     stackTimeWindowDesc: "Agrupar imágenes solo si fueron generadas dentro de este intervalo de tiempo",
+    suppressedWarnings: "Advertencias ocultas",
+    suppressedWarningsDesc: "Volver a activar todas las advertencias ocultas con «No volver a mostrar»",
+    resetWarnings: "Restablecer advertencias",
+    warningsReset: "Se restablecieron las advertencias ocultas.",
+    noSuppressedWarnings: "Actualmente no hay advertencias ocultas.",
   },
   addFolder: {
     title: "Añadir carpeta a la biblioteca",

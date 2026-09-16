@@ -1909,6 +1909,8 @@ pub struct AppConfig {
     pub stack_similarity_threshold: f64,
     #[serde(default = "default_stack_time_window")]
     pub stack_time_window_minutes: i64,
+    #[serde(default)]
+    pub suppressed_warnings: Vec<String>,
 }
 
 fn default_auto_stack() -> bool {
@@ -1939,6 +1941,7 @@ impl Default for AppConfig {
             auto_stack: false,
             stack_similarity_threshold: 0.85,
             stack_time_window_minutes: 180,
+            suppressed_warnings: Vec::new(),
         }
     }
 }
