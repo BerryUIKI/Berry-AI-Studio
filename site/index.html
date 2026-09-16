@@ -140,7 +140,7 @@
       <img src="app-icon.svg" alt="Berry Logo" class="w-8 h-8 rounded-lg group-hover:scale-105 transition-transform" />
       <div class="flex items-center gap-2">
         <span class="font-display text-[18px] font-bold text-white tracking-tight">Berry AI Studio</span>
-        <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#12b5cb]/15 text-[#67e8f9] border border-[#12b5cb]/30" id="headerVersionBadge">v0.1.3</span>
+        <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#12b5cb]/15 text-[#67e8f9] border border-[#12b5cb]/30" id="headerVersionBadge">v0.2.0</span>
       </div>
     </a>
 
@@ -197,7 +197,7 @@
       <!-- Release Badge -->
       <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.04] border border-white/10 text-[13px] text-[#94a3b8] mb-6">
         <span class="w-2 h-2 rounded-full bg-[#22c55e] animate-pulse"></span>
-        <span id="heroReleaseTag">v0.1.3 Released · 100% Local & Free Open Source</span>
+        <span id="heroReleaseTag">v0.2.0 Released · 100% Local & Free Open Source</span>
       </div>
 
       <!-- Title -->
@@ -213,11 +213,11 @@
       <!-- Primary Smart Download CTA & Actions -->
       <div class="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto mb-6">
         <!-- Smart Detected Download Button -->
-        <a id="smartDownloadBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.1.3/Berry-AI-Studio_Windows_x64.exe" onclick="handleSmartDownload(event)" class="w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 rounded-xl bg-gradient-to-r from-[#12b5cb] via-[#0ea5e9] to-[#fab82b] text-[#0b0b0e] text-[16px] font-bold hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-[#12b5cb]/25 glow-cyan">
+        <a id="smartDownloadBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.2.0/Berry-AI-Studio_Windows_x64.exe" onclick="handleSmartDownload(event)" class="w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 rounded-xl bg-gradient-to-r from-[#12b5cb] via-[#0ea5e9] to-[#fab82b] text-[#0b0b0e] text-[16px] font-bold hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-[#12b5cb]/25 glow-cyan">
           <span id="smartOsIcon" class="text-xl">🪟</span>
           <div class="text-left">
             <div class="text-[15px] font-bold leading-tight" id="smartDownloadTitle">Download for Windows (x64)</div>
-            <div class="text-[11px] opacity-85 font-medium" id="smartDownloadSubtitle">v0.1.3 · Installer (.msi / .exe)</div>
+            <div class="text-[11px] opacity-85 font-medium" id="smartDownloadSubtitle">v0.2.0 · Installer (.msi / .exe)</div>
           </div>
         </a>
 
@@ -403,11 +403,11 @@
             <p class="text-[#94a3b8] text-[13px] mb-6" data-i18n="download.winDesc">Compatible with Windows 10 / 11 (64-bit).</p>
             
             <div class="flex flex-col gap-2.5 mb-6">
-              <a id="winMsiBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.1.3/Berry-AI-Studio_Windows_x64.exe" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.09] border border-white/10 text-[13px] text-white font-medium transition-colors">
+              <a id="winMsiBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.2.0/Berry-AI-Studio_Windows_x64.exe" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.09] border border-white/10 text-[13px] text-white font-medium transition-colors">
                 <span class="flex items-center gap-2"><span>📦</span> Windows Installer (.exe)</span>
                 <span class="text-[11px] text-[#67e8f9] font-semibold" data-i18n="download.recommended">Recommended</span>
               </a>
-              <a id="winExeBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.1.3/Berry-AI-Studio_Windows_x64.zip" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 text-[13px] text-[#cbd5e1] transition-colors">
+              <a id="winExeBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.2.0/Berry-AI-Studio_Windows_x64.zip" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 text-[13px] text-[#cbd5e1] transition-colors">
                 <span class="flex items-center gap-2"><span>⚙️</span> Portable Archive (.zip)</span>
                 <span class="text-[11px] text-[#64748b]">x64</span>
               </a>
@@ -429,15 +429,15 @@
             <p class="text-[#94a3b8] text-[13px] mb-6" data-i18n="download.macDesc">Compatible with macOS 11.0 Big Sur or later.</p>
             
             <div class="flex flex-col gap-2.5 mb-6">
-              <a id="macArmBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.1.3/Berry-AI-Studio_macOS_aarch64.dmg" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.09] border border-white/10 text-[13px] text-white font-medium transition-colors">
+              <a id="macArmBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.2.0/Berry-AI-Studio_macOS_aarch64.dmg" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.09] border border-white/10 text-[13px] text-white font-medium transition-colors">
                 <span class="flex items-center gap-2"><span>🍏</span> Apple Silicon (.dmg)</span>
                 <span class="text-[11px] text-[#67e8f9] font-semibold">M1 / M2 / M3 / M4</span>
               </a>
-              <a id="macIntelBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.1.3/Berry-AI-Studio_macOS_x64.dmg" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 text-[13px] text-[#cbd5e1] transition-colors">
+              <a id="macIntelBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.2.0/Berry-AI-Studio_macOS_x64.dmg" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 text-[13px] text-[#cbd5e1] transition-colors">
                 <span class="flex items-center gap-2"><span>🖥️</span> Intel x64 (.dmg)</span>
                 <span class="text-[11px] text-[#64748b]">x86_64</span>
               </a>
-              <a id="macArmTarBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.1.3/Berry-AI-Studio_macOS_aarch64.dmg" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 text-[13px] text-[#cbd5e1] transition-colors">
+              <a id="macArmTarBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.2.0/Berry-AI-Studio_macOS_aarch64.dmg" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 text-[13px] text-[#cbd5e1] transition-colors">
                 <span class="flex items-center gap-2"><span>📦</span> App Bundle (.tar.gz)</span>
                 <span class="text-[11px] text-[#64748b]">Apple Silicon</span>
               </a>
@@ -459,15 +459,15 @@
             <p class="text-[#94a3b8] text-[13px] mb-6" data-i18n="download.linuxDesc">Supports Ubuntu, Debian, Arch, Fedora and others.</p>
             
             <div class="flex flex-col gap-2.5 mb-6">
-              <a id="linuxAppImageBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.1.3/Berry-AI-Studio_Linux_x64.AppImage" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.09] border border-white/10 text-[13px] text-white font-medium transition-colors">
+              <a id="linuxAppImageBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.2.0/Berry-AI-Studio_Linux_x64.AppImage" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.09] border border-white/10 text-[13px] text-white font-medium transition-colors">
                 <span class="flex items-center gap-2"><span>🚀</span> Universal AppImage</span>
                 <span class="text-[11px] text-[#67e8f9] font-semibold" data-i18n="download.recommended">Recommended</span>
               </a>
-              <a id="linuxDebBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.1.3/Berry-AI-Studio_Linux_x64.deb" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 text-[13px] text-[#cbd5e1] transition-colors">
+              <a id="linuxDebBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.2.0/Berry-AI-Studio_Linux_x64.deb" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 text-[13px] text-[#cbd5e1] transition-colors">
                 <span class="flex items-center gap-2"><span>📦</span> Debian / Ubuntu (.deb)</span>
                 <span class="text-[11px] text-[#64748b]">apt</span>
               </a>
-              <a id="linuxRpmBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.1.3/Berry-AI-Studio_Linux_x64.AppImage" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 text-[13px] text-[#cbd5e1] transition-colors">
+              <a id="linuxRpmBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.2.0/Berry-AI-Studio_Linux_x64.AppImage" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 text-[13px] text-[#cbd5e1] transition-colors">
                 <span class="flex items-center gap-2"><span>🗜️</span> Fedora / RHEL (.rpm)</span>
                 <span class="text-[11px] text-[#64748b]">rpm</span>
               </a>
@@ -484,7 +484,7 @@
             ✓
           </div>
           <div>
-            <div class="text-[14px] font-bold text-white" id="releaseInfoTitle">Latest Release: v0.1.3</div>
+            <div class="text-[14px] font-bold text-white" id="releaseInfoTitle">Latest Release: v0.2.0</div>
             <div class="text-[12px] text-[#94a3b8]" id="releaseInfoDate">Built on Tauri 2.11 + Rust 1.85 + Vue 3.5</div>
           </div>
         </div>
@@ -1066,7 +1066,7 @@
 
     // Current Language & State
     let currentLang = localStorage.getItem("berry_site_lang") || "en";
-    let latestVersion = "v0.1.3";
+    let latestVersion = "v0.2.0";
     let releaseAssets = [];
 
     // Language Switcher Toggle
@@ -1337,7 +1337,7 @@
           }
         }
       } catch (err) {
-        console.warn("Could not query GitHub Releases API (rate-limited or offline), using fallback v0.1.3 assets:", err);
+        console.warn("Could not query GitHub Releases API (rate-limited or offline), using fallback v0.2.0 assets:", err);
       }
     }
 
