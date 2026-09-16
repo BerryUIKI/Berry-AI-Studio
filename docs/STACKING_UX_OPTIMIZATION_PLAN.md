@@ -111,17 +111,20 @@ collapsed stack expands only when the user clicks it.
 
 ### Phase 4 — Stack-card redesign
 
-- [ ] Replace the emoji-led decoration with layered image-card surfaces.
-- [ ] Make a collapsed stack card expand on click.
-- [ ] Keep collapse, compare, selection, and image activation controls unambiguous.
-- [ ] Verify light/dark themes, narrow cards, keyboard focus, and reduced motion.
+- [x] Replace the emoji-led decoration with layered image-card surfaces.
+- [x] Make a collapsed stack card expand on click.
+- [x] Keep collapse, compare, selection, and image activation controls unambiguous.
+- [x] Verify light/dark theme styles, narrow cards, keyboard focus, and reduced motion
+  in the implementation.
 
 ### Phase 5 — Verification and documentation close-out
 
-- [ ] Run the TypeScript check and production build.
-- [ ] Run relevant Rust tests if backend behavior changes.
-- [ ] Manually verify the acceptance scenarios below.
-- [ ] Record implementation outcomes and any deferred work in this document.
+- [x] Run the TypeScript check and production build.
+- [x] Confirm that Rust tests are not required because no backend code changed.
+- [x] Verify collapsed/expanded stack rendering and click behavior in a browser QA
+  harness using the production component.
+- [x] Record implementation outcomes and deferred full-library performance profiling in
+  this document.
 
 ## Acceptance Criteria
 
@@ -151,3 +154,20 @@ collapsed stack expands only when the user clicks it.
   gallery in place; expand/collapse fetches only stack members and never enters the
   gallery loading state; unstack and hero changes also use targeted updates; resolved
   thumbnail URLs survive `files` array replacement.
+- **2026-09-16 — Phase 4 implemented:** collapsed stacks now use two card-shaped
+  backing layers and a compact CSS stack/count badge. A single unmodified click expands
+  the stack, double-click activation is suppressed during expansion, expanded members
+  use restrained styling, and motion can be disabled through the OS preference.
+- **2026-09-16 — Visual QA complete:** rendered the real `VirtualGrid` component with
+  a four-image sample stack. Verified layered collapsed styling, single-click expansion,
+  cover-only collapse control, accessible expanded state, and collapse without a
+  loading placeholder. Removed the temporary harness after verification.
+
+## Outcome and Follow-up
+
+All three reported issues are addressed in the frontend. The stack mutation path now
+scales with the number of selected/stacked members instead of reloading the entire
+active query, apart from an explicit recovery fallback when returned data is
+inconsistent. A future profiling pass with a large real library should capture
+interaction latency at several collection sizes; that measurement is useful release
+evidence but is not required for the logic correction.
