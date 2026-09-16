@@ -11,8 +11,8 @@ use std::sync::MutexGuard;
 use berry_clip::{ClipEngine, ClipModelInfo};
 use berry_domain::{
     Album, CheckpointModelStat, CleanupQueueItem, DatabaseStats, DetectedLora, FileSortField,
-    Folder, ImageFile, LoraModel, ModelCacheEntry, PipelineDetectedPath, PromptStat, SearchCriteria,
-    SimilarityMatch, SortDirection, StackSummary, Tag,
+    Folder, ImageFile, LoraModel, ModelCacheEntry, PipelineDetectedPath, PromptStat,
+    SearchCriteria, SimilarityMatch, SortDirection, StackSummary, Tag,
 };
 use berry_scan::{ScanStats, Scanner};
 use berry_storage::Database;
@@ -142,7 +142,6 @@ pub fn add_folder_with_options(
     )
     .map_err(|e| e.to_string())
 }
-
 
 /// All registered folders, ordered by id.
 #[tauri::command]
@@ -2171,7 +2170,8 @@ pub async fn download_update(
             }
         }
 
-        file.flush().map_err(|e| format!("Failed to flush update file: {e}"))?;
+        file.flush()
+            .map_err(|e| format!("Failed to flush update file: {e}"))?;
         drop(file);
 
         if dest_path_clone.exists() {
@@ -2186,7 +2186,11 @@ pub async fn download_update(
             "update-download-progress",
             UpdateDownloadProgress {
                 downloaded_bytes,
-                total_bytes: if total_bytes == 0 { downloaded_bytes } else { total_bytes },
+                total_bytes: if total_bytes == 0 {
+                    downloaded_bytes
+                } else {
+                    total_bytes
+                },
                 percent: 100.0,
                 speed_bytes_per_sec: 0,
                 done: true,
@@ -2202,7 +2206,11 @@ pub async fn download_update(
 
 /// Launch the downloaded installer to execute in-place upgrade and cleanly exit current process.
 #[tauri::command]
-pub fn install_update(app: AppHandle, installer_path: String, silent: Option<bool>) -> Result<(), String> {
+pub fn install_update(
+    app: AppHandle,
+    installer_path: String,
+    silent: Option<bool>,
+) -> Result<(), String> {
     let p = Path::new(&installer_path);
     if !p.exists() {
         return Err(format!("Installer file not found: {installer_path}"));
@@ -2217,7 +2225,8 @@ pub fn install_update(app: AppHandle, installer_path: String, silent: Option<boo
         if is_silent {
             cmd.arg("/S");
         }
-        cmd.spawn().map_err(|e| format!("Failed to launch installer: {e}"))?;
+        cmd.spawn()
+            .map_err(|e| format!("Failed to launch installer: {e}"))?;
         app.exit(0);
     }
 
@@ -2290,13 +2299,37 @@ pub fn autodetect_local_ai_paths() -> Result<Vec<PipelineDetectedPath>, String> 
     ];
 
     let patterns = [
-        ("Stable Diffusion WebUI", "stable-diffusion-webui/outputs/txt2img-images", "txt2img"),
-        ("Stable Diffusion WebUI", "stable-diffusion-webui/outputs/img2img-images", "img2img"),
-        ("Stable Diffusion WebUI", "sd.webui/outputs/txt2img-images", "txt2img"),
-        ("Stable Diffusion WebUI (Aki)", "sd-webui-aki/outputs/txt2img-images", "txt2img"),
-        ("Stable Diffusion WebUI (Aki)", "sd-webui-aki/outputs/img2img-images", "img2img"),
+        (
+            "Stable Diffusion WebUI",
+            "stable-diffusion-webui/outputs/txt2img-images",
+            "txt2img",
+        ),
+        (
+            "Stable Diffusion WebUI",
+            "stable-diffusion-webui/outputs/img2img-images",
+            "img2img",
+        ),
+        (
+            "Stable Diffusion WebUI",
+            "sd.webui/outputs/txt2img-images",
+            "txt2img",
+        ),
+        (
+            "Stable Diffusion WebUI (Aki)",
+            "sd-webui-aki/outputs/txt2img-images",
+            "txt2img",
+        ),
+        (
+            "Stable Diffusion WebUI (Aki)",
+            "sd-webui-aki/outputs/img2img-images",
+            "img2img",
+        ),
         ("ComfyUI", "ComfyUI/output", "output"),
-        ("ComfyUI (Portable)", "ComfyUI_windows_portable/ComfyUI/output", "output"),
+        (
+            "ComfyUI (Portable)",
+            "ComfyUI_windows_portable/ComfyUI/output",
+            "output",
+        ),
         ("ComfyUI (Aki)", "ComfyUI-aki/ComfyUI/output", "output"),
         ("Fooocus", "Fooocus/outputs", "outputs"),
         ("Fooocus (MRE)", "Fooocus-MRE/outputs", "outputs"),
@@ -2324,7 +2357,10 @@ pub fn autodetect_local_ai_paths() -> Result<Vec<PipelineDetectedPath>, String> 
 }
 
 #[tauri::command]
-pub fn harvest_pipeline_folder(folder_id: i64, state: State<'_, AppState>) -> Result<usize, String> {
+pub fn harvest_pipeline_folder(
+    folder_id: i64,
+    state: State<'_, AppState>,
+) -> Result<usize, String> {
     let folder = {
         let db = db(&state)?;
         db.find_folder_by_id(folder_id)
@@ -2343,7 +2379,9 @@ pub fn harvest_pipeline_folder(folder_id: i64, state: State<'_, AppState>) -> Re
 
     let source_dir = Path::new(&source_path_str);
     if !source_dir.is_dir() {
-        return Err(format!("pipeline source path does not exist: {source_path_str}"));
+        return Err(format!(
+            "pipeline source path does not exist: {source_path_str}"
+        ));
     }
 
     let dest_dir = Path::new(&folder.path);
@@ -2488,7 +2526,10 @@ pub fn process_pipeline_cleanups(state: State<'_, AppState>) -> Result<u64, Stri
         let p = Path::new(&item.source_file_path);
         if p.exists() {
             if let Err(e) = trash::delete(p) {
-                eprintln!("Failed to trash expired pipeline file {}: {e}", item.source_file_path);
+                eprintln!(
+                    "Failed to trash expired pipeline file {}: {e}",
+                    item.source_file_path
+                );
                 let _ = db.update_cleanup_status(item.id, "failed");
                 continue;
             }
@@ -2511,7 +2552,8 @@ pub fn get_pipeline_cleanup_queue(
     state: State<'_, AppState>,
 ) -> Result<Vec<CleanupQueueItem>, String> {
     let db = db(&state)?;
-    db.get_cleanup_queue(limit.unwrap_or(50)).map_err(|e| e.to_string())
+    db.get_cleanup_queue(limit.unwrap_or(50))
+        .map_err(|e| e.to_string())
 }
 
 // ---------------------------------------------------------------------------
@@ -2547,7 +2589,10 @@ pub fn set_stack_hero(
 }
 
 #[tauri::command]
-pub fn get_stack_members(stack_id: String, state: State<'_, AppState>) -> Result<Vec<ImageFile>, String> {
+pub fn get_stack_members(
+    stack_id: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<ImageFile>, String> {
     let db = db(&state)?;
     db.get_stack_members(&stack_id).map_err(|e| e.to_string())
 }
@@ -2593,7 +2638,7 @@ pub fn cull_stack_drafts(
 
 fn tokenize_prompt(prompt: &str) -> std::collections::HashSet<String> {
     prompt
-        .split(|c: char| c == ',' || c == '\n' || c == '\r' || c == '\t')
+        .split([',', '\n', '\r', '\t'])
         .map(|s| s.trim().to_lowercase())
         .filter(|s| !s.is_empty())
         .collect()
@@ -2665,8 +2710,7 @@ pub fn auto_stack_images(
 
         let mut cluster = vec![id_a];
 
-        for j in (i + 1)..file_tokens.len() {
-            let (file_b, tokens_b) = &file_tokens[j];
+        for (file_b, tokens_b) in file_tokens.iter().skip(i + 1) {
             let id_b = match file_b.id {
                 Some(id) => id,
                 None => continue,
@@ -2681,8 +2725,14 @@ pub fn auto_stack_images(
                 continue;
             }
 
-            let model_a = file_a.metadata.as_ref().and_then(|m| m.model_name.as_deref());
-            let model_b = file_b.metadata.as_ref().and_then(|m| m.model_name.as_deref());
+            let model_a = file_a
+                .metadata
+                .as_ref()
+                .and_then(|m| m.model_name.as_deref());
+            let model_b = file_b
+                .metadata
+                .as_ref()
+                .and_then(|m| m.model_name.as_deref());
             if model_a.is_some() && model_b.is_some() && model_a != model_b {
                 continue;
             }
@@ -2708,5 +2758,3 @@ pub fn auto_stack_images(
 
     Ok(created_stacks)
 }
-
-

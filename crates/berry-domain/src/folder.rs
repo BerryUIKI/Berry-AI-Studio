@@ -35,4 +35,3 @@ fn default_folder_type() -> String {
 fn default_auto_harvest() -> bool {
     true
 }
-

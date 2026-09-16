@@ -159,4 +159,3 @@ pub const MIGRATIONS: &[&str] = &[
 
 /// The schema version the current code migrates databases to.
 pub const LATEST_VERSION: i64 = MIGRATIONS.len() as i64;
-

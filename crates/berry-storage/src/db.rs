@@ -90,7 +90,6 @@ const UPSERT_FILE_SQL: &str =
          stack_id        = coalesce(excluded.stack_id, files.stack_id),
          stack_order     = coalesce(excluded.stack_order, files.stack_order)";
 
-
 /// A SQLite database with a fully migrated schema.
 pub struct Database {
     conn: Connection,
@@ -351,7 +350,6 @@ impl Database {
         }
     }
 
-
     /// Delete a folder and cascade-delete its indexed files.
     ///
     /// Errors with [`DatabaseError::FolderNotFound`] if the id does not exist.
@@ -566,8 +564,7 @@ impl Database {
 
     /// Delete a file record by id.
     pub fn delete_file_by_id(&self, id: i64) -> Result<(), DatabaseError> {
-        self.conn
-            .execute("DELETE FROM files WHERE id = ?1", [id])?;
+        self.conn.execute("DELETE FROM files WHERE id = ?1", [id])?;
         Ok(())
     }
 
@@ -2024,9 +2021,8 @@ impl Database {
 
         let tx = self.conn.unchecked_transaction()?;
         {
-            let mut stmt = tx.prepare_cached(
-                "UPDATE files SET stack_id = ?1, stack_order = ?2 WHERE id = ?3",
-            )?;
+            let mut stmt = tx
+                .prepare_cached("UPDATE files SET stack_id = ?1, stack_order = ?2 WHERE id = ?3")?;
             for (idx, file_id) in file_ids.iter().enumerate() {
                 stmt.execute(params![sid, idx as i64, file_id])?;
             }
@@ -2152,7 +2148,10 @@ impl Database {
     }
 
     /// List pending cleanup items that are due for deletion.
-    pub fn list_due_cleanups(&self, now_timestamp: i64) -> Result<Vec<CleanupQueueItem>, DatabaseError> {
+    pub fn list_due_cleanups(
+        &self,
+        now_timestamp: i64,
+    ) -> Result<Vec<CleanupQueueItem>, DatabaseError> {
         let mut stmt = self.conn.prepare_cached(
             "SELECT id, source_file_path, target_file_id, scheduled_delete_at, created_at, status
              FROM pipeline_cleanup_queue
@@ -3784,7 +3783,14 @@ mod tests {
 
         // 2. Managed mode
         let managed_folder = db
-            .add_folder_with_mode("/path/to/managed", "managed", None, Some("copy"), None, false)
+            .add_folder_with_mode(
+                "/path/to/managed",
+                "managed",
+                None,
+                Some("copy"),
+                None,
+                false,
+            )
             .unwrap();
         assert_eq!(managed_folder.folder_type, "managed");
         assert_eq!(managed_folder.ingest_action.as_deref(), Some("copy"));
@@ -3912,4 +3918,3 @@ mod tests {
         assert!(db.get_stack_members(&stack_id).unwrap().is_empty());
     }
 }
-
