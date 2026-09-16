@@ -28,11 +28,6 @@ jobs:
             args: --target aarch64-apple-darwin
             dmg_asset_name: Berry-AI-Studio_macOS_aarch64.dmg
 
-          - target: x86_64-apple-darwin
-            arch_name: x86_64
-            args: --target x86_64-apple-darwin
-            dmg_asset_name: Berry-AI-Studio_macOS_x86_64.dmg
-
     runs-on: macos-latest
 
     env:
@@ -396,7 +391,7 @@ jobs:
             target: 'x86_64-pc-windows-msvc'
             os_name: 'Windows'
             arch_name: 'x64'
-          - platform: 'ubuntu-22.04'
+          - platform: 'ubuntu-latest'
             target: 'x86_64-unknown-linux-gnu'
             os_name: 'Linux'
             arch_name: 'x64'
@@ -430,15 +425,16 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-22.04'
+        if: matrix.os_name == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
+            libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf \
-            libsoup-3.0-dev
+            libsoup-3.0-dev \
+            libssl-dev
 
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
