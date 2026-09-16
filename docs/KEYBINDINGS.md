@@ -71,4 +71,6 @@ Ctrl/Cmd-click toggles individual images and establishes a new range anchor.
 ## 💡 Quick Tips
 - **Single-Key Blind Rating**: You can press `1` through `5` at any time while browsing in the grid or in fullscreen lightbox to rate images immediately without opening any menus.
 - **Copy Prompt**: Click on any token chip in the Inspector pane to instantly copy individual tags, or click the `Copy` button in the header to copy the full prompt.
-- **Poker Deck Stacks**: Grouped stacks display a stacked deck badge (e.g. `📚 12`). Double-click or click the badge to expand all versions inline.
+- **Image Stacks**: A collapsed group appears as layered image cards with a count
+  badge. Click the card or its badge once to expand all versions inline; click the
+  badge again to collapse it.
