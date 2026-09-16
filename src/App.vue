@@ -161,13 +161,17 @@ const selectedFilesList = computed(() => {
   return list;
 });
 
-const viewMode = ref<"grid" | "table">(
-  (localStorage.getItem("berry_default_view") as "grid" | "table") || "grid",
+type GalleryViewMode = "grid" | "masonry" | "table";
+const savedViewMode = localStorage.getItem("berry_default_view");
+const viewMode = ref<GalleryViewMode>(
+  savedViewMode === "grid" || savedViewMode === "masonry" || savedViewMode === "table"
+    ? savedViewMode
+    : "grid",
 );
 const blurNsfw = ref(localStorage.getItem("berry_blur_nsfw") !== "false");
 const showCardBadges = ref(localStorage.getItem("berry_card_badges") !== "false");
 
-function setViewMode(mode: "grid" | "table") {
+function setViewMode(mode: GalleryViewMode) {
   viewMode.value = mode;
   localStorage.setItem("berry_default_view", mode);
 }
@@ -177,7 +181,7 @@ function onSettingsSaved(settings: {
   autoScan: boolean;
   blurNsfw: boolean;
   showCardBadges: boolean;
-  defaultView: "grid" | "table";
+  defaultView: GalleryViewMode;
   thumbnailMaxEdge?: number;
   autoCheckUpdate?: boolean;
   allowMultipleStacksOpen?: boolean;
@@ -1585,7 +1589,7 @@ function onResetZoom() {
             />
 
             <!-- Zoom Slider (Eagle style slider for grid thumbnail size) -->
-            <div v-if="viewMode === 'grid'" class="zoom-slider-wrapper" :title="t.preview.zoomGrid">
+            <div v-if="viewMode !== 'table'" class="zoom-slider-wrapper" :title="t.preview.zoomGrid">
               <span class="zoom-icon small">▪</span>
               <input
                 v-model.number="gridItemWidth"
@@ -1600,6 +1604,15 @@ function onResetZoom() {
 
             <!-- View Mode Switch -->
             <div class="view-mode-toggle">
+              <button
+                type="button"
+                class="toggle-btn"
+                :class="{ active: viewMode === 'masonry' }"
+                :title="t.view.masonry"
+                @click="setViewMode('masonry')"
+              >
+                ▥
+              </button>
               <button
                 type="button"
                 class="toggle-btn"
@@ -1679,7 +1692,7 @@ function onResetZoom() {
         <!-- Main Viewport: Grid or Table -->
         <div class="gallery-viewport">
           <VirtualGrid
-            v-if="viewMode === 'grid'"
+            v-if="viewMode !== 'table'"
             :files="files"
             :selected-file="selectedFile"
             :selected-file-paths="selectedFilePaths"
@@ -1689,6 +1702,7 @@ function onResetZoom() {
             :show-card-badges="showCardBadges"
             :stack-map="stackMap"
             :expanded-stacks="expandedStacks"
+            :layout="viewMode"
             @select="onFileSelected"
             @activate="onActivateFile"
             @toggle-select="toggleSelectFile"

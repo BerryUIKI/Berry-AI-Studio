@@ -48,6 +48,7 @@ export const zhCN: typeof en = {
   },
   view: {
     grid: "网格",
+    masonry: "瀑布流",
     table: "列表",
     files: "文件",
     selectAll: "全选",
@@ -365,6 +366,9 @@ export const zhCN: typeof en = {
     defaultView: "默认画廊视图",
     defaultViewDesc: "选择启动软件时默认使用的图片展示方式",
     viewGrid: "网格瀑布流 (Grid)",
+    viewMasonry: "瀑布流（原始宽高比）",
+    allowMultipleStacks: "允许同时展开多个堆栈",
+    allowMultipleStacksDesc: "打开新堆栈时保留已展开的堆栈",
     viewTable: "详细列表 (Table)",
     autoScan: "启动时自动扫描",
     autoScanDesc: "启动时自动检查已添加文件夹中的新增/变动图片",

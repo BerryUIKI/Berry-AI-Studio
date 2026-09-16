@@ -48,6 +48,7 @@ export const ja: typeof en = {
   },
   view: {
     grid: "グリッド",
+    masonry: "ウォーターフォール",
     table: "リスト",
     files: "ファイル",
     selectAll: "すべて選択",
@@ -365,6 +366,9 @@ export const ja: typeof en = {
     defaultView: "デフォルトのギャラリー表示",
     defaultViewDesc: "アプリ起動時のデフォルト画像表示モードを選択します",
     viewGrid: "グリッド表示 (Grid)",
+    viewMasonry: "ウォーターフォール（元の縦横比）",
+    allowMultipleStacks: "複数のスタックを同時に開く",
+    allowMultipleStacksDesc: "別のスタックを開いても既存のスタックを展開したままにします",
     viewTable: "詳細リスト (Table)",
     autoScan: "起動時に自動スキャン",
     autoScanDesc: "起動時に追加済みフォルダの新規・変更画像を自動確認します",

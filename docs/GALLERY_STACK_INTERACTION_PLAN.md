@@ -114,18 +114,18 @@ preferences. The redesign will use:
 
 ### Phase 4 — Virtualized waterfall layout
 
-- [ ] Add `masonry` to the persisted gallery view mode.
-- [ ] Compute shortest-column positions from original aspect ratios.
-- [ ] Virtualize cards by vertical intersection with overscan.
-- [ ] Preserve full images with non-cropping thumbnail presentation.
-- [ ] Integrate the view toggle, zoom control, selection, stack gestures, and keyboard
+- [x] Add `masonry` to the persisted gallery view mode.
+- [x] Compute shortest-column positions from original aspect ratios.
+- [x] Virtualize cards by vertical intersection with overscan.
+- [x] Preserve full images with non-cropping thumbnail presentation.
+- [x] Integrate the view toggle, zoom control, selection, stack gestures, and keyboard
   scrolling.
 
 ### Phase 5 — Settings redesign
 
 - [ ] Reorganize settings into task-oriented categories and grouped sections.
-- [ ] Add Grid, Waterfall, and Table default-view choices.
-- [ ] Add the multi-open stack preference with clear default behavior.
+- [x] Add Grid, Waterfall, and Table default-view choices.
+- [x] Add the multi-open stack preference with clear default behavior.
 - [ ] Improve responsive layout, focus visibility, action hierarchy, and immediate-action
   feedback.
 
@@ -164,3 +164,8 @@ preferences. The redesign will use:
 - **2026-09-16 — Phase 3 implemented:** collapsed covers retain the cached hero
   thumbnail but replace filename/path presentation with a localized Image Stack label,
   member count, and neutral STACK type marker.
+- **2026-09-16 — Phase 4 implemented:** Grid and Waterfall now share one virtualized
+  card pipeline. Waterfall computes stable shortest-column geometry from metadata,
+  mounts only viewport-adjacent cards, preserves original aspect ratios without
+  cropping, and remains compatible with selection, stack gestures, zoom sizing,
+  thumbnail prefetch, drag behavior, and keyboard scrolling.
