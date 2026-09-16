@@ -21,6 +21,7 @@ import {
   saveAppConfig,
   getStoragePaths,
   openStorageDir,
+  resetSuppressedWarnings,
   type StoragePaths,
 } from "../utils/config";
 
@@ -55,6 +56,9 @@ const thumbnailMaxEdge = ref(getThumbnailMaxEdge());
 const autoStack = ref(false);
 const stackSimilarityThreshold = ref(0.85);
 const stackTimeWindowMinutes = ref(180);
+const suppressedWarningCount = ref(0);
+const resettingWarnings = ref(false);
+const warningResetMessage = ref("");
 
 // Storage paths state
 const storagePaths = ref<StoragePaths | null>(null);
@@ -85,6 +89,8 @@ async function loadSettingsAndPaths() {
     autoStack.value = config.auto_stack ?? false;
     stackSimilarityThreshold.value = config.stack_similarity_threshold ?? 0.85;
     stackTimeWindowMinutes.value = config.stack_time_window_minutes ?? 180;
+    suppressedWarningCount.value = config.suppressed_warnings.length;
+    warningResetMessage.value = "";
 
     storagePaths.value = await getStoragePaths();
   } catch (e) {
@@ -103,6 +109,22 @@ async function handleClearCache() {
     cacheMessage.value = `${e}`;
   } finally {
     clearingCache.value = false;
+  }
+}
+
+async function handleResetWarnings() {
+  resettingWarnings.value = true;
+  warningResetMessage.value = "";
+  try {
+    const resetCount = await resetSuppressedWarnings();
+    suppressedWarningCount.value = 0;
+    warningResetMessage.value = resetCount > 0
+      ? t.value.settings.warningsReset
+      : t.value.settings.noSuppressedWarnings;
+  } catch (e) {
+    warningResetMessage.value = String(e);
+  } finally {
+    resettingWarnings.value = false;
   }
 }
 
@@ -270,6 +292,24 @@ async function saveSettings() {
                 <span class="row-desc">{{ t.settings.autoCheckUpdateDesc }}</span>
               </div>
               <input v-model="autoCheckUpdate" type="checkbox" class="toggle-checkbox" />
+            </div>
+
+            <div class="setting-row">
+              <div class="row-info">
+                <span class="row-label">{{ t.settings.suppressedWarnings }}</span>
+                <span class="row-desc">{{ t.settings.suppressedWarningsDesc }}</span>
+                <span v-if="warningResetMessage" class="setting-feedback">
+                  {{ warningResetMessage }}
+                </span>
+              </div>
+              <button
+                type="button"
+                class="btn secondary"
+                :disabled="resettingWarnings || suppressedWarningCount === 0"
+                @click="handleResetWarnings"
+              >
+                {{ t.settings.resetWarnings }}
+              </button>
             </div>
           </div>
 
@@ -637,6 +677,17 @@ async function saveSettings() {
 .row-desc {
   font-size: 0.7rem;
   color: #71717a;
+}
+
+.setting-feedback {
+  margin-top: 3px;
+  font-size: 0.68rem;
+  color: #4ade80;
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .path-code {

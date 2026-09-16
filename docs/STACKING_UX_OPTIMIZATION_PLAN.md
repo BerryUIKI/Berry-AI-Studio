@@ -223,9 +223,9 @@ and ambiguous nested-stack operation from the user's perspective.
 
 #### Phase 7 — Warning preference infrastructure
 
-- [ ] Add backward-compatible `suppressed_warnings` configuration storage.
-- [ ] Add reusable helpers for checking, suppressing, and resetting named warnings.
-- [ ] Add the Settings reset control with success/error feedback.
+- [x] Add backward-compatible `suppressed_warnings` configuration storage.
+- [x] Add reusable helpers for checking, suppressing, and resetting named warnings.
+- [x] Add the Settings reset control with success/error feedback.
 
 #### Phase 8 — Merge warning and Ctrl/Cmd+G integration
 
@@ -265,3 +265,6 @@ and ambiguous nested-stack operation from the user's perspective.
   operation and Tauri command. Tests cover stack-to-stack merging, standalone appends,
   duplicate inputs, target hero preservation, source dissolution, and stale stacked-ID
   rejection with full rollback.
+- **2026-09-16 — Phase 7 implemented:** added a backward-compatible named warning
+  suppression list, typed persistence helpers, and a Settings control that resets all
+  suppressed warnings without changing other preferences.

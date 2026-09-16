@@ -409,6 +409,11 @@ export const zhTW: typeof en = {
     stackThresholdDesc: "合併為同一堆疊所需的最低提示詞分詞相似度",
     stackTimeWindow: "生成批次最大時間窗口",
     stackTimeWindowDesc: "僅將在此時間範圍內生成的連續圖片聚合為堆疊",
+    suppressedWarnings: "已隱藏的警告對話框",
+    suppressedWarningsDesc: "重新啟用所有透過「不再顯示」隱藏的警告對話框",
+    resetWarnings: "重設已隱藏的警告",
+    warningsReset: "已重設隱藏的警告對話框。",
+    noSuppressedWarnings: "目前沒有隱藏的警告對話框。",
   },
   addFolder: {
     title: "新增資料夾至媒體庫",
