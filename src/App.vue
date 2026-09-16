@@ -16,6 +16,7 @@ import type {
   SimilarFileItem,
   SortDirection,
   Tag,
+  StackSummary,
 } from "./types";
 import { getFileName } from "./utils/image";
 import TitleBar from "./components/TitleBar.vue";
@@ -42,9 +43,14 @@ import UpdateModal from "./components/UpdateModal.vue";
 import AutoTagModal from "./components/AutoTagModal.vue";
 import ClipManagerModal from "./components/ClipManagerModal.vue";
 import LoraManagerModal from "./components/LoraManagerModal.vue";
+import AddFolderModal from "./components/AddFolderModal.vue";
+import OnboardingModal from "./components/OnboardingModal.vue";
+import CompareModal from "./components/CompareModal.vue";
 import { t } from "./i18n";
 import { countActiveFilters, criteriaToQuery } from "./utils/search";
 import { requestBatchThumbnails } from "./utils/thumbnail";
+import { loadAppConfig, saveAppConfig } from "./utils/config";
+import { checkForUpdates } from "./utils/updater";
 
 const info = ref<AppInfo | null>(null);
 const folders = ref<Folder[]>([]);
@@ -90,6 +96,16 @@ const tagTargetFileIds = ref<number[]>([]);
 const autoTagModalOpen = ref(false);
 const autoTagTargetFile = ref<ImageFile | null>(null);
 const inspectorRef = ref<InstanceType<typeof InspectorPane> | null>(null);
+const addFolderModalOpen = ref(false);
+const onboardingModalOpen = ref(false);
+/** Session-level guard: once the onboarding modal is dismissed it can never reopen. */
+let onboardingDismissedThisSession = false;
+const compareModalOpen = ref(false);
+const compareImages = ref<ImageFile[]>([]);
+
+// Image Stacking State
+const stackMap = ref<Record<string, { count: number; heroId: number | null }>>({});
+const expandedStacks = ref<Set<string>>(new Set());
 
 // Filter Metadata
 const distinctModels = ref<string[]>([]);
@@ -133,10 +149,13 @@ function setViewMode(mode: "grid" | "table") {
 }
 
 function onSettingsSaved(settings: {
+  locale?: string;
   autoScan: boolean;
   blurNsfw: boolean;
   showCardBadges: boolean;
   defaultView: "grid" | "table";
+  thumbnailMaxEdge?: number;
+  autoCheckUpdate?: boolean;
 }) {
   blurNsfw.value = settings.blurNsfw;
   showCardBadges.value = settings.showCardBadges;
@@ -196,6 +215,38 @@ function handleWindowKeyDown(e: KeyboardEvent) {
     return;
   }
 
+  // Open Add Folder Modal: Cmd+O / Ctrl+O
+  if ((e.ctrlKey || e.metaKey) && (e.key === "o" || e.key === "O")) {
+    e.preventDefault();
+    addFolderModalOpen.value = true;
+    return;
+  }
+
+  // Stacking: Group (Ctrl+G) or Ungroup (Ctrl+Shift+G)
+  if ((e.ctrlKey || e.metaKey) && (e.key === "g" || e.key === "G")) {
+    e.preventDefault();
+    if (e.shiftKey) {
+      void onUnstackSelected();
+    } else {
+      void onStackSelected();
+    }
+    return;
+  }
+
+  // Set Hero Cover for Stack: Alt+S
+  if (e.altKey && (e.key === "s" || e.key === "S")) {
+    e.preventDefault();
+    void onSetHeroSelected();
+    return;
+  }
+
+  // Compare Mode: C (without modifiers)
+  if ((e.key === "c" || e.key === "C") && !e.ctrlKey && !e.metaKey && !e.altKey && !lightboxFile.value) {
+    e.preventDefault();
+    void onTriggerCompare();
+    return;
+  }
+
   // Select All: Cmd+A / Ctrl+A
   if ((e.ctrlKey || e.metaKey) && (e.key === "a" || e.key === "A")) {
     e.preventDefault();
@@ -251,6 +302,18 @@ function handleWindowKeyDown(e: KeyboardEvent) {
     }
     if (clipModalOpen.value) {
       clipModalOpen.value = false;
+      return;
+    }
+    if (onboardingModalOpen.value) {
+      void onOnboardingComplete();
+      return;
+    }
+    if (addFolderModalOpen.value) {
+      addFolderModalOpen.value = false;
+      return;
+    }
+    if (compareModalOpen.value) {
+      compareModalOpen.value = false;
       return;
     }
     if (loraModalOpen.value) {
@@ -330,14 +393,36 @@ onMounted(async () => {
   window.addEventListener("keydown", handleWindowKeyDown);
   try {
     info.value = await invoke<AppInfo>("get_app_info");
+
+    // Load persistent configuration from config.json (auto-migrating localStorage)
+    const cfg = await loadAppConfig();
+    viewMode.value = cfg.default_view || "grid";
+    blurNsfw.value = cfg.blur_nsfw;
+    showCardBadges.value = cfg.show_card_badges;
+
     await reloadFolders();
     await refreshCounts();
     await reloadFiltersMeta();
     await loadAlbumsAndTags();
     await loadFiles();
 
-    if (localStorage.getItem("berry_autoscan") !== "false" && folders.value.length > 0) {
+    if (!cfg.has_completed_onboarding && !onboardingDismissedThisSession) {
+      onboardingModalOpen.value = true;
+    }
+
+    // Safely process any due pipeline trash cleanups
+    void invoke("process_pipeline_cleanups").catch(() => {});
+
+    if (cfg.auto_scan && folders.value.length > 0) {
       void runBackgroundStartupScan();
+    }
+
+    if (cfg.auto_check_update && info.value?.app_version) {
+      void checkForUpdates(info.value.app_version).then((res) => {
+        if (res.status === "update_available") {
+          updateModalOpen.value = true;
+        }
+      });
     }
   } catch (e) {
     error.value = String(e);
@@ -573,6 +658,115 @@ function onOpenAlbumModal(fileIds?: number[]) {
   albumModalOpen.value = true;
 }
 
+async function onStackSelected() {
+  const ids = selectedFilesList.value
+    .map((f) => f.id)
+    .filter((id): id is number => id != null);
+  if (ids.length < 2) return;
+  try {
+    await invoke("stack_images", { fileIds: ids });
+    await loadFiles();
+  } catch (err) {
+    error.value = String(err);
+  }
+}
+
+async function onUnstackSelected() {
+  const file = selectedFile.value || (selectedFilesList.value.length > 0 ? selectedFilesList.value[0] : null);
+  if (!file?.stack_id) return;
+  try {
+    await invoke("unstack_images", { stackId: file.stack_id });
+    expandedStacks.value.delete(file.stack_id);
+    await loadFiles();
+  } catch (err) {
+    error.value = String(err);
+  }
+}
+
+async function onSetHeroSelected() {
+  const file = selectedFile.value || (selectedFilesList.value.length > 0 ? selectedFilesList.value[0] : null);
+  if (!file?.stack_id || file.id == null) return;
+  try {
+    await invoke("set_stack_hero", { stackId: file.stack_id, heroFileId: file.id });
+    await loadFiles();
+  } catch (err) {
+    error.value = String(err);
+  }
+}
+
+function onToggleStackExpand(stackId: string) {
+  if (expandedStacks.value.has(stackId)) {
+    expandedStacks.value.delete(stackId);
+  } else {
+    expandedStacks.value.add(stackId);
+  }
+  void loadFiles();
+}
+
+async function onTriggerCompare(customStackId?: string) {
+  if (customStackId) {
+    try {
+      const members = await invoke<ImageFile[]>("get_stack_members", { stackId: customStackId });
+      if (members.length > 0) {
+        compareImages.value = members;
+        compareModalOpen.value = true;
+        return;
+      }
+    } catch (err) {
+      console.warn("Failed to load stack members for compare:", err);
+    }
+  }
+
+  // Otherwise compare selected files
+  if (selectedFilesList.value.length >= 2) {
+    compareImages.value = selectedFilesList.value;
+    compareModalOpen.value = true;
+  } else if (selectedFile.value?.stack_id) {
+    try {
+      const members = await invoke<ImageFile[]>("get_stack_members", { stackId: selectedFile.value.stack_id });
+      if (members.length > 0) {
+        compareImages.value = members;
+        compareModalOpen.value = true;
+      }
+    } catch (err) {
+      console.warn("Failed to load stack members for compare:", err);
+    }
+  }
+}
+
+async function onCompareSetHero(img: ImageFile) {
+  if (!img.stack_id || img.id == null) return;
+  try {
+    await invoke("set_stack_hero", { stackId: img.stack_id, heroFileId: img.id });
+    await loadFiles();
+  } catch (err) {
+    console.error("Failed to set hero in compare:", err);
+  }
+}
+
+async function onOnboardingComplete() {
+  // Immediately prevent any re-opening — this is the critical guard
+  onboardingDismissedThisSession = true;
+  onboardingModalOpen.value = false;
+  try {
+    const cfg = await loadAppConfig();
+    await saveAppConfig({
+      ...cfg,
+      has_completed_onboarding: true,
+    });
+  } catch (err) {
+    console.warn("Failed to mark onboarding complete:", err);
+  }
+  // Reload data in the background (errors here should NOT affect the modal state)
+  try {
+    await reloadFolders();
+    await refreshCounts();
+    await loadFiles();
+  } catch (err) {
+    console.warn("Post-onboarding data reload failed:", err);
+  }
+}
+
 function onBatchAddToAlbum() {
   const ids = selectedFilesList.value
     .map((f) => f.id)
@@ -748,6 +942,32 @@ async function loadFiles() {
       }
       files.value = await invoke<ImageFile[]>("search_files", { criteria });
     }
+
+    // Refresh stack summaries for active folder or all
+    try {
+      const folderId = activeTarget.value.type === "folder" ? activeTarget.value.folder.id : null;
+      const stacks = await invoke<StackSummary[]>("list_stacks", { folderId });
+      const map: Record<string, { count: number; heroId: number | null }> = {};
+      for (const s of stacks) {
+        map[s.stack_id] = { count: s.count, heroId: s.hero_image_id };
+      }
+      stackMap.value = map;
+
+      // Filter out non-hero stack members unless that stack is expanded
+      if (files.value.length > 0) {
+        files.value = files.value.filter((f) => {
+          if (!f.stack_id) return true;
+          const info = stackMap.value[f.stack_id];
+          if (!info || info.count <= 1) return true;
+          if (expandedStacks.value.has(f.stack_id)) return true;
+          // Only show the Hero Cover (stack_order === 0 or matches hero_image_id)
+          return f.stack_order === 0 || (f.id != null && f.id === info.heroId);
+        });
+      }
+    } catch (stackErr) {
+      console.warn("Failed to load stack metadata:", stackErr);
+    }
+
     // Background async batch generation for initial slice of files
     if (files.value.length > 0) {
       void requestBatchThumbnails(files.value.slice(0, 200));
@@ -1068,6 +1288,7 @@ function onResetZoom() {
         @open-model-manager="modelManagerModalOpen = true"
         @open-db-manager="dbManagerModalOpen = true"
         @open-shortcuts-help="shortcutsHelpModalOpen = true"
+        @open-add-folder-modal="addFolderModalOpen = true"
         @move-files-to-folder="onDropMoveFiles"
         @add-files-to-album="onDropAddFilesToAlbum"
         @tag-files="onDropTagFiles"
@@ -1223,10 +1444,14 @@ function onResetZoom() {
             :item-min-width="gridItemWidth"
             :blur-nsfw="blurNsfw"
             :show-card-badges="showCardBadges"
+            :stack-map="stackMap"
+            :expanded-stacks="expandedStacks"
             @select="onFileSelected"
             @activate="onActivateFile"
             @toggle-select="toggleSelectFile"
             @find-similar="handleFindSimilar"
+            @toggle-stack-expand="onToggleStackExpand"
+            @compare-stack="onTriggerCompare"
           />
 
           <FileList
@@ -1404,6 +1629,27 @@ function onResetZoom() {
       :show="updateModalOpen"
       :current-version="info?.app_version || '0.1.1'"
       @close="updateModalOpen = false"
+    />
+
+    <!-- Multi-Mode Add Folder Modal -->
+    <AddFolderModal
+      v-if="addFolderModalOpen"
+      @close="addFolderModalOpen = false"
+      @folder-added="onFolderAdded"
+    />
+
+    <!-- Onboarding Setup Wizard Modal -->
+    <OnboardingModal
+      v-if="onboardingModalOpen"
+      @close="onOnboardingComplete"
+    />
+
+    <!-- Side-by-Side Compare Modal -->
+    <CompareModal
+      v-if="compareModalOpen"
+      :images="compareImages"
+      @close="compareModalOpen = false"
+      @set-hero="onCompareSetHero"
     />
   </div>
 </template>

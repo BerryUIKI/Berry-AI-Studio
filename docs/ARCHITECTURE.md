@@ -1,6 +1,6 @@
-# 🏗️ Berry-AIGC-Toolbox Architecture
+# 🏗️ Berry AI Studio Architecture
 
-**Berry-AIGC-Toolbox** is a high-performance desktop application built on **Tauri 2**, **Rust**, **Vue 3**, and **SQLite**. It uses a multi-crate Rust backend to handle heavy I/O, file system operations, and metadata extraction, while providing a modern Eagle-style 3-Pane Studio UI in the frontend webview.
+**Berry AI Studio** is a high-performance desktop application built on **Tauri 2**, **Rust**, **Vue 3**, and **SQLite**. It uses a multi-crate Rust backend to handle heavy I/O, file system operations, and metadata extraction, while providing a modern Eagle-style 3-Pane Studio UI in the frontend webview.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -86,3 +86,22 @@ The frontend is built with **Vue 3 Composition API** + **TypeScript** + **Vite**
 ### 2. State & Localization
 - **Reactive i18n (`src/i18n/`)**: Lightweight reactive internationalization supporting 7 locales (`en`, `zh-CN`, `zh-TW`, `ja`, `de`, `fr`, `es`) and automatic OS language detection (`auto`).
 - **Updater (`src/utils/updater.ts` & `UpdateModal.vue`)**: SemVer comparison against GitHub Releases API with automated asset matching and release notes rendering.
+
+---
+
+## ⚡ Multi-Mode Folders & AIGC Ingestion Pipeline
+
+Berry AI Studio extends conventional folder management into three high-performance modes (see [INGESTION_AND_STACKING.md](INGESTION_AND_STACKING.md) for full specifications):
+- **Link Folders (`link`)**: Zero-copy in-place file surveillance without file movement.
+- **Managed Vaults (`managed`)**: Managed repository supporting direct drag-and-drop Copy or Move ingestion.
+- **AIGC Ingestion Pipeline (`pipeline`)**: Automated surveillance of WebUI, ComfyUI, and Fooocus output directories with write-lock debouncing, atomic ingest to the library, and non-destructive delayed cleanup (grace period) moving aged source files to the OS Recycle Bin.
+
+---
+
+## 🗃️ Image Stacking Architecture
+
+To solve the "AI Burst / Roll" gallery clutter problem:
+- **Burst Clustering**: Groups batch generation variants by exact or high-similarity prompts (Jaccard threshold) constrained within a temporal generation window.
+- **Manual Stacking**: Full keyboard-driven grouping via `Ctrl+G` (stack) and `Ctrl+Shift+G` (unstack).
+- **Poker Deck Presentation**: Collapsed stack presentation with item count badges (`📚 N`), inline expansion, hero cover selection (`Alt+S`), and side-by-side comparison (`C`).
+

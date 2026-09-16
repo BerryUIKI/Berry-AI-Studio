@@ -24,6 +24,9 @@ pub fn run() {
             // Open (and migrate) the SQLite database in the OS app data dir.
             let data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
+            let _ = std::fs::create_dir_all(data_dir.join("updates"));
+            let _ = std::fs::create_dir_all(data_dir.join("thumbnails"));
+            let _ = std::fs::create_dir_all(data_dir.join("models"));
             let db = Database::connect(&data_dir.join("berry.db"))?;
             app.manage(AppState {
                 db: Mutex::new(db),
@@ -114,6 +117,24 @@ pub fn run() {
             commands::get_image_detected_loras,
             commands::import_lora_civitai_info,
             commands::scan_loras_directory,
+            commands::get_app_config,
+            commands::save_app_config,
+            commands::get_storage_paths,
+            commands::open_storage_dir,
+            commands::download_update,
+            commands::install_update,
+            commands::add_folder_with_options,
+            commands::autodetect_local_ai_paths,
+            commands::harvest_pipeline_folder,
+            commands::process_pipeline_cleanups,
+            commands::get_pipeline_cleanup_queue,
+            commands::stack_images,
+            commands::unstack_images,
+            commands::set_stack_hero,
+            commands::get_stack_members,
+            commands::list_stacks,
+            commands::cull_stack_drafts,
+            commands::auto_stack_images,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

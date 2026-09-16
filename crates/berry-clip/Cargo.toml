@@ -3,7 +3,7 @@ name = "berry-clip"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Local CLIP/SigLIP multi-modal embedding and text-to-image semantic search for Berry-AIGC-Toolbox"
+description = "Local CLIP/SigLIP multi-modal embedding and text-to-image semantic search for Berry AI Studio"
 
 [dependencies]
 berry-domain = { path = "../berry-domain" }

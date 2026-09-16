@@ -1,4 +1,4 @@
-//! The AI image generators whose metadata Berry-AIGC-Toolbox understands.
+//! The AI image generators whose metadata Berry AI Studio understands.
 
 use serde::{Deserialize, Serialize};
 

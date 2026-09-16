@@ -92,6 +92,12 @@ pub struct ImageFile {
     /// Whether this file is flagged as NSFW.
     #[serde(default)]
     pub is_nsfw: bool,
+    /// Identifier of the image stack this image belongs to, if any.
+    #[serde(default)]
+    pub stack_id: Option<String>,
+    /// Order index within the stack (0 = Hero Cover, 1..N = members).
+    #[serde(default)]
+    pub stack_order: i32,
 }
 
 /// Field by which to sort a list of [`ImageFile`]s.

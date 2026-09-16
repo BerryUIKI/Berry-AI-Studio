@@ -1,6 +1,6 @@
-# ⌨️ Berry-AIGC-Toolbox Keyboard Shortcuts
+# ⌨️ Berry AI Studio Keyboard Shortcuts
 
-Berry-AIGC-Toolbox is designed with desktop productivity in mind. Most major operations can be performed using keyboard shortcuts.
+Berry AI Studio is designed with desktop productivity in mind. Most major operations can be performed using keyboard shortcuts.
 
 ---
 
@@ -41,11 +41,24 @@ Berry-AIGC-Toolbox is designed with desktop productivity in mind. Most major ope
 
 ---
 
+---
+
+## 🗃️ Image Stacking & Grouping
+
+| Shortcut | Scope | Action |
+| :--- | :--- | :--- |
+| `Ctrl+G` / `Cmd+G` | Gallery | Group selected images into a manual Image Stack |
+| `Ctrl+Shift+G` / `Cmd+Shift+G` | Gallery | Unstack / dissolve selected stack into individual images |
+| `Alt+S` | Gallery / Lightbox | Set selected image as the Hero Cover of its parent stack |
+| `C` | Gallery / Lightbox | Enter Side-by-Side Compare Mode for selected stack or pair |
+
+---
+
 ## 📁 Library & Settings
 
 | Shortcut | Scope | Action |
 | :--- | :--- | :--- |
-| `Ctrl+O` / `Cmd+O` | Global | Open Folder Picker to add a new library folder |
+| `Ctrl+O` / `Cmd+O` | Global | Launch Folder Mode Wizard (Link, Managed, or Pipeline) |
 | `Ctrl+,` / `Cmd+,` | Global | Open Preferences & Settings dialog |
 | `?` or `Shift+/` | Global | Open Keyboard Shortcuts Help Modal |
 
@@ -54,3 +67,4 @@ Berry-AIGC-Toolbox is designed with desktop productivity in mind. Most major ope
 ## 💡 Quick Tips
 - **Single-Key Blind Rating**: You can press `1` through `5` at any time while browsing in the grid or in fullscreen lightbox to rate images immediately without opening any menus.
 - **Copy Prompt**: Click on any token chip in the Inspector pane to instantly copy individual tags, or click the `Copy` button in the header to copy the full prompt.
+- **Poker Deck Stacks**: Grouped stacks display a stacked deck badge (e.g. `📚 12`). Double-click or click the badge to expand all versions inline.

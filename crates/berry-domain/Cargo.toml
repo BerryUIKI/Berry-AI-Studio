@@ -3,7 +3,7 @@ name = "berry-domain"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Core domain types shared across Berry-AIGC-Toolbox crates"
+description = "Core domain types shared across Berry AI Studio crates"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

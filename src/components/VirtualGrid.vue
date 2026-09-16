@@ -26,6 +26,8 @@ const props = withDefaults(
     overscan?: number;
     blurNsfw?: boolean;
     showCardBadges?: boolean;
+    stackMap?: Record<string, { count: number; heroId: number | null }>;
+    expandedStacks?: Set<string>;
   }>(),
   {
     selectedFile: null,
@@ -43,6 +45,8 @@ const emit = defineEmits<{
   (e: "activate", file: ImageFile): void;
   (e: "toggleSelect", file: ImageFile): void;
   (e: "findSimilar", file: ImageFile): void;
+  (e: "toggleStackExpand", stackId: string): void;
+  (e: "compareStack", stackId: string): void;
 }>();
 
 const containerRef = ref<HTMLElement | null>(null);
@@ -360,6 +364,8 @@ watch(
             :class="{
               active: selectedFile?.path === file.path,
               'multi-selected': selectedFilePaths?.has(file.path),
+              'is-stacked': file.stack_id && (stackMap?.[file.stack_id]?.count ?? 1) > 1,
+              'stack-expanded': file.stack_id && expandedStacks?.has(file.stack_id),
             }"
             draggable="true"
             @dragstart="onDragStart($event, file)"
@@ -482,6 +488,29 @@ watch(
                 >
                   ⚡ {{ Math.round(file.similarity_score * 100) }}%
                 </span>
+
+                <!-- Stacking badge -->
+                <button
+                  v-if="file.stack_id && (stackMap?.[file.stack_id]?.count ?? 1) > 1"
+                  type="button"
+                  class="card-badge badge-stack"
+                  :class="{ expanded: expandedStacks?.has(file.stack_id) }"
+                  :title="t.stack.toggleExpand || 'Toggle Stack Expansion'"
+                  @click.stop="emit('toggleStackExpand', file.stack_id)"
+                >
+                  📚 {{ stackMap?.[file.stack_id]?.count }}
+                </button>
+
+                <!-- Stack compare trigger button -->
+                <button
+                  v-if="file.stack_id && (stackMap?.[file.stack_id]?.count ?? 1) > 1"
+                  type="button"
+                  class="card-stack-compare-btn"
+                  :title="t.compare.title || 'Compare Stack'"
+                  @click.stop="emit('compareStack', file.stack_id)"
+                >
+                  ⚖️
+                </button>
               </template>
             </div>
 
@@ -571,6 +600,29 @@ watch(
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
   border-color: rgba(47, 111, 237, 0.4);
+}
+
+/* Poker Deck Stack Shadow Effect */
+.grid-card.is-stacked {
+  box-shadow: 3px 3px 0 0 rgba(0, 0, 0, 0.12), 6px 6px 0 0 rgba(0, 0, 0, 0.06);
+  border-color: rgba(47, 111, 237, 0.35);
+}
+
+@media (prefers-color-scheme: dark) {
+  .grid-card.is-stacked {
+    box-shadow: 3px 3px 0 0 rgba(255, 255, 255, 0.08), 6px 6px 0 0 rgba(255, 255, 255, 0.04);
+    border-color: rgba(47, 111, 237, 0.45);
+  }
+}
+
+.grid-card.is-stacked:hover {
+  transform: translateY(-3px);
+  box-shadow: 4px 4px 0 0 rgba(0, 0, 0, 0.15), 8px 8px 0 0 rgba(0, 0, 0, 0.08);
+}
+
+.grid-card.stack-expanded {
+  border-style: dashed;
+  border-color: #2f6fed;
 }
 
 .grid-card.active {
@@ -715,6 +767,62 @@ watch(
   color: #fff;
   font-weight: 700;
   box-shadow: 0 2px 6px rgba(99, 102, 241, 0.4);
+}
+
+.badge-stack {
+  top: 6px;
+  right: 6px;
+  background: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #38bdf8;
+  font-weight: 700;
+  font-size: 0.72em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  cursor: pointer;
+  z-index: 2;
+  transition: all 0.15s ease;
+}
+
+.badge-stack:hover {
+  background: #0284c7;
+  color: #fff;
+  border-color: #38bdf8;
+}
+
+.badge-stack.expanded {
+  background: #2563eb;
+  color: #fff;
+  border-color: #60a5fa;
+}
+
+.card-stack-compare-btn {
+  position: absolute;
+  top: 6px;
+  right: 64px;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #fff;
+  font-size: 0.75em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  z-index: 2;
+  transition: all 0.15s ease;
+}
+
+.grid-card:hover .card-stack-compare-btn {
+  opacity: 1;
+}
+
+.card-stack-compare-btn:hover {
+  background: #4f46e5;
+  border-color: #818cf8;
 }
 
 .card-similar-btn {

@@ -4,12 +4,12 @@
 
 **[English](README.md)** | **[简体中文](README.zh-CN.md)** | **[繁體中文](README.zh-TW.md)** | **[日本語](README.ja.md)**
 
-[![Website](https://img.shields.io/badge/website-GitHub%20Pages-12b5cb.svg)](https://berryuiki.github.io/Berry-AIGC-Toolbox/)
+[![Website](https://img.shields.io/badge/website-GitHub%20Pages-12b5cb.svg)](https://berryuiki.github.io/Berry-AI-Studio/)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Tauri](https://img.shields.io/badge/Tauri-2-24c8db)](https://tauri.app)
 [![Rust](https://img.shields.io/badge/Rust-1.7+-orange)](https://www.rust-lang.org)
 [![Vue](https://img.shields.io/badge/Vue-3-42b883)](https://vuejs.org)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](https://github.com/BerryUIKI/Berry-AIGC-Toolbox/releases)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](https://github.com/BerryUIKI/Berry-AI-Studio/releases)
 
 *A high-performance, open-source metadata indexer and asset management studio for AI-generated images.*
 
@@ -27,7 +27,7 @@
 
 ## 🌟 Overview
 
-**Berry AI Studio** (formerly *Berry-AIGC-Toolbox*) is a modern, desktop-first asset manager built for digital artists, AI creators, and prompt engineers. It indexes and parses prompt metadata and generation parameters across all major AI image platforms into a fast, local SQLite database, providing an **All-in-One 3-Pane Studio Workspace** with smooth virtual grid navigation, tokenized prompt inspectors, instant full-screen lightbox preview, and smart categorization.
+**Berry AI Studio** is a modern, desktop-first asset manager built for digital artists, AI creators, and prompt engineers. It indexes and parses prompt metadata and generation parameters across all major AI image platforms into a fast, local SQLite database, providing an **All-in-One 3-Pane Studio Workspace** with smooth virtual grid navigation, tokenized prompt inspectors, instant full-screen lightbox preview, and smart categorization.
 
 > 🚀 **Clean-Slate Architecture**: Berry v0.1.0+ is a ground-up rewrite in **Tauri 2 + Rust + Vue 3**. The legacy C#/.NET codebase is archived in the `archive/old-main` tag and `old/main` branch.
 
@@ -83,18 +83,18 @@ Automatically extracts and indexes generation parameters (Prompt, Negative Promp
 
 ## 📦 Release Package Naming Convention
 
-Official pre-built binaries on [GitHub Releases](https://github.com/BerryUIKI/Berry-AIGC-Toolbox/releases) follow the standardized naming convention:
+Official pre-built binaries on [GitHub Releases](https://github.com/BerryUIKI/Berry-AI-Studio/releases) follow the standardized naming convention:
 
 $$\text{<AppName>}\_\text{<OS>}\_\text{<Architecture>}.\text{<extension>}$$
 
 | Platform / OS | Architecture | Package Format | Release Asset File Name |
 | :--- | :--- | :--- | :--- |
-| **Windows** | x86_64 (64-bit) | NSIS Installer | `Berry-AIGC-Toolbox_Windows_x64.exe` |
-| **Windows** | x86_64 (64-bit) | Portable Zip | `Berry-AIGC-Toolbox_Windows_x64.zip` |
-| **macOS** | Apple Silicon (ARM64) | DMG Disk Image | `Berry-AIGC-Toolbox_macOS_aarch64.dmg` |
-| **macOS** | Intel (x86_64) | DMG Disk Image | `Berry-AIGC-Toolbox_macOS_x64.dmg` |
-| **Linux** | x86_64 (64-bit) | AppImage | `Berry-AIGC-Toolbox_Linux_x64.AppImage` |
-| **Linux** | x86_64 (64-bit) | Debian Package | `Berry-AIGC-Toolbox_Linux_x64.deb` |
+| **Windows** | x86_64 (64-bit) | NSIS Installer | `Berry-AI-Studio_Windows_x64.exe` |
+| **Windows** | x86_64 (64-bit) | Portable Zip | `Berry-AI-Studio_Windows_x64.zip` |
+| **macOS** | Apple Silicon (ARM64) | DMG Disk Image | `Berry-AI-Studio_macOS_aarch64.dmg` |
+| **macOS** | Intel (x86_64) | DMG Disk Image | `Berry-AI-Studio_macOS_x64.dmg` |
+| **Linux** | x86_64 (64-bit) | AppImage | `Berry-AI-Studio_Linux_x64.AppImage` |
+| **Linux** | x86_64 (64-bit) | Debian Package | `Berry-AI-Studio_Linux_x64.deb` |
 
 ---
 
@@ -108,8 +108,8 @@ $$\text{<AppName>}\_\text{<OS>}\_\text{<Architecture>}.\text{<extension>}$$
 ### Steps
 ```bash
 # 1. Clone the repository
-git clone https://github.com/BerryUIKI/Berry-AIGC-Toolbox.git
-cd Berry-AIGC-Toolbox
+git clone https://github.com/BerryUIKI/Berry-AI-Studio.git
+cd Berry-AI-Studio
 
 # 2. Install frontend dependencies
 pnpm install

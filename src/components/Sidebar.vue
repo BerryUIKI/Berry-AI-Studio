@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
-import { open } from "@tauri-apps/plugin-dialog";
 import { t } from "../i18n";
 import type { Album, Folder, LibraryCounts, NavTarget, ScanProgress, ScanStats, Tag } from "../types";
 
@@ -27,6 +26,7 @@ const emit = defineEmits<{
   openModelManager: [];
   openDbManager: [];
   openShortcutsHelp: [];
+  openAddFolderModal: [];
   moveFilesToFolder: [payload: { filePaths: string[]; folderId: number }];
   addFilesToAlbum: [payload: { fileIds: number[]; albumId: number }];
   tagFiles: [payload: { fileIds: number[]; tagId: number }];
@@ -34,7 +34,7 @@ const emit = defineEmits<{
 }>();
 
 const addingFolder = ref(false);
-const running = ref<{ id: number; action: "scan" | "rebuild" } | null>(null);
+const running = ref<{ id: number; action: "scan" | "rebuild" | "harvest" } | null>(null);
 const error = ref("");
 
 function displayPath(path: string): string {
@@ -51,18 +51,21 @@ function isBusy(id: number): boolean {
   return running.value?.id === id;
 }
 
-async function pickFolder() {
+function pickFolder() {
+  emit("openAddFolderModal");
+}
+
+async function harvest(folder: Folder, e: MouseEvent) {
+  e.stopPropagation();
   error.value = "";
+  running.value = { id: folder.id, action: "harvest" };
   try {
-    const selected = await open({ directory: true, multiple: false });
-    if (typeof selected !== "string") return;
-    addingFolder.value = true;
-    const folder = await invoke<Folder>("add_folder", { path: selected });
-    emit("folderAdded", folder);
+    await invoke<number>("harvest_pipeline_folder", { folderId: folder.id });
+    emit("scanned", folder.id);
   } catch (e) {
     error.value = String(e);
   } finally {
-    addingFolder.value = false;
+    running.value = null;
   }
 }
 
@@ -227,11 +230,23 @@ function onDropOnTag(e: DragEvent, tag: Tag) {
             @dragover.prevent
             @drop="onDropOnFolder($event, folder)"
           >
-            <span class="item-icon">📁</span>
+            <span class="item-icon">
+              {{ folder.folder_type === 'pipeline' ? '⚡' : folder.folder_type === 'managed' ? '📦' : '📁' }}
+            </span>
             <span class="item-label truncate">{{ getFolderName(folder.path) }}</span>
             <span v-if="counts?.folders" class="item-badge">{{ counts.folders[folder.id] ?? 0 }}</span>
 
             <div class="folder-actions" @click.stop>
+              <button
+                v-if="folder.folder_type === 'pipeline'"
+                type="button"
+                class="icon-btn harvest-btn"
+                :disabled="isBusy(folder.id)"
+                :title="t.nav.harvest || 'Harvest New Images'"
+                @click="harvest(folder, $event)"
+              >
+                {{ isBusy(folder.id) ? '⏳' : '⚡' }}
+              </button>
               <button
                 type="button"
                 class="icon-btn"

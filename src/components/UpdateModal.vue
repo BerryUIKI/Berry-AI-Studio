@@ -4,8 +4,12 @@ import { t } from "../i18n";
 import {
   checkForUpdates,
   openUrl,
+  downloadUpdateAsset,
+  installUpdate,
   type UpdateCheckResult,
+  type UpdateDownloadProgress,
 } from "../utils/updater";
+import { openStorageDir } from "../utils/config";
 import { formatBytes } from "../utils/image";
 
 const props = defineProps<{
@@ -20,9 +24,22 @@ const emit = defineEmits<{
 const checking = ref(false);
 const result = ref<UpdateCheckResult | null>(null);
 
+// In-app auto update download & install state
+const downloading = ref(false);
+const downloadProgress = ref<UpdateDownloadProgress | null>(null);
+const downloadError = ref<string | null>(null);
+const downloadedFilePath = ref<string | null>(null);
+const silentInstall = ref(false);
+const installing = ref(false);
+
 async function runCheck() {
   checking.value = true;
   result.value = null;
+  downloading.value = false;
+  downloadProgress.value = null;
+  downloadError.value = null;
+  downloadedFilePath.value = null;
+  installing.value = false;
   try {
     const res = await checkForUpdates(props.currentVersion);
     result.value = res;
@@ -58,6 +75,54 @@ function handleDownloadAsset() {
   } else if (result.value?.release?.html_url) {
     void openUrl(result.value.release.html_url);
   }
+}
+
+async function handleAutoDownload() {
+  if (!result.value?.matchedAsset?.browser_download_url) {
+    handleDownloadAsset();
+    return;
+  }
+  downloading.value = true;
+  downloadError.value = null;
+  downloadedFilePath.value = null;
+  downloadProgress.value = {
+    downloaded_bytes: 0,
+    total_bytes: result.value.matchedAsset.size || 0,
+    percent: 0,
+    speed_bytes_per_sec: 0,
+    done: false,
+    target_file: null,
+  };
+
+  try {
+    const filePath = await downloadUpdateAsset(
+      result.value.matchedAsset.browser_download_url,
+      result.value.matchedAsset.name,
+      (progress) => {
+        downloadProgress.value = progress;
+      }
+    );
+    downloadedFilePath.value = filePath;
+  } catch (err: any) {
+    downloadError.value = err?.message || String(err);
+  } finally {
+    downloading.value = false;
+  }
+}
+
+async function handleInstallAndRestart() {
+  if (!downloadedFilePath.value) return;
+  installing.value = true;
+  try {
+    await installUpdate(downloadedFilePath.value, silentInstall.value);
+  } catch (err: any) {
+    downloadError.value = err?.message || String(err);
+    installing.value = false;
+  }
+}
+
+function handleOpenUpdatesFolder() {
+  void openStorageDir("updates");
 }
 </script>
 
@@ -116,6 +181,51 @@ function handleDownloadAsset() {
             <span v-if="result.release?.published_at" class="publish-time">
               {{ new Date(result.release.published_at).toLocaleDateString() }}
             </span>
+          </div>
+
+          <!-- Safe Storage & No-Uninstall Guarantee Notice -->
+          <div class="preserve-notice-box">
+            <span class="notice-icon">🛡️</span>
+            <span class="notice-text">{{ t.updater.preserveDataNotice }}</span>
+          </div>
+
+          <!-- In-App Download Progress Card -->
+          <div v-if="downloading || downloadedFilePath || downloadError" class="download-progress-card">
+            <!-- If download error -->
+            <div v-if="downloadError" class="download-error-line">
+              <span>⚠️ {{ downloadError }}</span>
+            </div>
+
+            <!-- If currently downloading -->
+            <div v-if="downloading" class="progress-details">
+              <div class="progress-header">
+                <span class="progress-title">⚡ {{ t.updater.downloading }}</span>
+                <span class="progress-speed">
+                  {{ downloadProgress?.speed_bytes_per_sec ? `${formatBytes(downloadProgress.speed_bytes_per_sec)}/s` : '' }}
+                </span>
+              </div>
+              <div class="progress-bar-track">
+                <div class="progress-bar-fill" :style="{ width: `${downloadProgress?.percent || 0}%` }"></div>
+              </div>
+              <div class="progress-sub">
+                <span>{{ formatBytes(downloadProgress?.downloaded_bytes || 0) }} / {{ formatBytes(downloadProgress?.total_bytes || 0) }}</span>
+                <span class="progress-pct">{{ (downloadProgress?.percent || 0).toFixed(1) }}%</span>
+              </div>
+            </div>
+
+            <!-- If downloaded and ready to install -->
+            <div v-else-if="downloadedFilePath" class="ready-details">
+              <div class="ready-title-line">
+                <span class="ready-badge">✓</span>
+                <span class="ready-text">{{ t.updater.downloadComplete }}</span>
+              </div>
+              <div class="silent-option">
+                <label class="checkbox-label">
+                  <input type="checkbox" v-model="silentInstall" />
+                  <span>{{ t.updater.silentInstall }}</span>
+                </label>
+              </div>
+            </div>
           </div>
 
           <!-- Release Notes -->
@@ -184,16 +294,62 @@ function handleDownloadAsset() {
           🌐 GitHub Releases
         </button>
 
+        <!-- Browser fallback download button -->
         <button
-          v-if="result?.status === 'update_available'"
+          v-if="result?.status === 'update_available' && !downloadedFilePath && !downloading"
           type="button"
-          class="btn primary"
+          class="btn secondary"
           @click="handleDownloadAsset"
         >
-          ⬇️ {{ t.updater.downloadUpdate }}
+          🌐 {{ t.updater.downloadInBrowser }}
         </button>
 
-        <button type="button" class="btn" :class="{ 'primary': result?.status !== 'update_available' }" @click="emit('close')">
+        <!-- Auto Download Action Button -->
+        <button
+          v-if="result?.status === 'update_available' && !downloadedFilePath && !downloading"
+          type="button"
+          class="btn primary"
+          @click="handleAutoDownload"
+        >
+          {{ t.updater.autoDownloadAndInstall }}
+        </button>
+
+        <!-- Downloading State Indicator -->
+        <button
+          v-if="downloading"
+          type="button"
+          class="btn primary"
+          disabled
+        >
+          ⏳ {{ t.updater.downloading }}
+        </button>
+
+        <!-- Install & Restart Action -->
+        <button
+          v-if="downloadedFilePath"
+          type="button"
+          class="btn secondary"
+          @click="handleOpenUpdatesFolder"
+        >
+          📁 {{ t.settings.openFolder }}
+        </button>
+
+        <button
+          v-if="downloadedFilePath"
+          type="button"
+          class="btn primary install-btn"
+          :disabled="installing"
+          @click="handleInstallAndRestart"
+        >
+          {{ installing ? '⏳ ...' : t.updater.installAndRestart }}
+        </button>
+
+        <button
+          type="button"
+          class="btn"
+          :class="{ 'primary': result?.status !== 'update_available' && !downloadedFilePath }"
+          @click="emit('close')"
+        >
           {{ t.updater.close }}
         </button>
       </div>
@@ -552,4 +708,157 @@ function handleDownloadAsset() {
 .btn.primary:hover {
   background: #0e9aa7;
 }
+
+.btn.install-btn {
+  background: linear-gradient(135deg, #10b981, #059669);
+  font-weight: 600;
+}
+
+.btn.install-btn:hover {
+  background: linear-gradient(135deg, #059669, #047857);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Safe Storage Notice Box */
+.preserve-notice-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.notice-icon {
+  font-size: 1.1rem;
+  line-height: 1.2;
+}
+
+.notice-text {
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: #a7f3d0;
+}
+
+/* Download Progress Card */
+.download-progress-card {
+  background: #1e1e24;
+  border: 1px solid rgba(18, 181, 203, 0.3);
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.download-error-line {
+  color: #f87171;
+  font-size: 0.76rem;
+  background: rgba(239, 68, 68, 0.1);
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+.progress-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.progress-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.progress-speed {
+  font-size: 0.74rem;
+  font-family: monospace;
+  color: #12b5cb;
+}
+
+.progress-bar-track {
+  width: 100%;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #12b5cb, #38bdf8);
+  border-radius: 999px;
+  transition: width 0.2s ease-out;
+}
+
+.progress-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.72rem;
+  color: #94a3b8;
+  font-family: monospace;
+}
+
+.progress-pct {
+  color: #f8fafc;
+  font-weight: 600;
+}
+
+.ready-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ready-title-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ready-badge {
+  background: #10b981;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.75rem;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ready-text {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #34d399;
+}
+
+.silent-option {
+  margin-top: 4px;
+}
+
+.checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  color: #cbd5e1;
+  cursor: pointer;
+}
+
 </style>

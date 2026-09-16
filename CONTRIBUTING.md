@@ -1,6 +1,6 @@
-# 🤝 Contributing to Berry-AIGC-Toolbox
+# 🤝 Contributing to Berry AI Studio
 
-Thank you for your interest in contributing to **Berry-AIGC-Toolbox**! We welcome bug reports, feature suggestions, new metadata format extractors, translation contributions, and code improvements.
+Thank you for your interest in contributing to **Berry AI Studio**! We welcome bug reports, feature suggestions, new metadata format extractors, translation contributions, and code improvements.
 
 ---
 
@@ -24,8 +24,8 @@ Thank you for your interest in contributing to **Berry-AIGC-Toolbox**! We welcom
 ### Running Locally
 ```bash
 # 1. Clone your fork
-git clone https://github.com/<your-username>/Berry-AIGC-Toolbox.git
-cd Berry-AIGC-Toolbox
+git clone https://github.com/<your-username>/Berry-AI-Studio.git
+cd Berry-AI-Studio
 
 # 2. Checkout dev branch
 git checkout dev
@@ -73,4 +73,4 @@ We welcome new languages and translation improvements!
 
 ## 📄 License
 
-By contributing to Berry-AIGC-Toolbox, you agree that your contributions will be licensed under the **AGPL-3.0 License**.
+By contributing to Berry AI Studio, you agree that your contributions will be licensed under the **AGPL-3.0 License**.
