@@ -483,6 +483,7 @@ export const ja: typeof en = {
     noImage: "画像が選択されていません",
   },
   stack: {
+    imageStack: "画像スタック",
     toggleExpand: "クリックしてスタック内の全画像を展開/折りたたみ",
     stackCount: "枚のスタック画像",
     unstack: "スタックを解除",
