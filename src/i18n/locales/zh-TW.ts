@@ -48,6 +48,7 @@ export const zhTW: typeof en = {
   },
   view: {
     grid: "網格",
+    masonry: "瀑布流",
     table: "清單",
     files: "檔案",
     selectAll: "全選",
@@ -365,6 +366,9 @@ export const zhTW: typeof en = {
     defaultView: "預設畫廊檢視",
     defaultViewDesc: "選擇啟動軟體時預設使用的圖片展示方式",
     viewGrid: "網格瀑布流 (Grid)",
+    viewMasonry: "瀑布流（原始寬高比）",
+    allowMultipleStacks: "允許同時展開多個堆疊",
+    allowMultipleStacksDesc: "開啟新堆疊時保留已展開的堆疊",
     viewTable: "詳細清單 (Table)",
     autoScan: "啟動時自動掃描",
     autoScanDesc: "啟動時自動檢查已加入資料夾中的新增/變動圖片",

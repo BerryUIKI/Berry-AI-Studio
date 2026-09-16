@@ -28,6 +28,7 @@ const props = withDefaults(
     showCardBadges?: boolean;
     stackMap?: Record<string, { count: number; heroId: number | null }>;
     expandedStacks?: Set<string>;
+    layout?: "grid" | "masonry";
   }>(),
   {
     selectedFile: null,
@@ -37,6 +38,7 @@ const props = withDefaults(
     overscan: 4,
     blurNsfw: true,
     showCardBadges: true,
+    layout: "grid",
   },
 );
 
@@ -129,9 +131,49 @@ const CARD_INFO_HEIGHT = 56;
 const cardHeight = computed(() => itemWidth.value + CARD_INFO_HEIGHT);
 const rowHeight = computed(() => cardHeight.value + props.gap);
 
+interface MasonryItem {
+  file: ImageFile;
+  index: number;
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+  imageHeight: number;
+}
+
+const masonryItems = computed<MasonryItem[]>(() => {
+  if (props.layout !== "masonry") return [];
+  const columnHeights = Array.from({ length: cols.value }, () => 0);
+  return props.files.map((file, index) => {
+    const column = columnHeights.indexOf(Math.min(...columnHeights));
+    const sourceWidth = file.metadata?.width ?? 1;
+    const sourceHeight = file.metadata?.height ?? 1;
+    const ratio = sourceWidth > 0 && sourceHeight > 0 ? sourceHeight / sourceWidth : 1;
+    const imageHeight = Math.max(96, Math.round(itemWidth.value * ratio));
+    const height = imageHeight + CARD_INFO_HEIGHT;
+    const item = {
+      file,
+      index,
+      top: columnHeights[column],
+      left: column * (itemWidth.value + props.gap),
+      width: itemWidth.value,
+      height,
+      imageHeight,
+    };
+    columnHeights[column] += height + props.gap;
+    return item;
+  });
+});
+
+const masonryHeight = computed(() => {
+  if (!masonryItems.value.length) return 0;
+  return Math.max(...masonryItems.value.map((item) => item.top + item.height));
+});
+
 // Total grid rows and phantom scroll height
 const totalRows = computed(() => Math.ceil(props.files.length / cols.value));
 const totalHeight = computed(() => {
+  if (props.layout === "masonry") return masonryHeight.value;
   if (totalRows.value === 0) return 0;
   return totalRows.value * rowHeight.value - props.gap;
 });
@@ -159,6 +201,29 @@ const visibleFiles = computed(() => {
   return props.files.slice(startIndex.value, endIndex.value + 1);
 });
 
+const visibleMasonryItems = computed(() => {
+  if (props.layout !== "masonry") return [];
+  const buffer = Math.max(itemWidth.value, props.overscan * 100);
+  const top = Math.max(0, scrollTop.value - buffer);
+  const bottom = scrollTop.value + containerHeight.value + buffer;
+  return masonryItems.value.filter(
+    (item) => item.top + item.height >= top && item.top <= bottom,
+  );
+});
+
+const visibleItems = computed(() => {
+  if (props.layout === "masonry") return visibleMasonryItems.value;
+  return visibleFiles.value.map((file, offset) => ({
+    file,
+    index: startIndex.value + offset,
+    top: 0,
+    left: 0,
+    width: 0,
+    height: cardHeight.value,
+    imageHeight: itemWidth.value,
+  }));
+});
+
 const translateY = computed(() => startRow.value * rowHeight.value);
 
 const thumbnailMap = ref<Record<number, string>>({});
@@ -179,8 +244,9 @@ async function loadThumbnailFor(file: ImageFile) {
 let prefetchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 watch(
-  visibleFiles,
-  (files) => {
+  visibleItems,
+  (items) => {
+    const files = items.map((item) => item.file);
     if (!files || files.length === 0) return;
 
     // 1. Immediately request thumbnails for currently visible items
@@ -194,15 +260,17 @@ watch(
     // 2. Proactive Lookahead Preload: pre-generate next 100 items in background
     if (prefetchDebounceTimer) clearTimeout(prefetchDebounceTimer);
     prefetchDebounceTimer = setTimeout(() => {
-      const aheadStart = endIndex.value + 1;
-      const aheadEnd = Math.min(props.files.length, endIndex.value + 101);
+      const firstVisibleIndex = items[0]?.index ?? 0;
+      const lastVisibleIndex = items[items.length - 1]?.index ?? 0;
+      const aheadStart = lastVisibleIndex + 1;
+      const aheadEnd = Math.min(props.files.length, lastVisibleIndex + 101);
       if (aheadStart < aheadEnd) {
         const aheadSlice = props.files.slice(aheadStart, aheadEnd);
         void requestBatchThumbnails(aheadSlice);
       }
-      const behindStart = Math.max(0, startIndex.value - 40);
-      if (behindStart < startIndex.value) {
-        const behindSlice = props.files.slice(behindStart, startIndex.value);
+      const behindStart = Math.max(0, firstVisibleIndex - 40);
+      if (behindStart < firstVisibleIndex) {
+        const behindSlice = props.files.slice(behindStart, firstVisibleIndex);
         void requestBatchThumbnails(behindSlice);
       }
     }, 40);
@@ -333,9 +401,10 @@ function handleKeyDown(e: KeyboardEvent) {
 // Ensure the selected item is scrolled into visible viewport
 function scrollToIndex(index: number) {
   if (!containerRef.value) return;
+  const masonryItem = props.layout === "masonry" ? masonryItems.value[index] : null;
   const targetRow = Math.floor(index / cols.value);
-  const targetTop = targetRow * rowHeight.value;
-  const targetBottom = targetTop + cardHeight.value;
+  const targetTop = masonryItem?.top ?? targetRow * rowHeight.value;
+  const targetBottom = targetTop + (masonryItem?.height ?? cardHeight.value);
 
   const currentScrollTop = containerRef.value.scrollTop;
   const viewportHeight = containerRef.value.clientHeight;
@@ -377,6 +446,7 @@ function onDragStart(e: DragEvent, file: ImageFile) {
       v-else
       ref="containerRef"
       class="virtual-grid-container"
+      :class="{ 'is-masonry': layout === 'masonry' }"
       role="grid"
       aria-label="Image gallery grid"
       tabindex="0"
@@ -385,16 +455,24 @@ function onDragStart(e: DragEvent, file: ImageFile) {
       <div class="virtual-phantom" :style="{ height: `${totalHeight}px` }">
         <div
           class="virtual-content"
+          :class="{ 'masonry-content': layout === 'masonry' }"
           :style="{
-            transform: `translateY(${translateY}px)`,
-            gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-            gap: `${gap}px`,
+            transform: layout === 'grid' ? `translateY(${translateY}px)` : undefined,
+            gridTemplateColumns: layout === 'grid' ? `repeat(${cols}, minmax(0, 1fr))` : undefined,
+            gap: layout === 'grid' ? `${gap}px` : undefined,
           }"
         >
           <div
-            v-for="file in visibleFiles"
+            v-for="{ file, top, left, width, height, imageHeight } in visibleItems"
             :key="file.id ?? file.path"
             class="grid-card"
+            :style="layout === 'masonry' ? {
+              position: 'absolute',
+              top: `${top}px`,
+              left: `${left}px`,
+              width: `${width}px`,
+              height: `${height}px`,
+            } : undefined"
             role="gridcell"
             :aria-selected="selectedFile?.path === file.path"
             :class="{
@@ -410,7 +488,10 @@ function onDragStart(e: DragEvent, file: ImageFile) {
             @dblclick="activateFile(file)"
             @contextmenu.prevent="emit('findSimilar', file)"
           >
-            <div class="thumbnail-wrapper">
+            <div
+              class="thumbnail-wrapper"
+              :style="layout === 'masonry' ? { height: `${imageHeight}px`, aspectRatio: 'auto' } : undefined"
+            >
               <button
                 type="button"
                 class="card-select-btn"
@@ -631,6 +712,14 @@ function onDragStart(e: DragEvent, file: ImageFile) {
   position: absolute;
   top: 0;
   left: 0;
+}
+
+.virtual-content.masonry-content {
+  display: block;
+}
+
+.is-masonry .thumbnail-img {
+  object-fit: contain;
 }
 
 .grid-card {

@@ -5,7 +5,7 @@ export interface AppConfig {
   auto_scan: boolean;
   blur_nsfw: boolean;
   show_card_badges: boolean;
-  default_view: "grid" | "table";
+  default_view: "grid" | "masonry" | "table";
   thumbnail_max_edge: number;
   similarity_limit: number;
   auto_check_update: boolean;
@@ -79,7 +79,7 @@ export async function loadAppConfig(): Promise<AppConfig> {
     }
 
     const legacyView = localStorage.getItem("berry_default_view");
-    if (legacyView === "grid" || legacyView === "table") {
+    if (legacyView === "grid" || legacyView === "masonry" || legacyView === "table") {
       config.default_view = legacyView;
     }
 

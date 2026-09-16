@@ -48,6 +48,7 @@ export const de: typeof en = {
   },
   view: {
     grid: "Raster",
+    masonry: "Wasserfall",
     table: "Tabelle",
     files: "Dateien",
     selectAll: "Alle auswählen",
@@ -365,6 +366,9 @@ export const de: typeof en = {
     defaultView: "Standard-Galerieansicht",
     defaultViewDesc: "Wählen Sie den standardmäßigen Anzeigemodus beim Start",
     viewGrid: "Rasteransicht (Grid)",
+    viewMasonry: "Wasserfall (Originales Seitenverhältnis)",
+    allowMultipleStacks: "Mehrere Stapel gleichzeitig öffnen",
+    allowMultipleStacksDesc: "Geöffnete Stapel beim Öffnen eines weiteren Stapels beibehalten",
     viewTable: "Detaillierte Liste (Table)",
     autoScan: "Automatisch beim Start scannen",
     autoScanDesc: "Beim Start automatisch nach neuen/geänderten Bildern in Ordnern suchen",
