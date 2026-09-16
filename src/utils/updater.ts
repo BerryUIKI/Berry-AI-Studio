@@ -1,4 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+
+export interface UpdateDownloadProgress {
+  downloaded_bytes: number;
+  total_bytes: number;
+  percent: number;
+  speed_bytes_per_sec: number;
+  done: boolean;
+  target_file: string | null;
+}
 
 export interface ReleaseAsset {
   name: string;
@@ -109,7 +119,7 @@ export function findMatchingAsset(assets: ReleaseAsset[]): ReleaseAsset | null {
  */
 export async function checkForUpdates(currentAppVersion: string): Promise<UpdateCheckResult> {
   const currentClean = currentAppVersion.replace(/^v/, "").trim();
-  const repo = "BerryUIKI/Berry-AIGC-Toolbox";
+  const repo = "BerryUIKI/Berry-AI-Studio";
   const url = `https://api.github.com/repos/${repo}/releases/latest`;
 
   try {
@@ -193,3 +203,36 @@ export async function openUrl(url: string): Promise<void> {
     window.open(url, "_blank");
   }
 }
+
+/**
+ * Download update asset through backend ureq with progress streaming.
+ */
+export async function downloadUpdateAsset(
+  url: string,
+  filename: string,
+  onProgress?: (progress: UpdateDownloadProgress) => void
+): Promise<string> {
+  let unlisten: UnlistenFn | null = null;
+  if (onProgress) {
+    unlisten = await listen<UpdateDownloadProgress>("update-download-progress", (event) => {
+      onProgress(event.payload);
+    });
+  }
+
+  try {
+    const targetFile = await invoke<string>("download_update", { url, filename });
+    return targetFile;
+  } finally {
+    if (unlisten) {
+      unlisten();
+    }
+  }
+}
+
+/**
+ * Launch the installer and exit current application for in-place upgrade.
+ */
+export async function installUpdate(installerPath: string, silent = false): Promise<void> {
+  await invoke("install_update", { installerPath, silent });
+}
+

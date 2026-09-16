@@ -4,11 +4,12 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use berry_domain::{
-    Album, CheckpointModelStat, Container, DatabaseStats, ExtractedMetadata, FileSortField, Folder,
-    ImageFile, LoraModel, ModelCacheEntry, PromptStat, SearchCriteria, SimilarityMatch,
-    SortDirection, Tag,
+    Album, CheckpointModelStat, CleanupQueueItem, Container, DatabaseStats, ExtractedMetadata,
+    FileSortField, Folder, ImageFile, LoraModel, ModelCacheEntry, PromptStat, SearchCriteria,
+    SimilarityMatch, SortDirection, StackSummary, Tag,
 };
 use rusqlite::{params, Connection, OpenFlags};
+use uuid::Uuid;
 
 use crate::migrations::{LATEST_VERSION, MIGRATIONS};
 
@@ -74,8 +75,8 @@ pub enum DatabaseError {
 
 /// SQL that inserts or updates a file row keyed by its unique path.
 const UPSERT_FILE_SQL: &str =
-    "INSERT INTO files (folder_id, path, container, size_bytes, modified_at, metadata, rating, aesthetic_score, is_favorite, is_nsfw)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+    "INSERT INTO files (folder_id, path, container, size_bytes, modified_at, metadata, rating, aesthetic_score, is_favorite, is_nsfw, stack_id, stack_order)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
      ON CONFLICT(path) DO UPDATE SET
          folder_id       = excluded.folder_id,
          container       = excluded.container,
@@ -85,7 +86,9 @@ const UPSERT_FILE_SQL: &str =
          rating          = coalesce(excluded.rating, files.rating),
          aesthetic_score = coalesce(excluded.aesthetic_score, files.aesthetic_score),
          is_favorite     = files.is_favorite,
-         is_nsfw         = files.is_nsfw";
+         is_nsfw         = files.is_nsfw,
+         stack_id        = coalesce(excluded.stack_id, files.stack_id),
+         stack_order     = coalesce(excluded.stack_order, files.stack_order)";
 
 /// A SQLite database with a fully migrated schema.
 pub struct Database {
@@ -242,37 +245,55 @@ impl Database {
 
     // --- Folders ---
 
-    /// Insert a new folder and return it (with its generated id and timestamp).
-    ///
-    /// Fails with a SQLite `UNIQUE` constraint error if the path already
-    /// exists; callers should check [`find_folder_by_path`](Self::find_folder_by_path)
-    /// first or surface the conflict to the user.
+    /// Insert a new folder with default 'link' mode.
     pub fn add_folder(&self, path: &str) -> Result<Folder, DatabaseError> {
-        self.conn
-            .execute("INSERT INTO folders (path) VALUES (?1)", [path])?;
+        self.add_folder_with_mode(path, "link", None, None, None, true)
+    }
+
+    /// Insert a new folder with explicit mode and optional pipeline parameters.
+    pub fn add_folder_with_mode(
+        &self,
+        path: &str,
+        folder_type: &str,
+        source_path: Option<&str>,
+        ingest_action: Option<&str>,
+        grace_period_hours: Option<i32>,
+        auto_harvest: bool,
+    ) -> Result<Folder, DatabaseError> {
+        self.conn.execute(
+            "INSERT INTO folders (path, folder_type, source_path, ingest_action, grace_period_hours, auto_harvest)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                path,
+                folder_type,
+                source_path,
+                ingest_action,
+                grace_period_hours,
+                if auto_harvest { 1 } else { 0 },
+            ],
+        )?;
         let id = self.conn.last_insert_rowid();
-        let added_at: String =
-            self.conn
-                .query_row("SELECT added_at FROM folders WHERE id = ?1", [id], |row| {
-                    row.get(0)
-                })?;
-        Ok(Folder {
-            id,
-            path: path.to_string(),
-            added_at,
-        })
+        self.find_folder_by_id(id)?
+            .ok_or(DatabaseError::FolderNotFound(id))
     }
 
     /// All folders, ordered by id.
     pub fn list_folders(&self) -> Result<Vec<Folder>, DatabaseError> {
-        let mut stmt = self
-            .conn
-            .prepare_cached("SELECT id, path, added_at FROM folders ORDER BY id")?;
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT id, path, added_at, folder_type, source_path, ingest_action, grace_period_hours, auto_harvest
+             FROM folders ORDER BY id",
+        )?;
         let rows = stmt.query_map([], |row| {
+            let auto_harvest_int: i32 = row.get(7).unwrap_or(1);
             Ok(Folder {
                 id: row.get(0)?,
                 path: row.get(1)?,
                 added_at: row.get(2)?,
+                folder_type: row.get(3).unwrap_or_else(|_| "link".to_string()),
+                source_path: row.get(4).unwrap_or(None),
+                ingest_action: row.get(5).unwrap_or(None),
+                grace_period_hours: row.get(6).unwrap_or(None),
+                auto_harvest: auto_harvest_int != 0,
             })
         })?;
         rows.collect::<rusqlite::Result<Vec<_>>>()
@@ -281,16 +302,50 @@ impl Database {
 
     /// The folder registered at `path`, if any.
     pub fn find_folder_by_path(&self, path: &str) -> Result<Option<Folder>, DatabaseError> {
-        let mut stmt = self
-            .conn
-            .prepare_cached("SELECT id, path, added_at FROM folders WHERE path = ?1")?;
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT id, path, added_at, folder_type, source_path, ingest_action, grace_period_hours, auto_harvest
+             FROM folders WHERE path = ?1",
+        )?;
         let mut rows = stmt.query([path])?;
         match rows.next()? {
-            Some(row) => Ok(Some(Folder {
-                id: row.get(0)?,
-                path: row.get(1)?,
-                added_at: row.get(2)?,
-            })),
+            Some(row) => {
+                let auto_harvest_int: i32 = row.get(7).unwrap_or(1);
+                Ok(Some(Folder {
+                    id: row.get(0)?,
+                    path: row.get(1)?,
+                    added_at: row.get(2)?,
+                    folder_type: row.get(3).unwrap_or_else(|_| "link".to_string()),
+                    source_path: row.get(4).unwrap_or(None),
+                    ingest_action: row.get(5).unwrap_or(None),
+                    grace_period_hours: row.get(6).unwrap_or(None),
+                    auto_harvest: auto_harvest_int != 0,
+                }))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// The folder registered with `id`, if any.
+    pub fn find_folder_by_id(&self, id: i64) -> Result<Option<Folder>, DatabaseError> {
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT id, path, added_at, folder_type, source_path, ingest_action, grace_period_hours, auto_harvest
+             FROM folders WHERE id = ?1",
+        )?;
+        let mut rows = stmt.query([id])?;
+        match rows.next()? {
+            Some(row) => {
+                let auto_harvest_int: i32 = row.get(7).unwrap_or(1);
+                Ok(Some(Folder {
+                    id: row.get(0)?,
+                    path: row.get(1)?,
+                    added_at: row.get(2)?,
+                    folder_type: row.get(3).unwrap_or_else(|_| "link".to_string()),
+                    source_path: row.get(4).unwrap_or(None),
+                    ingest_action: row.get(5).unwrap_or(None),
+                    grace_period_hours: row.get(6).unwrap_or(None),
+                    auto_harvest: auto_harvest_int != 0,
+                }))
+            }
             None => Ok(None),
         }
     }
@@ -334,6 +389,8 @@ impl Database {
                 file.aesthetic_score,
                 file.is_favorite as i64,
                 file.is_nsfw as i64,
+                file.stack_id,
+                file.stack_order as i64,
             ],
         )?;
         Ok(self.conn.last_insert_rowid())
@@ -370,6 +427,8 @@ impl Database {
                     file.aesthetic_score,
                     file.is_favorite as i64,
                     file.is_nsfw as i64,
+                    file.stack_id,
+                    file.stack_order as i64,
                 ])?;
                 count += 1;
             }
@@ -411,6 +470,8 @@ impl Database {
         let aesthetic_score: Option<f64> = row.get(8)?;
         let is_favorite: i64 = row.get(9).unwrap_or(0);
         let is_nsfw: i64 = row.get(10).unwrap_or(0);
+        let stack_id: Option<String> = row.get(11).unwrap_or(None);
+        let stack_order: i64 = row.get(12).unwrap_or(0);
 
         let container = Container::from_id(&container_id)
             .ok_or_else(|| DatabaseError::UnknownContainer(container_id))?;
@@ -430,6 +491,8 @@ impl Database {
             aesthetic_score,
             is_favorite: is_favorite != 0,
             is_nsfw: is_nsfw != 0,
+            stack_id,
+            stack_order: stack_order as i32,
         })
     }
 
@@ -452,7 +515,7 @@ impl Database {
     /// Retrieve a file by its file path.
     pub fn get_file_by_path(&self, path: &str) -> Result<Option<ImageFile>, DatabaseError> {
         let mut stmt = self.conn.prepare_cached(
-            "SELECT id, folder_id, path, container, size_bytes, modified_at, metadata, rating, aesthetic_score, is_favorite, is_nsfw
+            "SELECT id, folder_id, path, container, size_bytes, modified_at, metadata, rating, aesthetic_score, is_favorite, is_nsfw, stack_id, stack_order
              FROM files WHERE path = ?1 LIMIT 1",
         )?;
         let mut rows = stmt.query_and_then([path], Self::map_row)?;
@@ -465,7 +528,7 @@ impl Database {
     /// Retrieve a file by its database row ID.
     pub fn get_file_by_id(&self, id: i64) -> Result<Option<ImageFile>, DatabaseError> {
         let mut stmt = self.conn.prepare_cached(
-            "SELECT id, folder_id, path, container, size_bytes, modified_at, metadata, rating, aesthetic_score, is_favorite, is_nsfw
+            "SELECT id, folder_id, path, container, size_bytes, modified_at, metadata, rating, aesthetic_score, is_favorite, is_nsfw, stack_id, stack_order
              FROM files WHERE id = ?1 LIMIT 1",
         )?;
         let mut rows = stmt.query_and_then([id], Self::map_row)?;
@@ -496,6 +559,12 @@ impl Database {
     pub fn delete_file_by_path(&self, path: &str) -> Result<(), DatabaseError> {
         self.conn
             .execute("DELETE FROM files WHERE path = ?1", [path])?;
+        Ok(())
+    }
+
+    /// Delete a file record by id.
+    pub fn delete_file_by_id(&self, id: i64) -> Result<(), DatabaseError> {
+        self.conn.execute("DELETE FROM files WHERE id = ?1", [id])?;
         Ok(())
     }
 
@@ -656,7 +725,7 @@ impl Database {
         };
 
         let sql = format!(
-            "SELECT id, folder_id, path, container, size_bytes, modified_at, metadata, rating, aesthetic_score, is_favorite, is_nsfw
+            "SELECT id, folder_id, path, container, size_bytes, modified_at, metadata, rating, aesthetic_score, is_favorite, is_nsfw, stack_id, stack_order
              FROM files{where_clause} ORDER BY {order_clause}{limit_clause}"
         );
 
@@ -1921,7 +1990,7 @@ impl Database {
         }
 
         let mut stmt = self.conn.prepare_cached(
-            "SELECT id, folder_id, path, container, size_bytes, modified_at, metadata, rating, aesthetic_score, is_favorite, is_nsfw
+            "SELECT id, folder_id, path, container, size_bytes, modified_at, metadata, rating, aesthetic_score, is_favorite, is_nsfw, stack_id, stack_order
              FROM files
              WHERE id NOT IN (SELECT file_id FROM file_embeddings WHERE model_id = ?1)
              ORDER BY id ASC
@@ -1931,6 +2000,207 @@ impl Database {
         let rows = stmt.query_and_then(rusqlite::params![model_id, limit as i64], Self::map_row)?;
 
         rows.collect()
+    }
+
+    // --- Image Stacking ---
+
+    /// Group a list of image IDs into a stack with the given or generated stack_id.
+    /// The first image in `file_ids` becomes the hero (stack_order = 0), subsequent images have stack_order = 1, 2, ...
+    pub fn stack_images(
+        &self,
+        file_ids: &[i64],
+        custom_stack_id: Option<&str>,
+    ) -> Result<String, DatabaseError> {
+        if file_ids.is_empty() {
+            return Ok(String::new());
+        }
+
+        let sid = custom_stack_id
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| Uuid::new_v4().to_string());
+
+        let tx = self.conn.unchecked_transaction()?;
+        {
+            let mut stmt = tx
+                .prepare_cached("UPDATE files SET stack_id = ?1, stack_order = ?2 WHERE id = ?3")?;
+            for (idx, file_id) in file_ids.iter().enumerate() {
+                stmt.execute(params![sid, idx as i64, file_id])?;
+            }
+        }
+        tx.commit()?;
+        Ok(sid)
+    }
+
+    /// Dissolve a stack by clearing stack_id and resetting stack_order for all its member images.
+    pub fn unstack_images(&self, stack_id: &str) -> Result<u64, DatabaseError> {
+        let affected = self.conn.execute(
+            "UPDATE files SET stack_id = NULL, stack_order = 0 WHERE stack_id = ?1",
+            [stack_id],
+        )?;
+        Ok(affected as u64)
+    }
+
+    /// Set a specific image in a stack as the Hero Cover (stack_order = 0), shifting others.
+    pub fn set_stack_hero(&self, stack_id: &str, hero_file_id: i64) -> Result<(), DatabaseError> {
+        let tx = self.conn.unchecked_transaction()?;
+        {
+            // Shift all existing images in the stack
+            tx.execute(
+                "UPDATE files SET stack_order = stack_order + 1 WHERE stack_id = ?1",
+                [stack_id],
+            )?;
+            // Set the target hero image to stack_order = 0
+            tx.execute(
+                "UPDATE files SET stack_order = 0 WHERE id = ?1 AND stack_id = ?2",
+                params![hero_file_id, stack_id],
+            )?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Get all images belonging to a specific stack, ordered by stack_order ASC, id ASC.
+    pub fn get_stack_members(&self, stack_id: &str) -> Result<Vec<ImageFile>, DatabaseError> {
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT id, folder_id, path, container, size_bytes, modified_at, metadata, rating, aesthetic_score, is_favorite, is_nsfw, stack_id, stack_order
+             FROM files WHERE stack_id = ?1 ORDER BY stack_order ASC, id ASC",
+        )?;
+        let rows = stmt.query_and_then([stack_id], Self::map_row)?;
+        rows.collect()
+    }
+
+    /// List summary stats for all active stacks, optionally filtered by folder_id.
+    pub fn list_stacks(&self, folder_id: Option<i64>) -> Result<Vec<StackSummary>, DatabaseError> {
+        let (sql, params_vec): (&str, Vec<rusqlite::types::Value>) = match folder_id {
+            Some(fid) => (
+                "SELECT stack_id, COUNT(*) as count,
+                        (SELECT id FROM files f2 WHERE f2.stack_id = f1.stack_id ORDER BY f2.stack_order ASC, f2.id ASC LIMIT 1) as hero_id
+                 FROM files f1
+                 WHERE stack_id IS NOT NULL AND folder_id = ?1
+                 GROUP BY stack_id
+                 ORDER BY count DESC",
+                vec![rusqlite::types::Value::Integer(fid)],
+            ),
+            None => (
+                "SELECT stack_id, COUNT(*) as count,
+                        (SELECT id FROM files f2 WHERE f2.stack_id = f1.stack_id ORDER BY f2.stack_order ASC, f2.id ASC LIMIT 1) as hero_id
+                 FROM files f1
+                 WHERE stack_id IS NOT NULL
+                 GROUP BY stack_id
+                 ORDER BY count DESC",
+                vec![],
+            ),
+        };
+
+        let mut stmt = self.conn.prepare(sql)?;
+        let rows = stmt.query_map(rusqlite::params_from_iter(&params_vec), |row| {
+            Ok(StackSummary {
+                stack_id: row.get(0)?,
+                count: row.get::<_, i64>(1)? as usize,
+                hero_image_id: row.get(2)?,
+            })
+        })?;
+
+        rows.collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(Into::into)
+    }
+
+    /// Get non-hero images in a stack whose rating is below `min_rating`, for batch culling.
+    pub fn get_stack_cull_candidate_ids(
+        &self,
+        stack_id: &str,
+        min_rating: u8,
+    ) -> Result<Vec<i64>, DatabaseError> {
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT id FROM files
+             WHERE stack_id = ?1 AND stack_order > 0 AND (rating IS NULL OR rating < ?2)",
+        )?;
+        let rows = stmt.query_map(params![stack_id, min_rating as i64], |row| row.get(0))?;
+        rows.collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(Into::into)
+    }
+
+    // --- Pipeline Cleanup Queue ---
+
+    /// Enqueue a source file for delayed cleanup.
+    pub fn enqueue_cleanup(
+        &self,
+        source_path: &str,
+        target_file_id: i64,
+        grace_period_hours: i32,
+    ) -> Result<i64, DatabaseError> {
+        let created_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs() as i64;
+        let scheduled_delete_at = created_at + (grace_period_hours.max(0) as i64 * 3600);
+
+        self.conn.execute(
+            "INSERT INTO pipeline_cleanup_queue (source_file_path, target_file_id, scheduled_delete_at, created_at, status)
+             VALUES (?1, ?2, ?3, ?4, 'pending')
+             ON CONFLICT(source_file_path) DO UPDATE SET
+                 scheduled_delete_at = excluded.scheduled_delete_at,
+                 status = 'pending'",
+            params![source_path, target_file_id, scheduled_delete_at, created_at],
+        )?;
+
+        Ok(self.conn.last_insert_rowid())
+    }
+
+    /// List pending cleanup items that are due for deletion.
+    pub fn list_due_cleanups(
+        &self,
+        now_timestamp: i64,
+    ) -> Result<Vec<CleanupQueueItem>, DatabaseError> {
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT id, source_file_path, target_file_id, scheduled_delete_at, created_at, status
+             FROM pipeline_cleanup_queue
+             WHERE status = 'pending' AND scheduled_delete_at <= ?1
+             ORDER BY scheduled_delete_at ASC",
+        )?;
+        let rows = stmt.query_map([now_timestamp], |row| {
+            Ok(CleanupQueueItem {
+                id: row.get(0)?,
+                source_file_path: row.get(1)?,
+                target_image_id: row.get(2)?,
+                scheduled_delete_at: row.get(3)?,
+                created_at: row.get(4)?,
+                status: row.get(5)?,
+            })
+        })?;
+        rows.collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(Into::into)
+    }
+
+    /// Update status of a cleanup queue item.
+    pub fn update_cleanup_status(&self, id: i64, status: &str) -> Result<(), DatabaseError> {
+        self.conn.execute(
+            "UPDATE pipeline_cleanup_queue SET status = ?1 WHERE id = ?2",
+            params![status, id],
+        )?;
+        Ok(())
+    }
+
+    /// Get current cleanup queue list with limit.
+    pub fn get_cleanup_queue(&self, limit: usize) -> Result<Vec<CleanupQueueItem>, DatabaseError> {
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT id, source_file_path, target_file_id, scheduled_delete_at, created_at, status
+             FROM pipeline_cleanup_queue
+             ORDER BY id DESC
+             LIMIT ?1",
+        )?;
+        let rows = stmt.query_map([limit as i64], |row| {
+            Ok(CleanupQueueItem {
+                id: row.get(0)?,
+                source_file_path: row.get(1)?,
+                target_image_id: row.get(2)?,
+                scheduled_delete_at: row.get(3)?,
+                created_at: row.get(4)?,
+                status: row.get(5)?,
+            })
+        })?;
+        rows.collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(Into::into)
     }
 }
 
@@ -2002,6 +2272,8 @@ mod tests {
             aesthetic_score: None,
             is_favorite: false,
             is_nsfw: false,
+            stack_id: None,
+            stack_order: 0,
         }
     }
 
@@ -2770,10 +3042,10 @@ mod tests {
     // --- File Embeddings and Similarity Search Tests ---
 
     #[test]
-    fn migration_reaches_schema_version_8() {
+    fn migration_reaches_schema_version_9() {
         let db = Database::connect_in_memory().unwrap();
-        assert_eq!(db.user_version().unwrap(), 8);
-        assert_eq!(LATEST_VERSION, 8);
+        assert_eq!(db.user_version().unwrap(), 9);
+        assert_eq!(LATEST_VERSION, 9);
     }
 
     #[test]
@@ -3498,5 +3770,151 @@ mod tests {
         let deleted = db.delete_lora(saved.id).unwrap();
         assert!(deleted);
         assert!(db.get_lora(saved.id).unwrap().is_none());
+    }
+
+    #[test]
+    fn multi_mode_folders_work() {
+        let db = Database::connect_in_memory().unwrap();
+
+        // 1. Link mode (default)
+        let link_folder = db.add_folder("/path/to/link").unwrap();
+        assert_eq!(link_folder.folder_type, "link");
+        assert!(link_folder.source_path.is_none());
+
+        // 2. Managed mode
+        let managed_folder = db
+            .add_folder_with_mode(
+                "/path/to/managed",
+                "managed",
+                None,
+                Some("copy"),
+                None,
+                false,
+            )
+            .unwrap();
+        assert_eq!(managed_folder.folder_type, "managed");
+        assert_eq!(managed_folder.ingest_action.as_deref(), Some("copy"));
+
+        // 3. Pipeline mode
+        let pipeline_folder = db
+            .add_folder_with_mode(
+                "/path/to/vault",
+                "pipeline",
+                Some("/path/to/webui_output"),
+                Some("move"),
+                Some(48),
+                true,
+            )
+            .unwrap();
+        assert_eq!(pipeline_folder.folder_type, "pipeline");
+        assert_eq!(
+            pipeline_folder.source_path.as_deref(),
+            Some("/path/to/webui_output")
+        );
+        assert_eq!(pipeline_folder.grace_period_hours, Some(48));
+        assert!(pipeline_folder.auto_harvest);
+
+        // 4. List all folders
+        let all = db.list_folders().unwrap();
+        assert_eq!(all.len(), 3);
+        assert_eq!(all[0].id, link_folder.id);
+        assert_eq!(all[1].id, managed_folder.id);
+        assert_eq!(all[2].id, pipeline_folder.id);
+
+        // 5. Find by id
+        let found = db.find_folder_by_id(pipeline_folder.id).unwrap().unwrap();
+        assert_eq!(found.path, "/path/to/vault");
+        assert_eq!(found.folder_type, "pipeline");
+    }
+
+    #[test]
+    fn image_stacking_and_cleanup_queue_work() {
+        let db = Database::connect_in_memory().unwrap();
+        let folder = db.add_folder("/test/folder").unwrap();
+
+        // Seed 3 test files
+        let file1 = ImageFile {
+            id: None,
+            folder_id: folder.id,
+            path: "/test/folder/img1.png".to_string(),
+            size_bytes: 1024,
+            modified_at: 100,
+            container: Container::Png,
+            metadata: None,
+            rating: Some(4),
+            aesthetic_score: None,
+            is_favorite: false,
+            is_nsfw: false,
+            stack_id: None,
+            stack_order: 0,
+        };
+        let mut file2 = file1.clone();
+        file2.path = "/test/folder/img2.png".to_string();
+        file2.rating = Some(2);
+
+        let mut file3 = file1.clone();
+        file3.path = "/test/folder/img3.png".to_string();
+        file3.rating = None;
+
+        let id1 = db.upsert_file(&file1).unwrap();
+        let id2 = db.upsert_file(&file2).unwrap();
+        let id3 = db.upsert_file(&file3).unwrap();
+
+        // 1. Stack images [id1, id2, id3]
+        let stack_id = db.stack_images(&[id1, id2, id3], None).unwrap();
+        assert!(!stack_id.is_empty());
+
+        // Verify members
+        let members = db.get_stack_members(&stack_id).unwrap();
+        assert_eq!(members.len(), 3);
+        assert_eq!(members[0].id, Some(id1));
+        assert_eq!(members[0].stack_order, 0); // Hero
+        assert_eq!(members[1].id, Some(id2));
+        assert_eq!(members[1].stack_order, 1);
+        assert_eq!(members[2].id, Some(id3));
+        assert_eq!(members[2].stack_order, 2);
+
+        // 2. Set hero cover to id2
+        db.set_stack_hero(&stack_id, id2).unwrap();
+        let members_after_hero = db.get_stack_members(&stack_id).unwrap();
+        assert_eq!(members_after_hero[0].id, Some(id2));
+        assert_eq!(members_after_hero[0].stack_order, 0);
+
+        // 3. List stacks
+        let stacks = db.list_stacks(None).unwrap();
+        assert_eq!(stacks.len(), 1);
+        assert_eq!(stacks[0].stack_id, stack_id);
+        assert_eq!(stacks[0].count, 3);
+        assert_eq!(stacks[0].hero_image_id, Some(id2));
+
+        // 4. Cull candidates: non-hero with rating < 3 or unrated
+        let cull_ids = db.get_stack_cull_candidate_ids(&stack_id, 3).unwrap();
+        // id2 is hero (exempt), id1 has rating 4 (>=3 exempt), id3 has no rating (<3 cull candidate)
+        assert_eq!(cull_ids, vec![id3]);
+
+        // 5. Cleanup queue
+        let q_id = db.enqueue_cleanup("/source/temp.png", id1, 24).unwrap();
+        assert!(q_id > 0);
+
+        let due_now = db.list_due_cleanups(0).unwrap();
+        assert!(due_now.is_empty());
+
+        let future_timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64
+            + 100_000;
+        let due_future = db.list_due_cleanups(future_timestamp).unwrap();
+        assert_eq!(due_future.len(), 1);
+        assert_eq!(due_future[0].source_file_path, "/source/temp.png");
+
+        db.update_cleanup_status(q_id, "deleted").unwrap();
+        let queue = db.get_cleanup_queue(10).unwrap();
+        assert_eq!(queue[0].status, "deleted");
+
+        // 6. Unstack
+        let unstacked = db.unstack_images(&stack_id).unwrap();
+        assert_eq!(unstacked, 3);
+        assert!(db.get_stack_members(&stack_id).unwrap().is_empty());
     }
 }

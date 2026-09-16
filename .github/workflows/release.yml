@@ -26,12 +26,12 @@ jobs:
           - target: aarch64-apple-darwin
             arch_name: aarch64
             args: --target aarch64-apple-darwin
-            dmg_asset_name: Berry-AIGC-Toolbox_macOS_aarch64.dmg
+            dmg_asset_name: Berry-AI-Studio_macOS_aarch64.dmg
 
           - target: x86_64-apple-darwin
             arch_name: x86_64
             args: --target x86_64-apple-darwin
-            dmg_asset_name: Berry-AIGC-Toolbox_macOS_x86_64.dmg
+            dmg_asset_name: Berry-AI-Studio_macOS_x86_64.dmg
 
     runs-on: macos-latest
 
@@ -188,7 +188,7 @@ jobs:
           APPLE_API_KEY_PATH: ${{ steps.notarization.outputs.key_path }}
         with:
           tagName: ${{ env.RELEASE_TAG }}
-          releaseName: 'Berry-AIGC-Toolbox ${{ env.RELEASE_TAG }}'
+          releaseName: 'Berry AI Studio ${{ env.RELEASE_TAG }}'
           releaseBody: 'See [CHANGELOG.md](CHANGELOG.md) for full release details.'
           releaseDraft: true
           prerelease: false
@@ -449,7 +449,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ env.RELEASE_TAG }}
-          releaseName: 'Berry-AIGC-Toolbox ${{ env.RELEASE_TAG }}'
+          releaseName: 'Berry AI Studio ${{ env.RELEASE_TAG }}'
           releaseBody: 'See [CHANGELOG.md](CHANGELOG.md) for full release details.'
           releaseDraft: true
           prerelease: false

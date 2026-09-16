@@ -3,7 +3,7 @@ name = "berry-tagger"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Local WD14 / Danbooru tagger ONNX inference and auto-tagging for Berry-AIGC-Toolbox"
+description = "Local WD14 / Danbooru tagger ONNX inference and auto-tagging for Berry AI Studio"
 
 [dependencies]
 berry-domain = { path = "../berry-domain" }

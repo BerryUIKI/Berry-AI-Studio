@@ -10,8 +10,9 @@ use std::sync::MutexGuard;
 
 use berry_clip::{ClipEngine, ClipModelInfo};
 use berry_domain::{
-    Album, CheckpointModelStat, DatabaseStats, DetectedLora, FileSortField, Folder, ImageFile,
-    LoraModel, ModelCacheEntry, PromptStat, SearchCriteria, SimilarityMatch, SortDirection, Tag,
+    Album, CheckpointModelStat, CleanupQueueItem, DatabaseStats, DetectedLora, FileSortField,
+    Folder, ImageFile, LoraModel, ModelCacheEntry, PipelineDetectedPath, PromptStat,
+    SearchCriteria, SimilarityMatch, SortDirection, StackSummary, Tag,
 };
 use berry_scan::{ScanStats, Scanner};
 use berry_storage::Database;
@@ -96,16 +97,50 @@ pub fn get_app_info(state: State<'_, AppState>) -> Result<AppInfo, String> {
 /// directories, or are already registered.
 #[tauri::command]
 pub fn add_folder(path: String, state: State<'_, AppState>) -> Result<Folder, String> {
-    let path = canonicalize_folder(&path)?;
+    add_folder_with_options(path, None, None, None, None, None, state)
+}
+
+/// Register a folder with explicit mode ('link', 'managed', 'pipeline') and pipeline options.
+#[tauri::command]
+pub fn add_folder_with_options(
+    path: String,
+    folder_type: Option<String>,
+    source_path: Option<String>,
+    ingest_action: Option<String>,
+    grace_period_hours: Option<i32>,
+    auto_harvest: Option<bool>,
+    state: State<'_, AppState>,
+) -> Result<Folder, String> {
+    let ftype = folder_type.unwrap_or_else(|| "link".to_string());
+    if ftype == "managed" {
+        std::fs::create_dir_all(&path)
+            .map_err(|e| format!("Failed to create managed folder directory: {e}"))?;
+    }
+
+    let canonical = canonicalize_folder(&path)?;
     let db = db(&state)?;
     if db
-        .find_folder_by_path(&path)
+        .find_folder_by_path(&canonical)
         .map_err(|e| e.to_string())?
         .is_some()
     {
         return Err("folder is already added".to_string());
     }
-    db.add_folder(&path).map_err(|e| e.to_string())
+
+    let src = match source_path {
+        Some(s) if !s.trim().is_empty() => Some(canonicalize_folder(&s)?),
+        _ => None,
+    };
+
+    db.add_folder_with_mode(
+        &canonical,
+        &ftype,
+        src.as_deref(),
+        ingest_action.as_deref(),
+        grace_period_hours,
+        auto_harvest.unwrap_or(true),
+    )
+    .map_err(|e| e.to_string())
 }
 
 /// All registered folders, ordered by id.
@@ -1851,4 +1886,875 @@ pub fn scan_loras_directory(dir_path: String, state: State<'_, AppState>) -> Res
     }
 
     Ok(count)
+}
+
+// --- Application Configuration & Storage Directory Management ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppConfig {
+    pub locale: String,
+    pub auto_scan: bool,
+    pub blur_nsfw: bool,
+    pub show_card_badges: bool,
+    pub default_view: String,
+    pub thumbnail_max_edge: u32,
+    pub similarity_limit: u32,
+    pub auto_check_update: bool,
+    pub silent_install: bool,
+    #[serde(default)]
+    pub has_completed_onboarding: bool,
+    #[serde(default = "default_auto_stack")]
+    pub auto_stack: bool,
+    #[serde(default = "default_stack_similarity")]
+    pub stack_similarity_threshold: f64,
+    #[serde(default = "default_stack_time_window")]
+    pub stack_time_window_minutes: i64,
+}
+
+fn default_auto_stack() -> bool {
+    false
+}
+
+fn default_stack_similarity() -> f64 {
+    0.85
+}
+
+fn default_stack_time_window() -> i64 {
+    180
+}
+
+impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            locale: "auto".to_string(),
+            auto_scan: true,
+            blur_nsfw: true,
+            show_card_badges: true,
+            default_view: "grid".to_string(),
+            thumbnail_max_edge: 384,
+            similarity_limit: 50,
+            auto_check_update: true,
+            silent_install: false,
+            has_completed_onboarding: false,
+            auto_stack: false,
+            stack_similarity_threshold: 0.85,
+            stack_time_window_minutes: 180,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoragePaths {
+    pub data_dir: String,
+    pub config_file: String,
+    pub database_file: String,
+    pub thumbnails_dir: String,
+    pub models_dir: String,
+    pub updates_dir: String,
+}
+
+/// Retrieve the persisted application configuration from config.json.
+#[tauri::command]
+pub fn get_app_config(app: AppHandle) -> Result<AppConfig, String> {
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let config_path = data_dir.join("config.json");
+
+    if config_path.is_file() {
+        if let Ok(content) = std::fs::read_to_string(&config_path) {
+            if let Ok(cfg) = serde_json::from_str::<AppConfig>(&content) {
+                return Ok(cfg);
+            }
+        }
+    }
+
+    // Default configuration if not found or corrupted
+    let default_cfg = AppConfig::default();
+    if let Ok(json) = serde_json::to_string_pretty(&default_cfg) {
+        let _ = std::fs::create_dir_all(&data_dir);
+        let _ = std::fs::write(&config_path, json);
+    }
+    Ok(default_cfg)
+}
+
+/// Save the application configuration to config.json in the app data directory.
+#[tauri::command]
+pub fn save_app_config(app: AppHandle, config: AppConfig) -> Result<(), String> {
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let _ = std::fs::create_dir_all(&data_dir);
+    let config_path = data_dir.join("config.json");
+    let json = serde_json::to_string_pretty(&config)
+        .map_err(|e| format!("Failed to serialize configuration: {e}"))?;
+    std::fs::write(&config_path, json)
+        .map_err(|e| format!("Failed to write configuration file: {e}"))?;
+    Ok(())
+}
+
+/// Retrieve all standard storage and cache paths.
+#[tauri::command]
+pub fn get_storage_paths(app: AppHandle) -> Result<StoragePaths, String> {
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let _ = std::fs::create_dir_all(&data_dir);
+    let _ = std::fs::create_dir_all(data_dir.join("thumbnails"));
+    let _ = std::fs::create_dir_all(data_dir.join("models"));
+    let _ = std::fs::create_dir_all(data_dir.join("updates"));
+
+    Ok(StoragePaths {
+        data_dir: data_dir.to_string_lossy().to_string(),
+        config_file: data_dir.join("config.json").to_string_lossy().to_string(),
+        database_file: data_dir.join("berry.db").to_string_lossy().to_string(),
+        thumbnails_dir: data_dir.join("thumbnails").to_string_lossy().to_string(),
+        models_dir: data_dir.join("models").to_string_lossy().to_string(),
+        updates_dir: data_dir.join("updates").to_string_lossy().to_string(),
+    })
+}
+
+/// Open a designated storage directory or highlight a file in the system file manager.
+#[tauri::command]
+pub fn open_storage_dir(app: AppHandle, target: String) -> Result<(), String> {
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+
+    let path_to_open = match target.as_str() {
+        "config" => data_dir.join("config.json"),
+        "database" => data_dir.join("berry.db"),
+        "thumbnails" => data_dir.join("thumbnails"),
+        "models" => data_dir.join("models"),
+        "updates" => data_dir.join("updates"),
+        _ => data_dir.clone(),
+    };
+
+    if !path_to_open.exists() {
+        if path_to_open.is_file() || target == "config" || target == "database" {
+            // Parent dir must exist
+            let _ = std::fs::create_dir_all(&data_dir);
+        } else {
+            let _ = std::fs::create_dir_all(&path_to_open);
+        }
+    }
+
+    let p_str = path_to_open.to_string_lossy().to_string();
+    if path_to_open.is_file() {
+        reveal_in_file_manager(p_str)
+    } else {
+        #[cfg(target_os = "windows")]
+        {
+            std::process::Command::new("explorer")
+                .arg(&p_str)
+                .spawn()
+                .map_err(|e| format!("Failed to open explorer: {e}"))?;
+            Ok(())
+        }
+        #[cfg(target_os = "macos")]
+        {
+            std::process::Command::new("open")
+                .arg(&p_str)
+                .spawn()
+                .map_err(|e| format!("Failed to open Finder: {e}"))?;
+            Ok(())
+        }
+        #[cfg(target_os = "linux")]
+        {
+            std::process::Command::new("xdg-open")
+                .arg(&p_str)
+                .spawn()
+                .map_err(|e| format!("Failed to open file manager: {e}"))?;
+            Ok(())
+        }
+    }
+}
+
+// --- In-App Auto Update Download & In-Place Installation ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateDownloadProgress {
+    pub downloaded_bytes: u64,
+    pub total_bytes: u64,
+    pub percent: f64,
+    pub speed_bytes_per_sec: u64,
+    pub done: bool,
+    pub target_file: Option<String>,
+}
+
+/// Download an update asset directly into updates/ directory, reporting progress via events.
+#[tauri::command]
+pub async fn download_update(
+    app: AppHandle,
+    url: String,
+    filename: String,
+) -> Result<String, String> {
+    use std::io::{Read, Write};
+
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let updates_dir = data_dir.join("updates");
+    std::fs::create_dir_all(&updates_dir).map_err(|e| e.to_string())?;
+
+    let clean_filename = Path::new(&filename)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("update_installer.exe")
+        .to_string();
+    let dest_path = updates_dir.join(&clean_filename);
+    let tmp_path = updates_dir.join(format!("{clean_filename}.tmp"));
+
+    let app_clone = app.clone();
+    let url_clone = url.clone();
+    let dest_path_clone = dest_path.clone();
+
+    tauri::async_runtime::spawn_blocking(move || -> Result<String, String> {
+        let agent = ureq::builder()
+            .redirects(10)
+            .timeout(std::time::Duration::from_secs(600))
+            .build();
+
+        let resp = agent
+            .get(&url_clone)
+            .set("User-Agent", "Berry-AI-Studio-Updater")
+            .call()
+            .map_err(|e| format!("Download request failed: {e}"))?;
+
+        let total_bytes = resp
+            .header("content-length")
+            .and_then(|v| v.parse::<u64>().ok())
+            .unwrap_or(0);
+
+        let mut reader = resp.into_reader();
+        let mut file = std::fs::File::create(&tmp_path)
+            .map_err(|e| format!("Failed to create temporary update file: {e}"))?;
+
+        let mut buffer = [0u8; 64 * 1024];
+        let mut downloaded_bytes = 0u64;
+        let mut last_progress_time = std::time::Instant::now();
+        let mut bytes_since_last_progress = 0u64;
+        let mut speed_bytes_per_sec = 0u64;
+
+        loop {
+            let read_len = reader
+                .read(&mut buffer)
+                .map_err(|e| format!("Failed reading download stream: {e}"))?;
+
+            if read_len == 0 {
+                break;
+            }
+
+            file.write_all(&buffer[..read_len])
+                .map_err(|e| format!("Failed writing to update file: {e}"))?;
+
+            downloaded_bytes += read_len as u64;
+            bytes_since_last_progress += read_len as u64;
+
+            let elapsed = last_progress_time.elapsed();
+            if elapsed >= std::time::Duration::from_millis(200) {
+                let secs = elapsed.as_secs_f64();
+                if secs > 0.0 {
+                    speed_bytes_per_sec = (bytes_since_last_progress as f64 / secs) as u64;
+                }
+                last_progress_time = std::time::Instant::now();
+                bytes_since_last_progress = 0;
+
+                let percent = if total_bytes > 0 {
+                    (downloaded_bytes as f64 / total_bytes as f64 * 100.0).min(100.0)
+                } else {
+                    0.0
+                };
+
+                let _ = app_clone.emit(
+                    "update-download-progress",
+                    UpdateDownloadProgress {
+                        downloaded_bytes,
+                        total_bytes,
+                        percent,
+                        speed_bytes_per_sec,
+                        done: false,
+                        target_file: None,
+                    },
+                );
+            }
+        }
+
+        file.flush()
+            .map_err(|e| format!("Failed to flush update file: {e}"))?;
+        drop(file);
+
+        if dest_path_clone.exists() {
+            let _ = std::fs::remove_file(&dest_path_clone);
+        }
+        std::fs::rename(&tmp_path, &dest_path_clone)
+            .map_err(|e| format!("Failed to rename update file: {e}"))?;
+
+        let final_path_str = dest_path_clone.to_string_lossy().to_string();
+
+        let _ = app_clone.emit(
+            "update-download-progress",
+            UpdateDownloadProgress {
+                downloaded_bytes,
+                total_bytes: if total_bytes == 0 {
+                    downloaded_bytes
+                } else {
+                    total_bytes
+                },
+                percent: 100.0,
+                speed_bytes_per_sec: 0,
+                done: true,
+                target_file: Some(final_path_str.clone()),
+            },
+        );
+
+        Ok(final_path_str)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Launch the downloaded installer to execute in-place upgrade and cleanly exit current process.
+#[tauri::command]
+pub fn install_update(
+    app: AppHandle,
+    installer_path: String,
+    silent: Option<bool>,
+) -> Result<(), String> {
+    let p = Path::new(&installer_path);
+    if !p.exists() {
+        return Err(format!("Installer file not found: {installer_path}"));
+    }
+
+    let is_silent = silent.unwrap_or(false);
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+        let mut cmd = Command::new(&installer_path);
+        if is_silent {
+            cmd.arg("/S");
+        }
+        cmd.spawn()
+            .map_err(|e| format!("Failed to launch installer: {e}"))?;
+        app.exit(0);
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+        if installer_path.ends_with(".dmg") {
+            Command::new("open")
+                .arg(&installer_path)
+                .spawn()
+                .map_err(|e| format!("Failed to open DMG: {e}"))?;
+        } else {
+            Command::new("open")
+                .arg("-R")
+                .arg(&installer_path)
+                .spawn()
+                .map_err(|e| format!("Failed to reveal update: {e}"))?;
+        }
+        app.exit(0);
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        use std::process::Command;
+        if installer_path.ends_with(".AppImage") {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                if let Ok(metadata) = std::fs::metadata(&installer_path) {
+                    let mut perms = metadata.permissions();
+                    perms.set_mode(0o755);
+                    let _ = std::fs::set_permissions(&installer_path, perms);
+                }
+            }
+            Command::new(&installer_path)
+                .spawn()
+                .map_err(|e| format!("Failed to launch AppImage: {e}"))?;
+            app.exit(0);
+        } else {
+            let parent = p.parent().unwrap_or(p);
+            Command::new("xdg-open")
+                .arg(parent)
+                .spawn()
+                .map_err(|e| format!("Failed to open file manager: {e}"))?;
+        }
+    }
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// AIGC Ingestion Pipeline & Local AI Tool Autodetection
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub fn autodetect_local_ai_paths() -> Result<Vec<PipelineDetectedPath>, String> {
+    let mut detected = Vec::new();
+
+    #[cfg(target_os = "windows")]
+    let drive_roots: Vec<String> = (b'C'..=b'Z')
+        .map(|d| format!("{}:\\", d as char))
+        .filter(|root| Path::new(root).exists())
+        .collect();
+
+    #[cfg(not(target_os = "windows"))]
+    let drive_roots: Vec<String> = vec![
+        std::env::var("HOME").unwrap_or_else(|_| "/root".to_string()),
+        "/opt".to_string(),
+        "/media".to_string(),
+    ];
+
+    let patterns = [
+        (
+            "Stable Diffusion WebUI",
+            "stable-diffusion-webui/outputs/txt2img-images",
+            "txt2img",
+        ),
+        (
+            "Stable Diffusion WebUI",
+            "stable-diffusion-webui/outputs/img2img-images",
+            "img2img",
+        ),
+        (
+            "Stable Diffusion WebUI",
+            "sd.webui/outputs/txt2img-images",
+            "txt2img",
+        ),
+        (
+            "Stable Diffusion WebUI (Aki)",
+            "sd-webui-aki/outputs/txt2img-images",
+            "txt2img",
+        ),
+        (
+            "Stable Diffusion WebUI (Aki)",
+            "sd-webui-aki/outputs/img2img-images",
+            "img2img",
+        ),
+        ("ComfyUI", "ComfyUI/output", "output"),
+        (
+            "ComfyUI (Portable)",
+            "ComfyUI_windows_portable/ComfyUI/output",
+            "output",
+        ),
+        ("ComfyUI (Aki)", "ComfyUI-aki/ComfyUI/output", "output"),
+        ("Fooocus", "Fooocus/outputs", "outputs"),
+        ("Fooocus (MRE)", "Fooocus-MRE/outputs", "outputs"),
+        ("InvokeAI", "invokeai/outputs", "outputs"),
+    ];
+
+    for root in drive_roots {
+        let root_path = Path::new(&root);
+        for (tool, rel_path, cat) in &patterns {
+            let candidate = root_path.join(rel_path);
+            if candidate.is_dir() {
+                let p = candidate.display().to_string();
+                if !detected.iter().any(|d: &PipelineDetectedPath| d.path == p) {
+                    detected.push(PipelineDetectedPath {
+                        tool_name: tool.to_string(),
+                        path: p,
+                        category: cat.to_string(),
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(detected)
+}
+
+#[tauri::command]
+pub fn harvest_pipeline_folder(
+    folder_id: i64,
+    state: State<'_, AppState>,
+) -> Result<usize, String> {
+    let folder = {
+        let db = db(&state)?;
+        db.find_folder_by_id(folder_id)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "folder not found".to_string())?
+    };
+
+    if folder.folder_type != "pipeline" {
+        return Err("folder is not an ingestion pipeline".to_string());
+    }
+
+    let source_path_str = match &folder.source_path {
+        Some(s) if !s.is_empty() => s.clone(),
+        _ => return Err("pipeline folder has no source path configured".to_string()),
+    };
+
+    let source_dir = Path::new(&source_path_str);
+    if !source_dir.is_dir() {
+        return Err(format!(
+            "pipeline source path does not exist: {source_path_str}"
+        ));
+    }
+
+    let dest_dir = Path::new(&folder.path);
+    std::fs::create_dir_all(dest_dir)
+        .map_err(|e| format!("failed to create destination directory: {e}"))?;
+
+    let supported_exts = ["png", "jpg", "jpeg", "webp", "mp4"];
+    let mut harvested_count = 0;
+
+    let entries = std::fs::read_dir(source_dir)
+        .map_err(|e| format!("failed to read source directory: {e}"))?;
+
+    let now_ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64;
+
+    for entry in entries.flatten() {
+        let file_path = entry.path();
+        if !file_path.is_file() {
+            continue;
+        }
+
+        let ext = file_path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+
+        if !supported_exts.contains(&ext.as_str()) {
+            continue;
+        }
+
+        let meta = match file_path.metadata() {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+
+        if meta.len() == 0 {
+            continue;
+        }
+
+        let file_mtime = meta
+            .modified()
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+
+        if now_ts.saturating_sub(file_mtime) < 1 {
+            // Still being written to, debounce
+            continue;
+        }
+
+        let file_name = match file_path.file_name() {
+            Some(n) => n.to_string_lossy().to_string(),
+            None => continue,
+        };
+
+        let target_path = dest_dir.join(&file_name);
+        let src_str = file_path.display().to_string();
+        let tgt_str = target_path.display().to_string();
+
+        if target_path.exists() {
+            if let Ok(t_meta) = target_path.metadata() {
+                if t_meta.len() == meta.len() {
+                    continue;
+                }
+            }
+        }
+
+        if let Err(e) = std::fs::copy(&file_path, &target_path) {
+            eprintln!("Failed to copy {src_str} to {tgt_str}: {e}");
+            continue;
+        }
+
+        let src_txt = file_path.with_extension("txt");
+        if src_txt.exists() {
+            let tgt_txt = target_path.with_extension("txt");
+            let _ = std::fs::copy(&src_txt, &tgt_txt);
+        }
+
+        let container = match ext.as_str() {
+            "png" => berry_domain::Container::Png,
+            "jpg" | "jpeg" => berry_domain::Container::Jpeg,
+            "webp" => berry_domain::Container::WebP,
+            "mp4" => berry_domain::Container::Mp4,
+            _ => continue,
+        };
+
+        let metadata = berry_metadata::extract_metadata(container, &target_path);
+
+        let image_file = ImageFile {
+            id: None,
+            folder_id,
+            path: tgt_str.clone(),
+            size_bytes: meta.len(),
+            modified_at: file_mtime,
+            container,
+            metadata,
+            rating: None,
+            aesthetic_score: None,
+            is_favorite: false,
+            is_nsfw: false,
+            stack_id: None,
+            stack_order: 0,
+        };
+
+        let db = db(&state)?;
+        if let Ok(inserted_id) = db.upsert_file(&image_file) {
+            harvested_count += 1;
+
+            if folder.ingest_action.as_deref() == Some("move") {
+                let grace = folder.grace_period_hours.unwrap_or(24);
+                if grace <= 0 {
+                    let _ = trash::delete(&file_path);
+                    if src_txt.exists() {
+                        let _ = trash::delete(&src_txt);
+                    }
+                } else {
+                    let _ = db.enqueue_cleanup(&src_str, inserted_id, grace);
+                }
+            }
+        }
+    }
+
+    Ok(harvested_count)
+}
+
+#[tauri::command]
+pub fn process_pipeline_cleanups(state: State<'_, AppState>) -> Result<u64, String> {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64;
+
+    let db = db(&state)?;
+    let due_items = db.list_due_cleanups(now).map_err(|e| e.to_string())?;
+    let mut deleted_count = 0;
+
+    for item in due_items {
+        let p = Path::new(&item.source_file_path);
+        if p.exists() {
+            if let Err(e) = trash::delete(p) {
+                eprintln!(
+                    "Failed to trash expired pipeline file {}: {e}",
+                    item.source_file_path
+                );
+                let _ = db.update_cleanup_status(item.id, "failed");
+                continue;
+            }
+        }
+        let txt = p.with_extension("txt");
+        if txt.exists() {
+            let _ = trash::delete(&txt);
+        }
+
+        let _ = db.update_cleanup_status(item.id, "deleted");
+        deleted_count += 1;
+    }
+
+    Ok(deleted_count)
+}
+
+#[tauri::command]
+pub fn get_pipeline_cleanup_queue(
+    limit: Option<usize>,
+    state: State<'_, AppState>,
+) -> Result<Vec<CleanupQueueItem>, String> {
+    let db = db(&state)?;
+    db.get_cleanup_queue(limit.unwrap_or(50))
+        .map_err(|e| e.to_string())
+}
+
+// ---------------------------------------------------------------------------
+// Image Stacking & Burst Grouping
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub fn stack_images(
+    file_ids: Vec<i64>,
+    custom_stack_id: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let db = db(&state)?;
+    db.stack_images(&file_ids, custom_stack_id.as_deref())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn unstack_images(stack_id: String, state: State<'_, AppState>) -> Result<u64, String> {
+    let db = db(&state)?;
+    db.unstack_images(&stack_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn set_stack_hero(
+    stack_id: String,
+    hero_file_id: i64,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let db = db(&state)?;
+    db.set_stack_hero(&stack_id, hero_file_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_stack_members(
+    stack_id: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<ImageFile>, String> {
+    let db = db(&state)?;
+    db.get_stack_members(&stack_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn list_stacks(
+    folder_id: Option<i64>,
+    state: State<'_, AppState>,
+) -> Result<Vec<StackSummary>, String> {
+    let db = db(&state)?;
+    db.list_stacks(folder_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn cull_stack_drafts(
+    stack_id: String,
+    min_rating: u8,
+    state: State<'_, AppState>,
+) -> Result<u64, String> {
+    let db = db(&state)?;
+    let cull_ids = db
+        .get_stack_cull_candidate_ids(&stack_id, min_rating)
+        .map_err(|e| e.to_string())?;
+
+    let mut trashed = 0;
+    for id in cull_ids {
+        if let Ok(Some(file)) = db.get_file_by_id(id) {
+            let p = Path::new(&file.path);
+            if p.exists() {
+                let _ = trash::delete(p);
+            }
+            let txt = p.with_extension("txt");
+            if txt.exists() {
+                let _ = trash::delete(&txt);
+            }
+            let _ = db.delete_file_by_id(id);
+            trashed += 1;
+        }
+    }
+
+    Ok(trashed)
+}
+
+fn tokenize_prompt(prompt: &str) -> std::collections::HashSet<String> {
+    prompt
+        .split([',', '\n', '\r', '\t'])
+        .map(|s| s.trim().to_lowercase())
+        .filter(|s| !s.is_empty())
+        .collect()
+}
+
+fn prompt_jaccard_similarity(
+    tokens1: &std::collections::HashSet<String>,
+    tokens2: &std::collections::HashSet<String>,
+) -> f32 {
+    if tokens1.is_empty() && tokens2.is_empty() {
+        return 1.0;
+    }
+    let intersection = tokens1.intersection(tokens2).count();
+    let union = tokens1.union(tokens2).count();
+    if union == 0 {
+        1.0
+    } else {
+        intersection as f32 / union as f32
+    }
+}
+
+#[tauri::command]
+pub fn auto_stack_images(
+    folder_id: Option<i64>,
+    similarity_threshold: Option<f32>,
+    time_window_minutes: Option<i64>,
+    state: State<'_, AppState>,
+) -> Result<usize, String> {
+    let db = db(&state)?;
+    let threshold = similarity_threshold.unwrap_or(0.90);
+    let time_window_secs = time_window_minutes.unwrap_or(30) * 60;
+
+    let criteria = SearchCriteria {
+        folder_id,
+        sort: Some(FileSortField::ModifiedAt),
+        direction: Some(SortDirection::Asc),
+        ..Default::default()
+    };
+    let files = db.search_files(&criteria).map_err(|e| e.to_string())?;
+
+    if files.len() < 2 {
+        return Ok(0);
+    }
+
+    let mut file_tokens: Vec<(ImageFile, std::collections::HashSet<String>)> = Vec::new();
+    for f in files {
+        let p_str = f
+            .metadata
+            .as_ref()
+            .and_then(|m| m.prompt.as_deref())
+            .unwrap_or("");
+        let tokens = tokenize_prompt(p_str);
+        file_tokens.push((f, tokens));
+    }
+
+    let mut clusters: Vec<Vec<i64>> = Vec::new();
+    let mut assigned = std::collections::HashSet::new();
+
+    for i in 0..file_tokens.len() {
+        let (file_a, tokens_a) = &file_tokens[i];
+        let id_a = match file_a.id {
+            Some(id) => id,
+            None => continue,
+        };
+
+        if assigned.contains(&id_a) || file_a.stack_id.is_some() {
+            continue;
+        }
+
+        let mut cluster = vec![id_a];
+
+        for (file_b, tokens_b) in file_tokens.iter().skip(i + 1) {
+            let id_b = match file_b.id {
+                Some(id) => id,
+                None => continue,
+            };
+
+            if assigned.contains(&id_b) || file_b.stack_id.is_some() {
+                continue;
+            }
+
+            let time_diff = (file_b.modified_at - file_a.modified_at).abs();
+            if time_window_secs > 0 && time_diff > time_window_secs {
+                continue;
+            }
+
+            let model_a = file_a
+                .metadata
+                .as_ref()
+                .and_then(|m| m.model_name.as_deref());
+            let model_b = file_b
+                .metadata
+                .as_ref()
+                .and_then(|m| m.model_name.as_deref());
+            if model_a.is_some() && model_b.is_some() && model_a != model_b {
+                continue;
+            }
+
+            let sim = prompt_jaccard_similarity(tokens_a, tokens_b);
+            if sim >= threshold {
+                cluster.push(id_b);
+                assigned.insert(id_b);
+            }
+        }
+
+        if cluster.len() >= 2 {
+            assigned.insert(id_a);
+            clusters.push(cluster);
+        }
+    }
+
+    let mut created_stacks = 0;
+    for cluster in clusters {
+        let _ = db.stack_images(&cluster, None);
+        created_stacks += 1;
+    }
+
+    Ok(created_stacks)
 }

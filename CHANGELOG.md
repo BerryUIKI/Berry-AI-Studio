@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the Berry-AIGC-Toolbox project are documented in this file.
+All notable changes to the Berry AI Studio project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -37,14 +37,14 @@ Version 0.1.1 delivers a major UI/UX transformation with a professional Eagle-st
 
 ### Complete Clean-Slate Rewrite (Tauri 2 + Rust + Vue 3)
 
-Version 0.1.0 marks the initial release of the complete clean-slate rewrite of Berry-AIGC-Toolbox from the legacy C#/.NET architecture to a modern, high-performance, cross-platform stack powered by Tauri 2, Rust core crates, and Vue 3 + TypeScript.
+Version 0.1.0 marks the initial release of the complete clean-slate rewrite of Berry AI Studio from the legacy C#/.NET architecture to a modern, high-performance, cross-platform stack powered by Tauri 2, Rust core crates, and Vue 3 + TypeScript.
 
 ---
 
 ### Features by Milestone
 
 #### Milestone 1: Scaffolding & Foundation
-- Modular Rust multi-crate Cargo workspace layout (`berry-domain`, `berry-metadata`, `berry-scan`, `berry-storage`, and `berry-aigc-toolbox`).
+- Modular Rust multi-crate Cargo workspace layout (`berry-domain`, `berry-metadata`, `berry-scan`, `berry-storage`, and `berry-ai-studio`).
 - SQLite storage engine with transactional versioning via `PRAGMA user_version` (`migrations.rs`).
 - CI/CD build and verification pipelines for Windows, macOS, and Linux.
 

@@ -4,12 +4,12 @@
 
 **[English](README.md)** | **[简体中文](README.zh-CN.md)** | **[繁體中文](README.zh-TW.md)** | **[日本語](README.ja.md)**
 
-[![Website](https://img.shields.io/badge/公式HP-GitHub%20Pages-12b5cb.svg)](https://berryuiki.github.io/Berry-AIGC-Toolbox/)
+[![Website](https://img.shields.io/badge/公式HP-GitHub%20Pages-12b5cb.svg)](https://berryuiki.github.io/Berry-AI-Studio/)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Tauri](https://img.shields.io/badge/Tauri-2-24c8db)](https://tauri.app)
 [![Rust](https://img.shields.io/badge/Rust-1.7+-orange)](https://www.rust-lang.org)
 [![Vue](https://img.shields.io/badge/Vue-3-42b883)](https://vuejs.org)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](https://github.com/BerryUIKI/Berry-AIGC-Toolbox/releases)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](https://github.com/BerryUIKI/Berry-AI-Studio/releases)
 
 *AI画像クリエイターとプロンプトエンジニアのための、高速ローカルAIGCメタデータインデクサー＆アセット管理スタジオ。*
 
@@ -27,7 +27,7 @@
 
 ## 🌟 概要
 
-**Berry AI Studio**（旧 *Berry-AIGC-Toolbox*）は、AI画像クリエイターやプロンプトエンジニア向けに設計されたデスクトップ特化型画像アセット管理スタジオです。主要なAI画像生成ツールで作成された画像メタデータ（プロンプト、モデル名、サンプラー、ステップ数、CFG、シード値、ワークフローJSON）をローカルのSQLiteに高速インデックス化。**3ペインスタジオワークスペース**、スムーズな仮想スクロールグリッド、トークン化プロンプトインスペクター、全画面ライトボックスビューア、スマート整理機能を提供します。
+**Berry AI Studio** は、AI画像クリエイターやプロンプトエンジニア向けに設計されたデスクトップ特化型画像アセット管理スタジオです。主要なAI画像生成ツールで作成された画像メタデータ（プロンプト、モデル名、サンプラー、ステップ数、CFG、シード値、ワークフローJSON）をローカルのSQLiteに高速インデックス化。**3ペインスタジオワークスペース**、スムーズな仮想スクロールグリッド、トークン化プロンプトインスペクター、全画面ライトボックスビューア、スマート整理機能を提供します。
 
 > 🚀 **新アーキテクチャへの刷新**: Berry v0.1.0+ は **Tauri 2 + Rust + Vue 3** を採用してゼロから再構築されました。従来の旧 C#/.NET 版は `archive/old-main` タグおよび `old/main` ブランチにアーカイブされています。
 
@@ -83,18 +83,18 @@
 
 ## 📦 リリースパッケージ命名規則
 
-[GitHub Releases](https://github.com/BerryUIKI/Berry-AIGC-Toolbox/releases) で配布されるビルド済みバイナリは標準命名規則に従います：
+[GitHub Releases](https://github.com/BerryUIKI/Berry-AI-Studio/releases) で配布されるビルド済みバイナリは標準命名規則に従います：
 
 $$\text{<アプリ名>}\_\text{<OS>}\_\text{<アーキテクチャ>}.\text{<拡張子>}$$
 
 | OS プラットフォーム | アーキテクチャ | 形式 | 配布ファイル名 |
 | :--- | :--- | :--- | :--- |
-| **Windows** | x86_64 (64-bit) | NSIS インストーラー | `Berry-AIGC-Toolbox_Windows_x64.exe` |
-| **Windows** | x86_64 (64-bit) | ポータブル Zip | `Berry-AIGC-Toolbox_Windows_x64.zip` |
-| **macOS** | Apple Silicon (ARM64) | DMG ディスクイメージ | `Berry-AIGC-Toolbox_macOS_aarch64.dmg` |
-| **macOS** | Intel (x86_64) | DMG ディスクイメージ | `Berry-AIGC-Toolbox_macOS_x64.dmg` |
-| **Linux** | x86_64 (64-bit) | AppImage | `Berry-AIGC-Toolbox_Linux_x64.AppImage` |
-| **Linux** | x86_64 (64-bit) | Debian パッケージ | `Berry-AIGC-Toolbox_Linux_x64.deb` |
+| **Windows** | x86_64 (64-bit) | NSIS インストーラー | `Berry-AI-Studio_Windows_x64.exe` |
+| **Windows** | x86_64 (64-bit) | ポータブル Zip | `Berry-AI-Studio_Windows_x64.zip` |
+| **macOS** | Apple Silicon (ARM64) | DMG ディスクイメージ | `Berry-AI-Studio_macOS_aarch64.dmg` |
+| **macOS** | Intel (x86_64) | DMG ディスクイメージ | `Berry-AI-Studio_macOS_x64.dmg` |
+| **Linux** | x86_64 (64-bit) | AppImage | `Berry-AI-Studio_Linux_x64.AppImage` |
+| **Linux** | x86_64 (64-bit) | Debian パッケージ | `Berry-AI-Studio_Linux_x64.deb` |
 
 ---
 
@@ -108,8 +108,8 @@ $$\text{<アプリ名>}\_\text{<OS>}\_\text{<アーキテクチャ>}.\text{<拡�
 ### ビルド手順
 ```bash
 # 1. リポジトリをクローン
-git clone https://github.com/BerryUIKI/Berry-AIGC-Toolbox.git
-cd Berry-AIGC-Toolbox
+git clone https://github.com/BerryUIKI/Berry-AI-Studio.git
+cd Berry-AI-Studio
 
 # 2. フロントエンド依存関係のインストール
 pnpm install

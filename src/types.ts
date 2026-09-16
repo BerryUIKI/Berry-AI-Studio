@@ -7,10 +7,18 @@ export interface AppInfo {
   database_path: string;
 }
 
+export type FolderType = "link" | "managed" | "pipeline";
+export type IngestAction = "copy" | "move";
+
 export interface Folder {
   id: number;
   path: string;
   added_at: string;
+  folder_type?: FolderType;
+  source_path?: string | null;
+  ingest_action?: IngestAction | null;
+  grace_period_hours?: number | null;
+  auto_harvest?: boolean;
 }
 
 export type Container = "png" | "jpg" | "webp" | "mp4" | "txt";
@@ -58,6 +66,29 @@ export interface ImageFile {
   is_favorite?: boolean;
   is_nsfw?: boolean;
   similarity_score?: number | null;
+  stack_id?: string | null;
+  stack_order?: number;
+}
+
+export interface PipelineDetectedPath {
+  tool_name: string;
+  path: string;
+  category: string;
+}
+
+export interface CleanupQueueItem {
+  id: number;
+  source_file_path: string;
+  target_image_id: number;
+  scheduled_delete_at: number;
+  created_at: number;
+  status: "pending" | "deleted" | "cancelled" | "failed";
+}
+
+export interface StackSummary {
+  stack_id: string;
+  count: number;
+  hero_image_id: number | null;
 }
 
 export interface SimilarityMatch {
