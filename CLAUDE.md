@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Berry-AIGC-Toolbox** is an open-source **metadata indexer and viewer for
+**Berry AI Studio** is an open-source **local asset manager and prompt studio for
 AI-generated images**: it scans folders of images/videos, extracts prompt/model/
 parameter metadata (PNGInfo, EXIF, `.txt` sidecars), and indexes it into SQLite
 for search, organization (albums, tags, favorites, ratings, NSFW), and model
@@ -52,7 +52,7 @@ A single Cargo workspace (`Cargo.toml`) — run cargo commands from the root.
 
 | Crate | Responsibility | Notes |
 |---|---|---|
-| `berry-aigc-toolbox` (`src-tauri/`) | Tauri shell: window setup, IPC commands, `AppState` | Thin adapters only — **no business logic** |
+| `berry-ai-studio` (`src-tauri/`) | Tauri shell: window setup, IPC commands, `AppState` | Thin adapters only — **no business logic** |
 | `berry-domain` | `ImageFile`, `Container`, `MetadataFormat` | Depends on nothing in-repo |
 | `berry-metadata` | `detect_container` (magic bytes), `extract_metadata` dispatch: PNGInfo (`parameters` chunk), EXIF (`Software` tag + dimensions), `.txt` sidecar fallback | Depends on domain + kamadak-exif |
 | `berry-scan` | `Scanner`: walk → detect container → extract → batch upsert → orphan cleanup; incremental (size, mtime) skip + forced rebuild | Depends on domain + metadata + storage |

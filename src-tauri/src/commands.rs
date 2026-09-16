@@ -1852,3 +1852,359 @@ pub fn scan_loras_directory(dir_path: String, state: State<'_, AppState>) -> Res
 
     Ok(count)
 }
+
+// --- Application Configuration & Storage Directory Management ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppConfig {
+    pub locale: String,
+    pub auto_scan: bool,
+    pub blur_nsfw: bool,
+    pub show_card_badges: bool,
+    pub default_view: String,
+    pub thumbnail_max_edge: u32,
+    pub similarity_limit: u32,
+    pub auto_check_update: bool,
+    pub silent_install: bool,
+}
+
+impl Default for AppConfig {
+    fn default() -> Self {
+        Self {
+            locale: "auto".to_string(),
+            auto_scan: true,
+            blur_nsfw: true,
+            show_card_badges: true,
+            default_view: "grid".to_string(),
+            thumbnail_max_edge: 384,
+            similarity_limit: 50,
+            auto_check_update: true,
+            silent_install: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoragePaths {
+    pub data_dir: String,
+    pub config_file: String,
+    pub database_file: String,
+    pub thumbnails_dir: String,
+    pub models_dir: String,
+    pub updates_dir: String,
+}
+
+/// Retrieve the persisted application configuration from config.json.
+#[tauri::command]
+pub fn get_app_config(app: AppHandle) -> Result<AppConfig, String> {
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let config_path = data_dir.join("config.json");
+
+    if config_path.is_file() {
+        if let Ok(content) = std::fs::read_to_string(&config_path) {
+            if let Ok(cfg) = serde_json::from_str::<AppConfig>(&content) {
+                return Ok(cfg);
+            }
+        }
+    }
+
+    // Default configuration if not found or corrupted
+    let default_cfg = AppConfig::default();
+    if let Ok(json) = serde_json::to_string_pretty(&default_cfg) {
+        let _ = std::fs::create_dir_all(&data_dir);
+        let _ = std::fs::write(&config_path, json);
+    }
+    Ok(default_cfg)
+}
+
+/// Save the application configuration to config.json in the app data directory.
+#[tauri::command]
+pub fn save_app_config(app: AppHandle, config: AppConfig) -> Result<(), String> {
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let _ = std::fs::create_dir_all(&data_dir);
+    let config_path = data_dir.join("config.json");
+    let json = serde_json::to_string_pretty(&config)
+        .map_err(|e| format!("Failed to serialize configuration: {e}"))?;
+    std::fs::write(&config_path, json)
+        .map_err(|e| format!("Failed to write configuration file: {e}"))?;
+    Ok(())
+}
+
+/// Retrieve all standard storage and cache paths.
+#[tauri::command]
+pub fn get_storage_paths(app: AppHandle) -> Result<StoragePaths, String> {
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let _ = std::fs::create_dir_all(&data_dir);
+    let _ = std::fs::create_dir_all(data_dir.join("thumbnails"));
+    let _ = std::fs::create_dir_all(data_dir.join("models"));
+    let _ = std::fs::create_dir_all(data_dir.join("updates"));
+
+    Ok(StoragePaths {
+        data_dir: data_dir.to_string_lossy().to_string(),
+        config_file: data_dir.join("config.json").to_string_lossy().to_string(),
+        database_file: data_dir.join("berry.db").to_string_lossy().to_string(),
+        thumbnails_dir: data_dir.join("thumbnails").to_string_lossy().to_string(),
+        models_dir: data_dir.join("models").to_string_lossy().to_string(),
+        updates_dir: data_dir.join("updates").to_string_lossy().to_string(),
+    })
+}
+
+/// Open a designated storage directory or highlight a file in the system file manager.
+#[tauri::command]
+pub fn open_storage_dir(app: AppHandle, target: String) -> Result<(), String> {
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+
+    let path_to_open = match target.as_str() {
+        "config" => data_dir.join("config.json"),
+        "database" => data_dir.join("berry.db"),
+        "thumbnails" => data_dir.join("thumbnails"),
+        "models" => data_dir.join("models"),
+        "updates" => data_dir.join("updates"),
+        _ => data_dir.clone(),
+    };
+
+    if !path_to_open.exists() {
+        if path_to_open.is_file() || target == "config" || target == "database" {
+            // Parent dir must exist
+            let _ = std::fs::create_dir_all(&data_dir);
+        } else {
+            let _ = std::fs::create_dir_all(&path_to_open);
+        }
+    }
+
+    let p_str = path_to_open.to_string_lossy().to_string();
+    if path_to_open.is_file() {
+        reveal_in_file_manager(p_str)
+    } else {
+        #[cfg(target_os = "windows")]
+        {
+            std::process::Command::new("explorer")
+                .arg(&p_str)
+                .spawn()
+                .map_err(|e| format!("Failed to open explorer: {e}"))?;
+            Ok(())
+        }
+        #[cfg(target_os = "macos")]
+        {
+            std::process::Command::new("open")
+                .arg(&p_str)
+                .spawn()
+                .map_err(|e| format!("Failed to open Finder: {e}"))?;
+            Ok(())
+        }
+        #[cfg(target_os = "linux")]
+        {
+            std::process::Command::new("xdg-open")
+                .arg(&p_str)
+                .spawn()
+                .map_err(|e| format!("Failed to open file manager: {e}"))?;
+            Ok(())
+        }
+    }
+}
+
+// --- In-App Auto Update Download & In-Place Installation ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateDownloadProgress {
+    pub downloaded_bytes: u64,
+    pub total_bytes: u64,
+    pub percent: f64,
+    pub speed_bytes_per_sec: u64,
+    pub done: bool,
+    pub target_file: Option<String>,
+}
+
+/// Download an update asset directly into updates/ directory, reporting progress via events.
+#[tauri::command]
+pub async fn download_update(
+    app: AppHandle,
+    url: String,
+    filename: String,
+) -> Result<String, String> {
+    use std::io::{Read, Write};
+
+    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let updates_dir = data_dir.join("updates");
+    std::fs::create_dir_all(&updates_dir).map_err(|e| e.to_string())?;
+
+    let clean_filename = Path::new(&filename)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("update_installer.exe")
+        .to_string();
+    let dest_path = updates_dir.join(&clean_filename);
+    let tmp_path = updates_dir.join(format!("{clean_filename}.tmp"));
+
+    let app_clone = app.clone();
+    let url_clone = url.clone();
+    let dest_path_clone = dest_path.clone();
+
+    tauri::async_runtime::spawn_blocking(move || -> Result<String, String> {
+        let agent = ureq::builder()
+            .redirects(10)
+            .timeout(std::time::Duration::from_secs(600))
+            .build();
+
+        let resp = agent
+            .get(&url_clone)
+            .set("User-Agent", "Berry-AI-Studio-Updater")
+            .call()
+            .map_err(|e| format!("Download request failed: {e}"))?;
+
+        let total_bytes = resp
+            .header("content-length")
+            .and_then(|v| v.parse::<u64>().ok())
+            .unwrap_or(0);
+
+        let mut reader = resp.into_reader();
+        let mut file = std::fs::File::create(&tmp_path)
+            .map_err(|e| format!("Failed to create temporary update file: {e}"))?;
+
+        let mut buffer = [0u8; 64 * 1024];
+        let mut downloaded_bytes = 0u64;
+        let mut last_progress_time = std::time::Instant::now();
+        let mut bytes_since_last_progress = 0u64;
+        let mut speed_bytes_per_sec = 0u64;
+
+        loop {
+            let read_len = reader
+                .read(&mut buffer)
+                .map_err(|e| format!("Failed reading download stream: {e}"))?;
+
+            if read_len == 0 {
+                break;
+            }
+
+            file.write_all(&buffer[..read_len])
+                .map_err(|e| format!("Failed writing to update file: {e}"))?;
+
+            downloaded_bytes += read_len as u64;
+            bytes_since_last_progress += read_len as u64;
+
+            let elapsed = last_progress_time.elapsed();
+            if elapsed >= std::time::Duration::from_millis(200) {
+                let secs = elapsed.as_secs_f64();
+                if secs > 0.0 {
+                    speed_bytes_per_sec = (bytes_since_last_progress as f64 / secs) as u64;
+                }
+                last_progress_time = std::time::Instant::now();
+                bytes_since_last_progress = 0;
+
+                let percent = if total_bytes > 0 {
+                    (downloaded_bytes as f64 / total_bytes as f64 * 100.0).min(100.0)
+                } else {
+                    0.0
+                };
+
+                let _ = app_clone.emit(
+                    "update-download-progress",
+                    UpdateDownloadProgress {
+                        downloaded_bytes,
+                        total_bytes,
+                        percent,
+                        speed_bytes_per_sec,
+                        done: false,
+                        target_file: None,
+                    },
+                );
+            }
+        }
+
+        file.flush().map_err(|e| format!("Failed to flush update file: {e}"))?;
+        drop(file);
+
+        if dest_path_clone.exists() {
+            let _ = std::fs::remove_file(&dest_path_clone);
+        }
+        std::fs::rename(&tmp_path, &dest_path_clone)
+            .map_err(|e| format!("Failed to rename update file: {e}"))?;
+
+        let final_path_str = dest_path_clone.to_string_lossy().to_string();
+
+        let _ = app_clone.emit(
+            "update-download-progress",
+            UpdateDownloadProgress {
+                downloaded_bytes,
+                total_bytes: if total_bytes == 0 { downloaded_bytes } else { total_bytes },
+                percent: 100.0,
+                speed_bytes_per_sec: 0,
+                done: true,
+                target_file: Some(final_path_str.clone()),
+            },
+        );
+
+        Ok(final_path_str)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Launch the downloaded installer to execute in-place upgrade and cleanly exit current process.
+#[tauri::command]
+pub fn install_update(app: AppHandle, installer_path: String, silent: Option<bool>) -> Result<(), String> {
+    let p = Path::new(&installer_path);
+    if !p.exists() {
+        return Err(format!("Installer file not found: {installer_path}"));
+    }
+
+    let is_silent = silent.unwrap_or(false);
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+        let mut cmd = Command::new(&installer_path);
+        if is_silent {
+            cmd.arg("/S");
+        }
+        cmd.spawn().map_err(|e| format!("Failed to launch installer: {e}"))?;
+        app.exit(0);
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+        if installer_path.ends_with(".dmg") {
+            Command::new("open")
+                .arg(&installer_path)
+                .spawn()
+                .map_err(|e| format!("Failed to open DMG: {e}"))?;
+        } else {
+            Command::new("open")
+                .arg("-R")
+                .arg(&installer_path)
+                .spawn()
+                .map_err(|e| format!("Failed to reveal update: {e}"))?;
+        }
+        app.exit(0);
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        use std::process::Command;
+        if installer_path.ends_with(".AppImage") {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                if let Ok(metadata) = std::fs::metadata(&installer_path) {
+                    let mut perms = metadata.permissions();
+                    perms.set_mode(0o755);
+                    let _ = std::fs::set_permissions(&installer_path, perms);
+                }
+            }
+            Command::new(&installer_path)
+                .spawn()
+                .map_err(|e| format!("Failed to launch AppImage: {e}"))?;
+            app.exit(0);
+        } else {
+            let parent = p.parent().unwrap_or(p);
+            Command::new("xdg-open")
+                .arg(parent)
+                .spawn()
+                .map_err(|e| format!("Failed to open file manager: {e}"))?;
+        }
+    }
+
+    Ok(())
+}
+

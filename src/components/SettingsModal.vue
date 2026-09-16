@@ -16,6 +16,13 @@ import {
   t,
   type LocaleSetting,
 } from "../i18n";
+import {
+  loadAppConfig,
+  saveAppConfig,
+  getStoragePaths,
+  openStorageDir,
+  type StoragePaths,
+} from "../utils/config";
 
 const props = defineProps<{
   show: boolean;
@@ -31,18 +38,23 @@ const emit = defineEmits<{
     showCardBadges: boolean;
     defaultView: "grid" | "table";
     thumbnailMaxEdge: number;
+    autoCheckUpdate: boolean;
   }): void;
 }>();
 
 const activeTab = ref<"general" | "display" | "parsers" | "about">("general");
 
-// Settings state (persisted in localStorage)
+// Settings state (backed by persistent config.json)
 const selectedLocale = ref<LocaleSetting>(currentLocaleSetting.value);
-const autoScanOnStartup = ref(localStorage.getItem("berry_autoscan") !== "false");
-const blurNsfwDefault = ref(localStorage.getItem("berry_blur_nsfw") !== "false");
-const showCardBadges = ref(localStorage.getItem("berry_card_badges") !== "false");
-const defaultView = ref(localStorage.getItem("berry_default_view") || "grid");
+const autoScanOnStartup = ref(true);
+const autoCheckUpdate = ref(true);
+const blurNsfwDefault = ref(true);
+const showCardBadges = ref(true);
+const defaultView = ref<"grid" | "table">("grid");
 const thumbnailMaxEdge = ref(getThumbnailMaxEdge());
+
+// Storage paths state
+const storagePaths = ref<StoragePaths | null>(null);
 
 // Cache stats
 const cacheStats = ref<ThumbnailCacheStats | null>(null);
@@ -54,6 +66,23 @@ async function loadCacheStats() {
     cacheStats.value = await getThumbnailCacheStats();
   } catch (e) {
     console.error("Failed to load thumbnail cache stats:", e);
+  }
+}
+
+async function loadSettingsAndPaths() {
+  try {
+    const config = await loadAppConfig();
+    selectedLocale.value = (config.locale as LocaleSetting) || currentLocaleSetting.value;
+    autoScanOnStartup.value = config.auto_scan;
+    autoCheckUpdate.value = config.auto_check_update;
+    blurNsfwDefault.value = config.blur_nsfw;
+    showCardBadges.value = config.show_card_badges;
+    defaultView.value = config.default_view || "grid";
+    thumbnailMaxEdge.value = config.thumbnail_max_edge || getThumbnailMaxEdge();
+
+    storagePaths.value = await getStoragePaths();
+  } catch (e) {
+    console.warn("Failed to load config from config.json:", e);
   }
 }
 
@@ -71,16 +100,15 @@ async function handleClearCache() {
   }
 }
 
+function handleOpenDir(target: "config" | "database" | "thumbnails" | "models" | "data") {
+  void openStorageDir(target);
+}
+
 watch(
   () => props.show,
   (val) => {
     if (val) {
-      selectedLocale.value = currentLocaleSetting.value;
-      autoScanOnStartup.value = localStorage.getItem("berry_autoscan") !== "false";
-      blurNsfwDefault.value = localStorage.getItem("berry_blur_nsfw") !== "false";
-      showCardBadges.value = localStorage.getItem("berry_card_badges") !== "false";
-      defaultView.value = localStorage.getItem("berry_default_view") || "grid";
-      thumbnailMaxEdge.value = getThumbnailMaxEdge();
+      void loadSettingsAndPaths();
       void loadCacheStats();
     }
   },
@@ -88,17 +116,32 @@ watch(
 
 onMounted(() => {
   if (props.show) {
+    void loadSettingsAndPaths();
     void loadCacheStats();
   }
 });
 
-function saveSettings() {
+async function saveSettings() {
   setLocale(selectedLocale.value);
-  localStorage.setItem("berry_autoscan", String(autoScanOnStartup.value));
-  localStorage.setItem("berry_blur_nsfw", String(blurNsfwDefault.value));
-  localStorage.setItem("berry_card_badges", String(showCardBadges.value));
-  localStorage.setItem("berry_default_view", defaultView.value);
   setThumbnailMaxEdge(thumbnailMaxEdge.value);
+
+  // Write to persistent config.json
+  try {
+    await saveAppConfig({
+      locale: selectedLocale.value,
+      auto_scan: autoScanOnStartup.value,
+      blur_nsfw: blurNsfwDefault.value,
+      show_card_badges: showCardBadges.value,
+      default_view: defaultView.value,
+      thumbnail_max_edge: thumbnailMaxEdge.value,
+      similarity_limit: Number(localStorage.getItem("berry_similarity_limit")) || 50,
+      auto_check_update: autoCheckUpdate.value,
+      silent_install: localStorage.getItem("berry_silent_install") === "true",
+    });
+  } catch (e) {
+    console.error("Failed to save config.json:", e);
+  }
+
   emit("save", {
     locale: selectedLocale.value,
     autoScan: autoScanOnStartup.value,
@@ -106,6 +149,7 @@ function saveSettings() {
     showCardBadges: showCardBadges.value,
     defaultView: (defaultView.value === "table" ? "table" : "grid"),
     thumbnailMaxEdge: thumbnailMaxEdge.value,
+    autoCheckUpdate: autoCheckUpdate.value,
   });
   emit("close");
 }
@@ -200,6 +244,14 @@ function saveSettings() {
               </div>
               <input v-model="autoScanOnStartup" type="checkbox" class="toggle-checkbox" />
             </div>
+
+            <div class="setting-row">
+              <div class="row-info">
+                <span class="row-label">{{ t.settings.autoCheckUpdate }}</span>
+                <span class="row-desc">{{ t.settings.autoCheckUpdateDesc }}</span>
+              </div>
+              <input v-model="autoCheckUpdate" type="checkbox" class="toggle-checkbox" />
+            </div>
           </div>
 
           <!-- Tab: Display & Safety -->
@@ -291,7 +343,7 @@ function saveSettings() {
             </div>
           </div>
 
-          <!-- Tab: About -->
+          <!-- Tab: About & Storage -->
           <div v-if="activeTab === 'about'" class="settings-panel">
             <h4 class="panel-title">{{ t.settings.aboutTitle }}</h4>
 
@@ -301,15 +353,51 @@ function saveSettings() {
               </div>
               <div class="about-details">
                 <h5 class="about-name">Berry AI Studio</h5>
-                <p class="about-ver">v{{ info?.app_version || '0.1.1' }}</p>
+                <p class="about-ver">v{{ info?.app_version || '0.1.3' }}</p>
                 <p class="about-desc">{{ t.settings.aboutDesc }}</p>
               </div>
             </div>
 
-            <div class="setting-row">
-              <div class="row-info">
-                <span class="row-label">{{ t.settings.dbPath }}</span>
-                <span class="row-desc path-code" :title="info?.database_path">{{ info?.database_path || '—' }}</span>
+            <!-- Storage Locations Card -->
+            <div class="storage-section">
+              <h5 class="storage-section-title">{{ t.settings.storageTitle }}</h5>
+
+              <div class="storage-notice-box">
+                <span class="notice-icon">🛡️</span>
+                <span>{{ t.settings.storageNotice }}</span>
+              </div>
+
+              <!-- Config File -->
+              <div class="storage-item-row">
+                <div class="storage-item-info">
+                  <span class="storage-item-label">{{ t.settings.configFile }}</span>
+                  <span class="storage-item-path" :title="storagePaths?.config_file">{{ storagePaths?.config_file || '—' }}</span>
+                </div>
+                <button type="button" class="btn secondary mini-action-btn" @click="handleOpenDir('config')">
+                  📁 {{ t.settings.openFolder }}
+                </button>
+              </div>
+
+              <!-- Database File -->
+              <div class="storage-item-row">
+                <div class="storage-item-info">
+                  <span class="storage-item-label">{{ t.settings.databaseFile }}</span>
+                  <span class="storage-item-path" :title="storagePaths?.database_file">{{ storagePaths?.database_file || info?.database_path || '—' }}</span>
+                </div>
+                <button type="button" class="btn secondary mini-action-btn" @click="handleOpenDir('database')">
+                  📁 {{ t.settings.openFolder }}
+                </button>
+              </div>
+
+              <!-- Thumbnails Cache -->
+              <div class="storage-item-row">
+                <div class="storage-item-info">
+                  <span class="storage-item-label">{{ t.settings.thumbnailsDir }}</span>
+                  <span class="storage-item-path" :title="storagePaths?.thumbnails_dir">{{ storagePaths?.thumbnails_dir || '—' }}</span>
+                </div>
+                <button type="button" class="btn secondary mini-action-btn" @click="handleOpenDir('thumbnails')">
+                  📁 {{ t.settings.openFolder }}
+                </button>
               </div>
             </div>
           </div>
@@ -632,5 +720,77 @@ function saveSettings() {
 
 .btn.primary:hover {
   background: #0e9aa7;
+}
+
+/* Storage Section in Settings */
+.storage-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: #19191e;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.storage-section-title {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #f1f5f9;
+}
+
+.storage-notice-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 0.72rem;
+  color: #a7f3d0;
+  line-height: 1.4;
+}
+
+.storage-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  background: #202025;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.storage-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.storage-item-label {
+  font-size: 0.74rem;
+  font-weight: 500;
+  color: #e2e8f0;
+}
+
+.storage-item-path {
+  font-size: 0.68rem;
+  font-family: monospace;
+  color: #12b5cb;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mini-action-btn {
+  font-size: 0.7rem;
+  padding: 4px 10px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 </style>

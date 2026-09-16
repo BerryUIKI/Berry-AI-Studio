@@ -4,12 +4,12 @@
 
 **[English](README.md)** | **[简体中文](README.zh-CN.md)** | **[繁體中文](README.zh-TW.md)** | **[日本語](README.ja.md)**
 
-[![Website](https://img.shields.io/badge/官方主頁-GitHub%20Pages-12b5cb.svg)](https://berryuiki.github.io/Berry-AIGC-Toolbox/)
+[![Website](https://img.shields.io/badge/官方主頁-GitHub%20Pages-12b5cb.svg)](https://berryuiki.github.io/Berry-AI-Studio/)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Tauri](https://img.shields.io/badge/Tauri-2-24c8db)](https://tauri.app)
 [![Rust](https://img.shields.io/badge/Rust-1.7+-orange)](https://www.rust-lang.org)
 [![Vue](https://img.shields.io/badge/Vue-3-42b883)](https://vuejs.org)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](https://github.com/BerryUIKI/Berry-AIGC-Toolbox/releases)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](https://github.com/BerryUIKI/Berry-AI-Studio/releases)
 
 *專為 AI 圖像創作者與 Prompt 工程師打造的高效能、本機化 AIGC 元數據索引與資產管理工作台。*
 
@@ -27,7 +27,7 @@
 
 ## 🌟 專案概述
 
-**Berry AI Studio**（原 *Berry-AIGC-Toolbox*）是一款專為數位藝術家、AI 繪圖創作者和提示詞工程師設計的桌面級圖像資產管理系統。本軟體能夠毫秒級掃描並深度解析主流平台生成的圖片元數據（提示詞、模型、取樣器、步數、CFG、Seed 及工作流 JSON），並建立本機高速 SQLite 索引，提供 **沉浸式三欄現代工作台**、流暢的虛擬網格瀑布流、分詞高亮屬性面板、沉浸式全螢幕燈箱以及豐富的批次分類能力。
+**Berry AI Studio** 是一款專為數位藝術家、AI 繪圖創作者和提示詞工程師設計的桌面級圖像資產管理系統。本軟體能夠毫秒級掃描並深度解析主流平台生成的圖片元數據（提示詞、模型、取樣器、步數、CFG、Seed 及工作流 JSON），並建立本機高速 SQLite 索引，提供 **沉浸式三欄現代工作台**、流暢的虛擬網格瀑布流、分詞高亮屬性面板、沉浸式全螢幕燈箱以及豐富的批次分類能力。
 
 > 🚀 **全端架構重構**：Berry v0.1.0+ 採用 **Tauri 2 + Rust + Vue 3** 進行了全新重構開發。原先的歷史 C#/.NET 版本已永久封存至 `archive/old-main` 標籤與 `old/main` 分支中。
 
@@ -89,12 +89,12 @@ $$\text{<應用名>}\_\text{<作業系統>}\_\text{<系統架構>}.\text{<檔案
 
 | 作業系統平台 | 處理器架構 | 格式類型 | 安裝檔檔案名稱 |
 | :--- | :--- | :--- | :--- |
-| **Windows** | x86_64 (64位元) | NSIS 安裝檔 | `Berry-AIGC-Toolbox_Windows_x64.exe` |
-| **Windows** | x86_64 (64位元) | 免安裝免裝版 | `Berry-AIGC-Toolbox_Windows_x64.zip` |
-| **macOS** | Apple Silicon (ARM64) | DMG 磁碟映像 | `Berry-AIGC-Toolbox_macOS_aarch64.dmg` |
-| **macOS** | Intel (x86_64) | DMG 磁碟映像 | `Berry-AIGC-Toolbox_macOS_x64.dmg` |
-| **Linux** | x86_64 (64位元) | AppImage | `Berry-AIGC-Toolbox_Linux_x64.AppImage` |
-| **Linux** | x86_64 (64位元) | DEB 套件 | `Berry-AIGC-Toolbox_Linux_x64.deb` |
+| **Windows** | x86_64 (64位元) | NSIS 安裝檔 | `Berry-AI-Studio_Windows_x64.exe` |
+| **Windows** | x86_64 (64位元) | 免安裝免裝版 | `Berry-AI-Studio_Windows_x64.zip` |
+| **macOS** | Apple Silicon (ARM64) | DMG 磁碟映像 | `Berry-AI-Studio_macOS_aarch64.dmg` |
+| **macOS** | Intel (x86_64) | DMG 磁碟映像 | `Berry-AI-Studio_macOS_x64.dmg` |
+| **Linux** | x86_64 (64位元) | AppImage | `Berry-AI-Studio_Linux_x64.AppImage` |
+| **Linux** | x86_64 (64位元) | DEB 套件 | `Berry-AI-Studio_Linux_x64.deb` |
 
 ---
 
@@ -108,8 +108,8 @@ $$\text{<應用名>}\_\text{<作業系統>}\_\text{<系統架構>}.\text{<檔案
 ### 建置步驟
 ```bash
 # 1. 複製程式庫
-git clone https://github.com/BerryUIKI/Berry-AIGC-Toolbox.git
-cd Berry-AIGC-Toolbox
+git clone https://github.com/BerryUIKI/Berry-AI-Studio.git
+cd Berry-AI-Studio
 
 # 2. 安裝前端相依套件
 pnpm install

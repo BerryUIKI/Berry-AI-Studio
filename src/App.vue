@@ -45,6 +45,8 @@ import LoraManagerModal from "./components/LoraManagerModal.vue";
 import { t } from "./i18n";
 import { countActiveFilters, criteriaToQuery } from "./utils/search";
 import { requestBatchThumbnails } from "./utils/thumbnail";
+import { loadAppConfig } from "./utils/config";
+import { checkForUpdates } from "./utils/updater";
 
 const info = ref<AppInfo | null>(null);
 const folders = ref<Folder[]>([]);
@@ -133,10 +135,13 @@ function setViewMode(mode: "grid" | "table") {
 }
 
 function onSettingsSaved(settings: {
+  locale?: string;
   autoScan: boolean;
   blurNsfw: boolean;
   showCardBadges: boolean;
   defaultView: "grid" | "table";
+  thumbnailMaxEdge?: number;
+  autoCheckUpdate?: boolean;
 }) {
   blurNsfw.value = settings.blurNsfw;
   showCardBadges.value = settings.showCardBadges;
@@ -330,14 +335,29 @@ onMounted(async () => {
   window.addEventListener("keydown", handleWindowKeyDown);
   try {
     info.value = await invoke<AppInfo>("get_app_info");
+
+    // Load persistent configuration from config.json (auto-migrating localStorage)
+    const cfg = await loadAppConfig();
+    viewMode.value = cfg.default_view || "grid";
+    blurNsfw.value = cfg.blur_nsfw;
+    showCardBadges.value = cfg.show_card_badges;
+
     await reloadFolders();
     await refreshCounts();
     await reloadFiltersMeta();
     await loadAlbumsAndTags();
     await loadFiles();
 
-    if (localStorage.getItem("berry_autoscan") !== "false" && folders.value.length > 0) {
+    if (cfg.auto_scan && folders.value.length > 0) {
       void runBackgroundStartupScan();
+    }
+
+    if (cfg.auto_check_update && info.value?.app_version) {
+      void checkForUpdates(info.value.app_version).then((res) => {
+        if (res.status === "update_available") {
+          updateModalOpen.value = true;
+        }
+      });
     }
   } catch (e) {
     error.value = String(e);

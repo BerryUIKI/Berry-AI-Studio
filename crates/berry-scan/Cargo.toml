@@ -3,7 +3,7 @@ name = "berry-scan"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "Folder scanning and indexing orchestration for Berry-AIGC-Toolbox"
+description = "Folder scanning and indexing orchestration for Berry AI Studio"
 
 [dependencies]
 berry-domain = { path = "../berry-domain" }

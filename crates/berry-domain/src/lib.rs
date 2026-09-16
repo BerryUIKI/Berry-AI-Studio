@@ -1,4 +1,4 @@
-//! Core domain types shared across Berry-AIGC-Toolbox crates.
+//! Core domain types shared across Berry AI Studio crates.
 //!
 //! These types describe the *problem domain* — AI-generated image files and
 //! their embedded metadata — independent of any storage or extraction concern.

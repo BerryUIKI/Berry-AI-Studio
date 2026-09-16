@@ -1,6 +1,6 @@
-# 🗺️ Berry-AIGC-Toolbox Roadmap
+# 🗺️ Berry AI Studio Roadmap
 
-This roadmap documents completed milestones and future engineering goals for **Berry-AIGC-Toolbox**.
+This roadmap documents completed milestones and future engineering goals for **Berry AI Studio**.
 
 ---
 

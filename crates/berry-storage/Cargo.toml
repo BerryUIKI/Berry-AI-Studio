@@ -3,7 +3,7 @@ name = "berry-storage"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "SQLite persistence with schema versioning for Berry-AIGC-Toolbox"
+description = "SQLite persistence with schema versioning for Berry AI Studio"
 
 [dependencies]
 berry-domain = { path = "../berry-domain" }

@@ -1,6 +1,6 @@
-# 🏗️ Berry-AIGC-Toolbox Architecture
+# 🏗️ Berry AI Studio Architecture
 
-**Berry-AIGC-Toolbox** is a high-performance desktop application built on **Tauri 2**, **Rust**, **Vue 3**, and **SQLite**. It uses a multi-crate Rust backend to handle heavy I/O, file system operations, and metadata extraction, while providing a modern Eagle-style 3-Pane Studio UI in the frontend webview.
+**Berry AI Studio** is a high-performance desktop application built on **Tauri 2**, **Rust**, **Vue 3**, and **SQLite**. It uses a multi-crate Rust backend to handle heavy I/O, file system operations, and metadata extraction, while providing a modern Eagle-style 3-Pane Studio UI in the frontend webview.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐

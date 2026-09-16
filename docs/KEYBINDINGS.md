@@ -1,6 +1,6 @@
-# ⌨️ Berry-AIGC-Toolbox Keyboard Shortcuts
+# ⌨️ Berry AI Studio Keyboard Shortcuts
 
-Berry-AIGC-Toolbox is designed with desktop productivity in mind. Most major operations can be performed using keyboard shortcuts.
+Berry AI Studio is designed with desktop productivity in mind. Most major operations can be performed using keyboard shortcuts.
 
 ---
 
