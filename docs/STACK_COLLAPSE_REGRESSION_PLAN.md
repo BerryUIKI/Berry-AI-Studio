@@ -24,12 +24,12 @@ A collapsed stack must render exactly one card:
 
 ## Implementation Roadmap
 
-- [ ] Centralize hero detection in the gallery and card components.
-- [ ] Make initial stack filtering prefer the summary hero exclusively.
-- [ ] Make local collapse retain exactly the preferred hero.
-- [ ] Ensure only the preferred hero responds as the stack cover.
-- [ ] Add focused regression tests for duplicate zero-order data.
-- [ ] Run frontend build and relevant quality gates.
+- [x] Centralize hero detection in the gallery and card components.
+- [x] Make initial stack filtering prefer the summary hero exclusively.
+- [x] Make local collapse retain exactly the preferred hero.
+- [x] Ensure only the preferred hero responds as the stack cover.
+- [x] Add focused regression tests for duplicate zero-order data.
+- [x] Run frontend build and relevant quality gates.
 
 ## Acceptance Criteria
 
@@ -37,3 +37,9 @@ A collapsed stack must render exactly one card:
 - The retained card matches `hero_image_id` when it is available.
 - Repeated expand/collapse cycles remain stable.
 - Double-click zoom and ordinary member selection remain unchanged.
+
+## Verification
+
+- The focused Node regression suite passes all three duplicate-order, fallback, and
+  targeted-collapse cases.
+- The Vue TypeScript check and production Vite build pass.
