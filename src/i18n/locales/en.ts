@@ -486,6 +486,13 @@ export const en = {
     unstack: "Ungroup Stack",
     setHero: "Set as Cover Hero",
     cullDrafts: "Cull Lower Rated Drafts",
+    mergeWarningTitle: "Merge selected stacks?",
+    mergeWarningMessage: "You selected {stacks} stack(s) and {images} standalone image(s).",
+    mergeWarningTarget: "The first selected stack will remain the target. Every source stack and selected image will be merged into it.",
+    mergeWarningNoNesting: "Stacks cannot be nested. Source stacks will be flattened into individual images.",
+    dontShowAgain: "Do not show this warning again",
+    cancelMerge: "Cancel",
+    confirmMerge: "Merge into Stack",
   },
   sort: {
     title: "Sort By",

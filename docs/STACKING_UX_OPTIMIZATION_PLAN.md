@@ -229,17 +229,17 @@ and ambiguous nested-stack operation from the user's perspective.
 
 #### Phase 8 — Merge warning and Ctrl/Cmd+G integration
 
-- [ ] Resolve the selected visual items into a deterministic flat merge request.
-- [ ] Show an accessible warning dialog only for stack-affecting merges.
-- [ ] Apply the successful merge locally without a gallery-wide reload.
-- [ ] Update stack summaries, expanded state, selection, and thumbnail-preserving view
+- [x] Resolve the selected visual items into a deterministic flat merge request.
+- [x] Show an accessible warning dialog only for stack-affecting merges.
+- [x] Apply the successful merge locally without a gallery-wide reload.
+- [x] Update stack summaries, expanded state, selection, and thumbnail-preserving view
   state consistently.
 
 #### Phase 9 — Verification and close-out
 
-- [ ] Run frontend type-check/build and relevant Rust tests.
-- [ ] Verify dialog keyboard behavior, suppression, reset, and merge scenarios.
-- [ ] Update this document with final outcomes and any deferred profiling work.
+- [x] Run frontend type-check/build and relevant Rust tests.
+- [x] Verify dialog keyboard behavior, suppression, reset, and merge scenarios.
+- [x] Update this document with final outcomes and any deferred profiling work.
 
 ### Extension Acceptance Criteria
 
@@ -268,3 +268,19 @@ and ambiguous nested-stack operation from the user's perspective.
 - **2026-09-16 — Phase 7 implemented:** added a backward-compatible named warning
   suppression list, typed persistence helpers, and a Settings control that resets all
   suppressed warnings without changing other preferences.
+- **2026-09-16 — Phase 8 implemented:** Ctrl/Cmd+G now separates ordinary grouping
+  from stack-affecting merges, uses the first selected stack in visual order as the
+  target, presents a localized accessible warning, optionally persists suppression on
+  confirmation, and reconciles the merged cover locally without a full gallery reload.
+- **2026-09-16 — Phase 9 verified:** production rendering confirmed safe Cancel focus,
+  Escape cancellation, dynamic merge counts, suppression selection, and confirmation.
+  Automated coverage confirms transactional flattening/rollback and legacy config
+  compatibility; frontend and Rust verification commands pass.
+
+### Extension Outcome
+
+Stack nesting is now prevented by construction. Stack-affecting Ctrl/Cmd+G operations
+are explicit flat merges, execute transactionally, preserve the target stack identity
+and cover, and retain the non-blocking gallery behavior. Warning suppression is named,
+persistent, localized, and reversible from Settings. Future suppressible warnings can
+reuse the same configuration mechanism without adding one-off preference fields.

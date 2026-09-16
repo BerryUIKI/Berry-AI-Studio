@@ -2051,32 +2051,33 @@ impl Database {
         let mut member_ids = Vec::new();
         let mut seen_file_ids = HashSet::new();
 
-        let mut append_stack_members = |stack_id: &str| -> Result<(), DatabaseError> {
-            let mut stmt = tx.prepare(
-                "SELECT id FROM files WHERE stack_id = ?1 ORDER BY stack_order ASC, id ASC",
-            )?;
-            let ids = stmt
-                .query_map([stack_id], |row| row.get::<_, i64>(0))?
-                .collect::<rusqlite::Result<Vec<_>>>()?;
-            if ids.is_empty() {
-                return Err(DatabaseError::StackNotFound(stack_id.to_string()));
-            }
-            for id in ids {
-                if seen_file_ids.insert(id) {
-                    member_ids.push(id);
+        {
+            let mut append_stack_members = |stack_id: &str| -> Result<(), DatabaseError> {
+                let mut stmt = tx.prepare(
+                    "SELECT id FROM files WHERE stack_id = ?1 ORDER BY stack_order ASC, id ASC",
+                )?;
+                let ids = stmt
+                    .query_map([stack_id], |row| row.get::<_, i64>(0))?
+                    .collect::<rusqlite::Result<Vec<_>>>()?;
+                if ids.is_empty() {
+                    return Err(DatabaseError::StackNotFound(stack_id.to_string()));
+                }
+                for id in ids {
+                    if seen_file_ids.insert(id) {
+                        member_ids.push(id);
+                    }
+                }
+                Ok(())
+            };
+
+            append_stack_members(target_stack_id)?;
+            let mut seen_stack_ids = HashSet::from([target_stack_id.to_string()]);
+            for stack_id in source_stack_ids {
+                if seen_stack_ids.insert(stack_id.clone()) {
+                    append_stack_members(stack_id)?;
                 }
             }
-            Ok(())
-        };
-
-        append_stack_members(target_stack_id)?;
-        let mut seen_stack_ids = HashSet::from([target_stack_id.to_string()]);
-        for stack_id in source_stack_ids {
-            if seen_stack_ids.insert(stack_id.clone()) {
-                append_stack_members(stack_id)?;
-            }
         }
-        drop(append_stack_members);
 
         for file_id in standalone_file_ids {
             if seen_file_ids.contains(file_id) {
