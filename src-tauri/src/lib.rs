@@ -129,6 +129,7 @@ pub fn run() {
             commands::process_pipeline_cleanups,
             commands::get_pipeline_cleanup_queue,
             commands::stack_images,
+            commands::merge_stacks,
             commands::unstack_images,
             commands::set_stack_hero,
             commands::get_stack_members,

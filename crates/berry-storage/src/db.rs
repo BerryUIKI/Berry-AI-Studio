@@ -1,6 +1,6 @@
 //! SQLite database connection and migration runner.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use berry_domain::{
@@ -34,6 +34,10 @@ pub enum DatabaseError {
     TagNotFound(i64),
     #[error("no lora with id {0}")]
     LoraNotFound(i64),
+    #[error("no image stack with id {0}")]
+    StackNotFound(String),
+    #[error("file {file_id} already belongs to stack {stack_id}")]
+    FileAlreadyStacked { file_id: i64, stack_id: String },
     #[error("rating must be between 1 and 10, got {0}")]
     InvalidRating(u8),
     #[error("failed to open database at {path}: {source}")]
@@ -2031,6 +2035,79 @@ impl Database {
         Ok(sid)
     }
 
+    /// Flatten complete source stacks and standalone images into `target_stack_id`.
+    ///
+    /// Existing target members retain their order and hero. Complete source stacks
+    /// follow in the caller-provided order, then standalone images. Every image is
+    /// deduplicated and reassigned in one transaction, so a source stack can never be
+    /// left partially populated.
+    pub fn merge_stacks(
+        &self,
+        target_stack_id: &str,
+        source_stack_ids: &[String],
+        standalone_file_ids: &[i64],
+    ) -> Result<usize, DatabaseError> {
+        let tx = self.conn.unchecked_transaction()?;
+        let mut member_ids = Vec::new();
+        let mut seen_file_ids = HashSet::new();
+
+        let mut append_stack_members = |stack_id: &str| -> Result<(), DatabaseError> {
+            let mut stmt = tx.prepare(
+                "SELECT id FROM files WHERE stack_id = ?1 ORDER BY stack_order ASC, id ASC",
+            )?;
+            let ids = stmt
+                .query_map([stack_id], |row| row.get::<_, i64>(0))?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            if ids.is_empty() {
+                return Err(DatabaseError::StackNotFound(stack_id.to_string()));
+            }
+            for id in ids {
+                if seen_file_ids.insert(id) {
+                    member_ids.push(id);
+                }
+            }
+            Ok(())
+        };
+
+        append_stack_members(target_stack_id)?;
+        let mut seen_stack_ids = HashSet::from([target_stack_id.to_string()]);
+        for stack_id in source_stack_ids {
+            if seen_stack_ids.insert(stack_id.clone()) {
+                append_stack_members(stack_id)?;
+            }
+        }
+        drop(append_stack_members);
+
+        for file_id in standalone_file_ids {
+            if seen_file_ids.contains(file_id) {
+                continue;
+            }
+            let mut stmt = tx.prepare("SELECT stack_id FROM files WHERE id = ?1")?;
+            let mut rows = stmt.query([file_id])?;
+            let Some(row) = rows.next()? else {
+                return Err(DatabaseError::FileNotFound(*file_id));
+            };
+            if let Some(stack_id) = row.get::<_, Option<String>>(0)? {
+                return Err(DatabaseError::FileAlreadyStacked {
+                    file_id: *file_id,
+                    stack_id,
+                });
+            }
+            seen_file_ids.insert(*file_id);
+            member_ids.push(*file_id);
+        }
+
+        {
+            let mut update = tx
+                .prepare_cached("UPDATE files SET stack_id = ?1, stack_order = ?2 WHERE id = ?3")?;
+            for (order, file_id) in member_ids.iter().enumerate() {
+                update.execute(params![target_stack_id, order as i64, file_id])?;
+            }
+        }
+        tx.commit()?;
+        Ok(member_ids.len())
+    }
+
     /// Dissolve a stack by clearing stack_id and resetting stack_order for all its member images.
     pub fn unstack_images(&self, stack_id: &str) -> Result<u64, DatabaseError> {
         let affected = self.conn.execute(
@@ -3916,5 +3993,93 @@ mod tests {
         let unstacked = db.unstack_images(&stack_id).unwrap();
         assert_eq!(unstacked, 3);
         assert!(db.get_stack_members(&stack_id).unwrap().is_empty());
+    }
+
+    #[test]
+    fn merge_stacks_flattens_members_and_preserves_target_hero() {
+        let db = Database::connect_in_memory().unwrap();
+        let folder = db.add_folder("/test/merge").unwrap();
+        let base = ImageFile {
+            id: None,
+            folder_id: folder.id,
+            path: String::new(),
+            size_bytes: 1024,
+            modified_at: 100,
+            container: Container::Png,
+            metadata: None,
+            rating: None,
+            aesthetic_score: None,
+            is_favorite: false,
+            is_nsfw: false,
+            stack_id: None,
+            stack_order: 0,
+        };
+        let ids = (0..6)
+            .map(|index| {
+                let mut file = base.clone();
+                file.path = format!("/test/merge/img{index}.png");
+                db.upsert_file(&file).unwrap()
+            })
+            .collect::<Vec<_>>();
+
+        let target = db.stack_images(&ids[0..2], Some("target")).unwrap();
+        let source = db.stack_images(&ids[2..4], Some("source")).unwrap();
+        db.set_stack_hero(&target, ids[1]).unwrap();
+
+        let count = db
+            .merge_stacks(
+                &target,
+                &[source.clone(), source],
+                &[ids[4], ids[4], ids[5]],
+            )
+            .unwrap();
+
+        let members = db.get_stack_members(&target).unwrap();
+        assert_eq!(count, 6);
+        assert_eq!(
+            members
+                .iter()
+                .filter_map(|file| file.id)
+                .collect::<Vec<_>>(),
+            vec![ids[1], ids[0], ids[2], ids[3], ids[4], ids[5]],
+        );
+        assert_eq!(members[0].stack_order, 0);
+        assert!(db.get_stack_members("source").unwrap().is_empty());
+    }
+
+    #[test]
+    fn merge_stacks_rejects_an_unexpanded_stacked_file() {
+        let db = Database::connect_in_memory().unwrap();
+        let folder = db.add_folder("/test/merge-validation").unwrap();
+        let mut file = ImageFile {
+            id: None,
+            folder_id: folder.id,
+            path: "/test/merge-validation/a.png".to_string(),
+            size_bytes: 1,
+            modified_at: 1,
+            container: Container::Png,
+            metadata: None,
+            rating: None,
+            aesthetic_score: None,
+            is_favorite: false,
+            is_nsfw: false,
+            stack_id: None,
+            stack_order: 0,
+        };
+        let id1 = db.upsert_file(&file).unwrap();
+        file.path = "/test/merge-validation/b.png".to_string();
+        let id2 = db.upsert_file(&file).unwrap();
+        file.path = "/test/merge-validation/c.png".to_string();
+        let id3 = db.upsert_file(&file).unwrap();
+        let target = db.stack_images(&[id1], Some("target")).unwrap();
+        db.stack_images(&[id2, id3], Some("source")).unwrap();
+
+        let error = db.merge_stacks(&target, &[], &[id2]).unwrap_err();
+        assert!(matches!(
+            error,
+            DatabaseError::FileAlreadyStacked { file_id, .. } if file_id == id2
+        ));
+        assert_eq!(db.get_stack_members(&target).unwrap().len(), 1);
+        assert_eq!(db.get_stack_members("source").unwrap().len(), 2);
     }
 }
