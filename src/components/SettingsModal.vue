@@ -195,65 +195,78 @@ async function saveSettings() {
 
 <template>
   <div v-if="show" class="modal-overlay" @click.self="emit('close')">
-    <div class="settings-dialog">
+    <div class="settings-dialog" role="dialog" aria-modal="true" :aria-label="t.settings.title">
       <!-- Header -->
       <div class="dialog-header">
         <div class="header-left">
           <span class="dialog-icon">⚙️</span>
           <h3 class="dialog-title">{{ t.settings.title }}</h3>
         </div>
-        <button type="button" class="close-btn" @click="emit('close')">✕</button>
+        <button type="button" class="close-btn" :aria-label="t.settings.cancel" @click="emit('close')">✕</button>
       </div>
 
       <!-- Body: Left Tabs + Right Content -->
       <div class="dialog-body">
-        <aside class="settings-tabs">
+        <aside class="settings-tabs" role="tablist" :aria-label="t.settings.title">
           <button
             type="button"
             class="tab-btn"
             :class="{ active: activeTab === 'general' }"
+            role="tab"
+            :aria-selected="activeTab === 'general'"
             @click="activeTab = 'general'"
           >
-            {{ t.settings.tabs.general }}
+            <span aria-hidden="true">⚙</span><span>{{ t.settings.tabs.general }}</span>
           </button>
           <button
             type="button"
             class="tab-btn"
             :class="{ active: activeTab === 'display' }"
+            role="tab"
+            :aria-selected="activeTab === 'display'"
             @click="activeTab = 'display'"
           >
-            {{ t.settings.tabs.display }}
+            <span aria-hidden="true">▦</span><span>{{ t.settings.tabs.display }}</span>
           </button>
           <button
             type="button"
             class="tab-btn"
             :class="{ active: activeTab === 'stacking' }"
+            role="tab"
+            :aria-selected="activeTab === 'stacking'"
             @click="activeTab = 'stacking'"
           >
-            {{ t.settings.tabs.stacking || 'Stacking & Bursts' }}
+            <span aria-hidden="true">▱</span><span>{{ t.settings.tabs.stacking || 'Stacks' }}</span>
           </button>
           <button
             type="button"
             class="tab-btn"
             :class="{ active: activeTab === 'parsers' }"
+            role="tab"
+            :aria-selected="activeTab === 'parsers'"
             @click="activeTab = 'parsers'"
           >
-            {{ t.settings.tabs.parsers }}
+            <span aria-hidden="true">⌘</span><span>{{ t.settings.tabs.parsers }}</span>
           </button>
           <button
             type="button"
             class="tab-btn"
             :class="{ active: activeTab === 'about' }"
+            role="tab"
+            :aria-selected="activeTab === 'about'"
             @click="activeTab = 'about'"
           >
-            {{ t.settings.tabs.about }}
+            <span aria-hidden="true">ⓘ</span><span>{{ t.settings.tabs.about }}</span>
           </button>
         </aside>
 
         <section class="settings-content">
           <!-- Tab: General -->
           <div v-if="activeTab === 'general'" class="settings-panel">
-            <h4 class="panel-title">{{ t.settings.generalTitle }}</h4>
+            <div class="panel-heading">
+              <h4 class="panel-title">{{ t.settings.generalTitle }}</h4>
+              <p class="panel-subtitle">{{ t.settings.generalSubtitle }}</p>
+            </div>
 
             <!-- Language Setting -->
             <div class="setting-row">
@@ -300,7 +313,7 @@ async function saveSettings() {
               <input v-model="autoCheckUpdate" type="checkbox" class="toggle-checkbox" />
             </div>
 
-            <div class="setting-row">
+            <div class="setting-row immediate-action-row">
               <div class="row-info">
                 <span class="row-label">{{ t.settings.suppressedWarnings }}</span>
                 <span class="row-desc">{{ t.settings.suppressedWarningsDesc }}</span>
@@ -321,7 +334,10 @@ async function saveSettings() {
 
           <!-- Tab: Display & Safety -->
           <div v-if="activeTab === 'display'" class="settings-panel">
-            <h4 class="panel-title">{{ t.settings.displayTitle }}</h4>
+            <div class="panel-heading">
+              <h4 class="panel-title">{{ t.settings.displayTitle }}</h4>
+              <p class="panel-subtitle">{{ t.settings.displaySubtitle }}</p>
+            </div>
 
             <div class="setting-row">
               <div class="row-info">
@@ -352,7 +368,7 @@ async function saveSettings() {
               </select>
             </div>
 
-            <div class="setting-row">
+            <div class="setting-row immediate-action-row">
               <div class="row-info">
                 <span class="row-label">{{ t.settings.cacheManagement }}</span>
                 <span class="row-desc">
@@ -376,7 +392,10 @@ async function saveSettings() {
 
           <!-- Tab: Stacking & Bursts -->
           <div v-if="activeTab === 'stacking'" class="settings-panel">
-            <h4 class="panel-title">{{ t.settings.stackingTitle || 'Image Stacking & Burst Grouping' }}</h4>
+            <div class="panel-heading">
+              <h4 class="panel-title">{{ t.settings.stackingTitle || 'Image Stacking & Burst Grouping' }}</h4>
+              <p class="panel-subtitle">{{ t.settings.stackingSubtitle }}</p>
+            </div>
 
             <div class="setting-row">
               <div class="row-info">
@@ -463,7 +482,10 @@ async function saveSettings() {
 
           <!-- Tab: About & Storage -->
           <div v-if="activeTab === 'about'" class="settings-panel">
-            <h4 class="panel-title">{{ t.settings.aboutTitle }}</h4>
+            <div class="panel-heading">
+              <h4 class="panel-title">{{ t.settings.aboutTitle }}</h4>
+              <p class="panel-subtitle">{{ t.settings.aboutSubtitle }}</p>
+            </div>
 
             <div class="about-card">
               <div class="about-logo">
@@ -545,12 +567,11 @@ async function saveSettings() {
 }
 
 .settings-dialog {
-  width: 620px;
-  max-width: 90vw;
-  height: 480px;
-  background: #18181c;
+  width: min(840px, 92vw);
+  height: min(640px, 88vh);
+  background: #17171b;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
+  border-radius: 14px;
   display: flex;
   flex-direction: column;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
@@ -558,8 +579,8 @@ async function saveSettings() {
 }
 
 .dialog-header {
-  height: 46px;
-  padding: 0 16px;
+  min-height: 62px;
+  padding: 0 22px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -573,12 +594,18 @@ async function saveSettings() {
 }
 
 .dialog-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: rgba(18, 181, 203, 0.14);
   font-size: 1rem;
 }
 
 .dialog-title {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 1rem;
   font-weight: 600;
   color: #f1f5f9;
 }
@@ -588,7 +615,9 @@ async function saveSettings() {
   border: none;
   color: #71717a;
   cursor: pointer;
-  padding: 4px;
+  width: 32px;
+  height: 32px;
+  border-radius: 7px;
   font-size: 0.85rem;
   display: flex;
   align-items: center;
@@ -598,6 +627,7 @@ async function saveSettings() {
 
 .close-btn:hover {
   color: #ffffff;
+  background: rgba(255, 255, 255, 0.07);
 }
 
 .dialog-body {
@@ -607,10 +637,10 @@ async function saveSettings() {
 }
 
 .settings-tabs {
-  width: 170px;
+  width: 205px;
   background: #141417;
   border-right: 1px solid rgba(255, 255, 255, 0.06);
-  padding: 10px 8px;
+  padding: 16px 12px;
   display: flex;
   flex-direction: column;
   gap: 3px;
@@ -620,13 +650,23 @@ async function saveSettings() {
   background: transparent;
   border: none;
   color: #94a3b8;
-  padding: 8px 10px;
-  border-radius: 6px;
-  font-size: 0.78rem;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 0.8rem;
   font-family: inherit;
   text-align: left;
   cursor: pointer;
   transition: all 0.12s ease;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tab-btn > span:first-child {
+  width: 18px;
+  color: #64748b;
+  text-align: center;
+  font-size: 0.9rem;
 }
 
 .tab-btn:hover {
@@ -640,29 +680,52 @@ async function saveSettings() {
   font-weight: 600;
 }
 
+.tab-btn.active > span:first-child {
+  color: #67e8f9;
+}
+
+.tab-btn:focus-visible,
+.close-btn:focus-visible,
+.btn:focus-visible,
+.select-input:focus-visible,
+.toggle-checkbox:focus-visible,
+.range-input:focus-visible {
+  outline: 2px solid #22d3ee;
+  outline-offset: 2px;
+}
+
 .settings-content {
   flex: 1;
-  padding: 16px 20px;
+  padding: 24px 26px 30px;
   overflow-y: auto;
 }
 
 .settings-panel {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
+  max-width: 660px;
+}
+
+.panel-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 4px;
 }
 
 .panel-title {
   margin: 0;
-  font-size: 0.86rem;
+  font-size: 1rem;
   font-weight: 600;
   color: #f8fafc;
 }
 
 .panel-subtitle {
   margin: 0;
-  font-size: 0.74rem;
-  color: #71717a;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: #8b95a7;
 }
 
 .setting-row {
@@ -670,27 +733,41 @@ async function saveSettings() {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px;
-  background: #202024;
-  border-radius: 6px;
+  min-height: 54px;
+  padding: 12px 14px;
+  background: #202025;
+  border-radius: 9px;
   border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.setting-row:hover {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.setting-row.immediate-action-row {
+  margin-top: 6px;
+  background: rgba(18, 181, 203, 0.045);
+  border-style: dashed;
 }
 
 .row-info {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
+  padding-right: 8px;
 }
 
 .row-label {
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 500;
   color: #f1f5f9;
 }
 
 .row-desc {
-  font-size: 0.7rem;
-  color: #71717a;
+  font-size: 0.71rem;
+  line-height: 1.35;
+  color: #8b95a7;
 }
 
 .setting-feedback {
@@ -714,16 +791,45 @@ async function saveSettings() {
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #e2e8f0;
   border-radius: 5px;
-  padding: 4px 8px;
+  min-width: 178px;
+  padding: 7px 30px 7px 10px;
   font-size: 0.75rem;
   outline: none;
 }
 
 .toggle-checkbox {
-  width: 16px;
-  height: 16px;
-  accent-color: #12b5cb;
+  appearance: none;
+  position: relative;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  background: #34343b;
   cursor: pointer;
+  transition: background 0.16s ease, border-color 0.16s ease;
+}
+
+.toggle-checkbox::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  transition: transform 0.16s ease;
+}
+
+.toggle-checkbox:checked {
+  background: #0891a5;
+  border-color: #22d3ee;
+}
+
+.toggle-checkbox:checked::after {
+  background: #fff;
+  transform: translateX(16px);
 }
 
 .parser-list {
@@ -811,8 +917,8 @@ async function saveSettings() {
 }
 
 .dialog-footer {
-  height: 48px;
-  padding: 0 16px;
+  min-height: 60px;
+  padding: 0 22px;
   display: flex;
   align-items: center;
   justify-content: flex-end;
@@ -822,7 +928,8 @@ async function saveSettings() {
 }
 
 .btn {
-  padding: 5px 12px;
+  min-height: 32px;
+  padding: 6px 14px;
   border-radius: 6px;
   font-size: 0.76rem;
   cursor: pointer;
@@ -845,6 +952,7 @@ async function saveSettings() {
   background: #12b5cb;
   color: #ffffff;
   font-weight: 500;
+  min-width: 88px;
 }
 
 .btn.primary:hover {
@@ -921,5 +1029,55 @@ async function saveSettings() {
   padding: 4px 10px;
   flex-shrink: 0;
   white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .settings-dialog {
+    width: 94vw;
+    height: 92vh;
+  }
+
+  .dialog-body {
+    flex-direction: column;
+  }
+
+  .settings-tabs {
+    box-sizing: border-box;
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 9px 12px;
+    border-right: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .tab-btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  .settings-content {
+    padding: 18px;
+  }
+
+  .setting-row,
+  .storage-item-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .select-input {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab-btn,
+  .btn,
+  .toggle-checkbox,
+  .toggle-checkbox::after,
+  .close-btn {
+    transition: none;
+  }
 }
 </style>
