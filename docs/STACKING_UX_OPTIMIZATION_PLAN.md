@@ -216,9 +216,9 @@ and ambiguous nested-stack operation from the user's perspective.
 
 - [x] Document flat merge semantics, target selection, ordering, deduplication, and
   warning behavior before implementation.
-- [ ] Add a transactional storage operation that flattens source stacks into a target
+- [x] Add a transactional storage operation that flattens source stacks into a target
   stack without leaving partial source stacks.
-- [ ] Add storage tests for stack+image, stack+stack, duplicate-member, and target-cover
+- [x] Add storage tests for stack+image, stack+stack, duplicate-member, and target-cover
   preservation cases.
 
 #### Phase 7 — Warning preference infrastructure
@@ -261,3 +261,7 @@ and ambiguous nested-stack operation from the user's perspective.
 - **2026-09-16 — Extension audit complete:** confirmed the existing command can
   reassign a selected cover without including its hidden members. Defined a
   transactionally flat merge contract and a reusable warning-suppression model.
+- **2026-09-16 — Phase 6 implemented:** added a transactional flat-merge storage
+  operation and Tauri command. Tests cover stack-to-stack merging, standalone appends,
+  duplicate inputs, target hero preservation, source dissolution, and stale stacked-ID
+  rejection with full rollback.

@@ -2571,6 +2571,31 @@ pub fn stack_images(
         .map_err(|e| e.to_string())
 }
 
+#[derive(Debug, Serialize)]
+pub struct StackMergeResult {
+    pub stack_id: String,
+    pub members: Vec<ImageFile>,
+}
+
+#[tauri::command]
+pub fn merge_stacks(
+    target_stack_id: String,
+    source_stack_ids: Vec<String>,
+    standalone_file_ids: Vec<i64>,
+    state: State<'_, AppState>,
+) -> Result<StackMergeResult, String> {
+    let db = db(&state)?;
+    db.merge_stacks(&target_stack_id, &source_stack_ids, &standalone_file_ids)
+        .map_err(|e| e.to_string())?;
+    let members = db
+        .get_stack_members(&target_stack_id)
+        .map_err(|e| e.to_string())?;
+    Ok(StackMergeResult {
+        stack_id: target_stack_id,
+        members,
+    })
+}
+
 #[tauri::command]
 pub fn unstack_images(stack_id: String, state: State<'_, AppState>) -> Result<u64, String> {
     let db = db(&state)?;
