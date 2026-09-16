@@ -2236,13 +2236,13 @@ pub fn install_update(
         return Err(format!("Installer file not found: {installer_path}"));
     }
 
-    let is_silent = silent.unwrap_or(false);
+    let _is_silent = silent.unwrap_or(false);
 
     #[cfg(target_os = "windows")]
     {
         use std::process::Command;
         let mut cmd = Command::new(&installer_path);
-        if is_silent {
+        if _is_silent {
             cmd.arg("/S");
         }
         cmd.spawn()
