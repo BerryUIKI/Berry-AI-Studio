@@ -98,6 +98,8 @@ const autoTagTargetFile = ref<ImageFile | null>(null);
 const inspectorRef = ref<InstanceType<typeof InspectorPane> | null>(null);
 const addFolderModalOpen = ref(false);
 const onboardingModalOpen = ref(false);
+/** Session-level guard: once the onboarding modal is dismissed it can never reopen. */
+let onboardingDismissedThisSession = false;
 const compareModalOpen = ref(false);
 const compareImages = ref<ImageFile[]>([]);
 
@@ -303,7 +305,7 @@ function handleWindowKeyDown(e: KeyboardEvent) {
       return;
     }
     if (onboardingModalOpen.value) {
-      onboardingModalOpen.value = false;
+      void onOnboardingComplete();
       return;
     }
     if (addFolderModalOpen.value) {
@@ -404,7 +406,7 @@ onMounted(async () => {
     await loadAlbumsAndTags();
     await loadFiles();
 
-    if (!cfg.has_completed_onboarding) {
+    if (!cfg.has_completed_onboarding && !onboardingDismissedThisSession) {
       onboardingModalOpen.value = true;
     }
 
@@ -743,6 +745,8 @@ async function onCompareSetHero(img: ImageFile) {
 }
 
 async function onOnboardingComplete() {
+  // Immediately prevent any re-opening — this is the critical guard
+  onboardingDismissedThisSession = true;
   onboardingModalOpen.value = false;
   try {
     const cfg = await loadAppConfig();
@@ -750,11 +754,16 @@ async function onOnboardingComplete() {
       ...cfg,
       has_completed_onboarding: true,
     });
+  } catch (err) {
+    console.warn("Failed to mark onboarding complete:", err);
+  }
+  // Reload data in the background (errors here should NOT affect the modal state)
+  try {
     await reloadFolders();
     await refreshCounts();
     await loadFiles();
   } catch (err) {
-    console.warn("Failed to mark onboarding complete:", err);
+    console.warn("Post-onboarding data reload failed:", err);
   }
 }
 
@@ -1631,8 +1640,9 @@ function onResetZoom() {
 
     <!-- Onboarding Setup Wizard Modal -->
     <OnboardingModal
+      v-if="onboardingModalOpen"
       :open="onboardingModalOpen"
-      @update:open="onboardingModalOpen = $event"
+      @update:open="!$event && onOnboardingComplete()"
       @complete="onOnboardingComplete"
     />
 
