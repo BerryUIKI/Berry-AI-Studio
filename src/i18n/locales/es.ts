@@ -483,6 +483,7 @@ export const es: typeof en = {
     noImage: "Ninguna imagen seleccionada para este espacio",
   },
   stack: {
+    imageStack: "Pila de imágenes",
     toggleExpand: "Haga clic para expandir o contraer las imágenes de esta pila",
     stackCount: "imágenes en la pila",
     unstack: "Desapilar grupo",

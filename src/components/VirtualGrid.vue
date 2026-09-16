@@ -560,13 +560,24 @@ function onDragStart(e: DragEvent, file: ImageFile) {
             </div>
 
             <div class="card-info">
-              <div class="card-title" :title="normalizePath(file.path)">
-                {{ getFileName(file.path) }}
-              </div>
-              <div class="card-meta">
-                <span>{{ formatDimensions(file) }}</span>
-                <span class="card-container">{{ file.container.toUpperCase() }}</span>
-              </div>
+              <template v-if="isCollapsedStack(file)">
+                <div class="card-title stack-cover-title" :title="t.stack.imageStack">
+                  {{ t.stack.imageStack }}
+                </div>
+                <div class="card-meta">
+                  <span>{{ stackMap?.[file.stack_id!]?.count }} {{ t.stack.stackCount }}</span>
+                  <span class="card-container">STACK</span>
+                </div>
+              </template>
+              <template v-else>
+                <div class="card-title" :title="normalizePath(file.path)">
+                  {{ getFileName(file.path) }}
+                </div>
+                <div class="card-meta">
+                  <span>{{ formatDimensions(file) }}</span>
+                  <span class="card-container">{{ file.container.toUpperCase() }}</span>
+                </div>
+              </template>
             </div>
           </div>
         </div>
@@ -745,6 +756,11 @@ function onDragStart(e: DragEvent, file: ImageFile) {
 .grid-card:hover .card-select-btn,
 .card-select-btn.checked {
   opacity: 1;
+}
+
+.stack-cover-title {
+  font-weight: 650;
+  letter-spacing: 0.01em;
 }
 
 .card-select-btn.checked {

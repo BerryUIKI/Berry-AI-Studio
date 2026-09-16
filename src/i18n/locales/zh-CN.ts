@@ -483,6 +483,7 @@ export const zhCN: typeof en = {
     noImage: "该侧未选择比对图片",
   },
   stack: {
+    imageStack: "图片堆栈",
     toggleExpand: "点击展开/折叠堆栈中的全部图片",
     stackCount: "张图片在堆栈中",
     unstack: "解散堆栈",

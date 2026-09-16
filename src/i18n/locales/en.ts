@@ -481,6 +481,7 @@ export const en = {
     noImage: "No image selected for this slot",
   },
   stack: {
+    imageStack: "Image Stack",
     toggleExpand: "Click to expand/collapse all burst images in this stack",
     stackCount: "images in stack",
     unstack: "Ungroup Stack",
