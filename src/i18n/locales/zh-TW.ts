@@ -488,6 +488,13 @@ export const zhTW: typeof en = {
     unstack: "解散堆疊",
     setHero: "設為封面 Hero",
     cullDrafts: "清理低分草稿",
+    mergeWarningTitle: "合併所選堆疊？",
+    mergeWarningMessage: "您選擇了 {stacks} 個堆疊和 {images} 張獨立圖片。",
+    mergeWarningTarget: "第一個選取的堆疊將作為目標。所有來源堆疊和所選圖片都會合併至其中。",
+    mergeWarningNoNesting: "堆疊不能巢狀。來源堆疊將展開為獨立圖片。",
+    dontShowAgain: "不再顯示此警告",
+    cancelMerge: "取消",
+    confirmMerge: "合併至堆疊",
   },
   sort: {
     title: "排序方式",

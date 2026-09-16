@@ -51,7 +51,7 @@ Ctrl/Cmd-click toggles individual images and establishes a new range anchor.
 
 | Shortcut | Scope | Action |
 | :--- | :--- | :--- |
-| `Ctrl+G` / `Cmd+G` | Gallery | Group selected images into a manual Image Stack |
+| `Ctrl+G` / `Cmd+G` | Gallery | Group standalone images, or flatten selected stacks/images into the first selected stack after confirmation |
 | `Ctrl+Shift+G` / `Cmd+Shift+G` | Gallery | Unstack / dissolve selected stack into individual images |
 | `Alt+S` | Gallery / Lightbox | Set selected image as the Hero Cover of its parent stack |
 | `C` | Gallery / Lightbox | Enter Side-by-Side Compare Mode for selected stack or pair |

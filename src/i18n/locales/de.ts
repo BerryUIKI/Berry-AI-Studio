@@ -488,6 +488,13 @@ export const de: typeof en = {
     unstack: "Stapel auflösen",
     setHero: "Als Titelbild festlegen",
     cullDrafts: "Niedrig bewertete Entwürfe aussortieren",
+    mergeWarningTitle: "Ausgewählte Stapel zusammenführen?",
+    mergeWarningMessage: "Sie haben {stacks} Stapel und {images} Einzelbilder ausgewählt.",
+    mergeWarningTarget: "Der zuerst ausgewählte Stapel bleibt das Ziel. Alle Quellstapel und Bilder werden darin zusammengeführt.",
+    mergeWarningNoNesting: "Stapel können nicht verschachtelt werden. Quellstapel werden in einzelne Bilder aufgelöst.",
+    dontShowAgain: "Diese Warnung nicht mehr anzeigen",
+    cancelMerge: "Abbrechen",
+    confirmMerge: "In Stapel zusammenführen",
   },
   sort: {
     title: "Sortieren nach",
