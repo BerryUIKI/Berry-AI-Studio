@@ -128,6 +128,7 @@ const pendingStackMerge = ref<StackMergePlan | null>(null);
 const stackMap = ref<Record<string, { count: number; heroId: number | null }>>({});
 const expandedStacks = ref<Set<string>>(new Set());
 const pendingStackExpansions = new Set<string>();
+const allowMultipleStacksOpen = ref(false);
 
 // Filter Metadata
 const distinctModels = ref<string[]>([]);
@@ -179,9 +180,18 @@ function onSettingsSaved(settings: {
   defaultView: "grid" | "table";
   thumbnailMaxEdge?: number;
   autoCheckUpdate?: boolean;
+  allowMultipleStacksOpen?: boolean;
 }) {
   blurNsfw.value = settings.blurNsfw;
   showCardBadges.value = settings.showCardBadges;
+  if (settings.allowMultipleStacksOpen !== undefined) {
+    allowMultipleStacksOpen.value = settings.allowMultipleStacksOpen;
+    if (!settings.allowMultipleStacksOpen && expandedStacks.value.size > 1) {
+      const [keepOpen, ...collapseIds] = [...expandedStacks.value];
+      for (const stackId of collapseIds) collapseStackLocally(stackId);
+      expandedStacks.value = keepOpen ? new Set([keepOpen]) : new Set();
+    }
+  }
   setViewMode(settings.defaultView);
 }
 
@@ -422,6 +432,7 @@ onMounted(async () => {
     viewMode.value = cfg.default_view || "grid";
     blurNsfw.value = cfg.blur_nsfw;
     showCardBadges.value = cfg.show_card_badges;
+    allowMultipleStacksOpen.value = cfg.allow_multiple_open_stacks ?? false;
 
     await reloadFolders();
     await refreshCounts();
@@ -887,33 +898,18 @@ async function setStackHero(file: ImageFile) {
 
 async function onToggleStackExpand(stackId: string) {
   if (expandedStacks.value.has(stackId)) {
-    const info = stackMap.value[stackId];
-    const hiddenMemberPaths = new Set(
-      files.value
-        .filter((file) => file.stack_id === stackId && file.id !== info?.heroId)
-        .map((file) => file.path),
-    );
-    files.value = files.value.filter((file) => {
-      if (file.stack_id !== stackId) return true;
-      return file.stack_order === 0 || (file.id != null && file.id === info?.heroId);
-    });
-    const hero = files.value.find((file) => file.stack_id === stackId);
-    if (selectedFile.value?.stack_id === stackId && selectedFile.value.id !== hero?.id) {
-      selectedFile.value = hero ?? null;
-      selectionAnchorPath.value = hero?.path ?? null;
-    }
-    selectedFilePaths.value = new Set(
-      [...selectedFilePaths.value].filter((path) => !hiddenMemberPaths.has(path)),
-    );
-    expandedStacks.value = new Set(
-      [...expandedStacks.value].filter((expandedId) => expandedId !== stackId),
-    );
+    collapseStackLocally(stackId);
     return;
   }
 
   if (pendingStackExpansions.has(stackId)) return;
   pendingStackExpansions.add(stackId);
   try {
+    if (!allowMultipleStacksOpen.value) {
+      for (const expandedId of [...expandedStacks.value]) {
+        collapseStackLocally(expandedId);
+      }
+    }
     const members = await invoke<ImageFile[]>("get_stack_members", { stackId });
     if (members.length === 0) return;
     const insertionIndex = files.value.findIndex((file) => file.stack_id === stackId);
@@ -926,6 +922,30 @@ async function onToggleStackExpand(stackId: string) {
   } finally {
     pendingStackExpansions.delete(stackId);
   }
+}
+
+function collapseStackLocally(stackId: string) {
+  const info = stackMap.value[stackId];
+  const hiddenMemberPaths = new Set(
+    files.value
+      .filter((file) => file.stack_id === stackId && file.id !== info?.heroId)
+      .map((file) => file.path),
+  );
+  files.value = files.value.filter((file) => {
+    if (file.stack_id !== stackId) return true;
+    return file.stack_order === 0 || (file.id != null && file.id === info?.heroId);
+  });
+  const hero = files.value.find((file) => file.stack_id === stackId);
+  if (selectedFile.value?.stack_id === stackId && selectedFile.value.id !== hero?.id) {
+    selectedFile.value = hero ?? null;
+    selectionAnchorPath.value = hero?.path ?? null;
+  }
+  selectedFilePaths.value = new Set(
+    [...selectedFilePaths.value].filter((path) => !hiddenMemberPaths.has(path)),
+  );
+  expandedStacks.value = new Set(
+    [...expandedStacks.value].filter((expandedId) => expandedId !== stackId),
+  );
 }
 
 async function onTriggerCompare(customStackId?: string) {
@@ -1113,6 +1133,8 @@ async function loadFiles() {
   similaritySourceFile.value = null;
   rawSimilarityFiles.value = [];
   filesLoading.value = true;
+  expandedStacks.value = new Set();
+  pendingStackExpansions.clear();
   selectedFilePaths.value = new Set();
   selectionAnchorPath.value = null;
   try {

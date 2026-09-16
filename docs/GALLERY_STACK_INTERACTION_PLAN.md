@@ -100,11 +100,11 @@ preferences. The redesign will use:
 
 ### Phase 2 — Expansion state and gesture handling
 
-- [ ] Add the backward-compatible multi-open preference.
-- [ ] Make stack cover single-click toggle in both directions.
-- [ ] Preserve cover double-click zoom by cancelling the deferred single-click action.
-- [ ] Collapse other stacks before expansion unless multi-open is enabled.
-- [ ] Explicitly reset expansion state for application launch and new gallery contexts.
+- [x] Add the backward-compatible multi-open preference.
+- [x] Make stack cover single-click toggle in both directions.
+- [x] Preserve cover double-click zoom by cancelling the deferred single-click action.
+- [x] Collapse other stacks before expansion unless multi-open is enabled.
+- [x] Explicitly reset expansion state for application launch and new gallery contexts.
 
 ### Phase 3 — Stack cover content refinement
 
@@ -158,3 +158,6 @@ preferences. The redesign will use:
 - **2026-09-16 — Plan complete:** translated the feature requests into a non-conflicting
   gesture model, single-open default, zero-extra-asset cover strategy, virtualized
   waterfall design, and task-oriented Settings redesign.
+- **2026-09-16 — Phase 2 implemented:** stack covers now arbitrate deferred single-click
+  toggles against double-click zoom, new contexts explicitly reset expansion, and the
+  persisted multi-open preference controls whether opening a stack collapses its peer.

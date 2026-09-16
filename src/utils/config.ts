@@ -14,6 +14,7 @@ export interface AppConfig {
   auto_stack: boolean;
   stack_similarity_threshold: number;
   stack_time_window_minutes: number;
+  allow_multiple_open_stacks: boolean;
   suppressed_warnings: string[];
 }
 
@@ -42,6 +43,7 @@ const DEFAULT_CONFIG: AppConfig = {
   auto_stack: false,
   stack_similarity_threshold: 0.85,
   stack_time_window_minutes: 180,
+  allow_multiple_open_stacks: false,
   suppressed_warnings: [],
 };
 

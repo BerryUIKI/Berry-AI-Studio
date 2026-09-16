@@ -79,8 +79,8 @@ function updateDimensions() {
 
 let resizeObserver: ResizeObserver | null = null;
 let resizeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-const recentStackClicks = new Set<string>();
 const stackClickTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const STACK_CLICK_DELAY_MS = 240;
 
 onMounted(() => {
   if (containerRef.value) {
@@ -230,23 +230,35 @@ function isCollapsedStack(file: ImageFile): boolean {
   return isStacked(file) && !isStackExpanded(file);
 }
 
+function isStackCover(file: ImageFile): boolean {
+  return isStacked(file) && file.stack_order === 0;
+}
+
 function onCardClick(file: ImageFile, event: MouseEvent) {
-  if (file.stack_id && isCollapsedStack(file) && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
-    recentStackClicks.add(file.stack_id);
+  if (file.stack_id && isStackCover(file) && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
     const existingTimer = stackClickTimers.get(file.stack_id);
-    if (existingTimer) clearTimeout(existingTimer);
-    stackClickTimers.set(file.stack_id, setTimeout(() => {
-      recentStackClicks.delete(file.stack_id!);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
       stackClickTimers.delete(file.stack_id!);
-    }, 500));
-    emit("toggleStackExpand", file.stack_id);
+      return;
+    }
+    stackClickTimers.set(file.stack_id, setTimeout(() => {
+      stackClickTimers.delete(file.stack_id!);
+      emit("toggleStackExpand", file.stack_id!);
+    }, STACK_CLICK_DELAY_MS));
     return;
   }
   selectFile(file, event);
 }
 
 function activateFile(file: ImageFile) {
-  if (isCollapsedStack(file) || (file.stack_id && recentStackClicks.has(file.stack_id))) return;
+  if (file.stack_id) {
+    const pendingToggle = stackClickTimers.get(file.stack_id);
+    if (pendingToggle) {
+      clearTimeout(pendingToggle);
+      stackClickTimers.delete(file.stack_id);
+    }
+  }
   emit("activate", file);
 }
 

@@ -1910,6 +1910,8 @@ pub struct AppConfig {
     #[serde(default = "default_stack_time_window")]
     pub stack_time_window_minutes: i64,
     #[serde(default)]
+    pub allow_multiple_open_stacks: bool,
+    #[serde(default)]
     pub suppressed_warnings: Vec<String>,
 }
 
@@ -1941,6 +1943,7 @@ impl Default for AppConfig {
             auto_stack: false,
             stack_similarity_threshold: 0.85,
             stack_time_window_minutes: 180,
+            allow_multiple_open_stacks: false,
             suppressed_warnings: Vec::new(),
         }
     }
