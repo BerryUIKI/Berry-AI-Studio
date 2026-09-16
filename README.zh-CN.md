@@ -5,6 +5,7 @@
 **[English](README.md)** | **[简体中文](README.zh-CN.md)** | **[繁體中文](README.zh-TW.md)** | **[日本語](README.ja.md)**
 
 [![Website](https://img.shields.io/badge/官网主页-GitHub%20Pages-12b5cb.svg)](https://berryuiki.github.io/Berry-AI-Studio/)
+[![Release](https://img.shields.io/badge/版本-v0.2.0-blue.svg)](https://github.com/BerryUIKI/Berry-AI-Studio/releases/tag/v0.2.0)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Tauri](https://img.shields.io/badge/Tauri-2-24c8db)](https://tauri.app)
 [![Rust](https://img.shields.io/badge/Rust-1.7+-orange)](https://www.rust-lang.org)
@@ -29,7 +30,7 @@
 
 **Berry AI Studio** 是一款专为数字艺术家、AI 画师和提示词工程师设计的桌面级图像资产管理系统。软件能够毫秒级扫描并深度解析主流平台生成的图片元数据（提示词、模型、采样器、步数、CFG、Seed 及工作流 JSON），并构建本地高速 SQLite 索引，提供 **沉浸式三栏现代工作台**、流畅的虚拟网格瀑布流、分词高亮属性面板、沉浸式全屏灯箱以及丰富的批量分类能力。
 
-> 🚀 **全栈架构重构**：Berry v0.1.0+ 采用 **Tauri 2 + Rust + Vue 3** 进行了全新重构开发。原先的历史 C#/.NET 版本已永久归档至 `archive/old-main` 标签与 `old/main` 分支中。
+> 🚀 **v0.2.0 版本发布**：全新支持本地 CLIP 语义搜索、AI 智能打标、LoRA 触发词库、多模式收割管道、智能连拍堆叠与虚拟滚动瀑布流。
 
 ---
 
@@ -79,7 +80,9 @@
 | `F` | 切换收藏状态 | `B` | 显示 / 隐藏左侧导航栏 |
 | `I` | 显示 / 隐藏右侧属性检查器 | `/` 或 `Ctrl+F` | 聚焦顶部搜索框 |
 | `Ctrl+A` | 全选当前视图全部图像 | `Esc` | 取消选择 / 关闭弹窗或灯箱 |
-| `Ctrl+O` | 快速添加图像文件夹 | `Ctrl+,` | 打开首选项与设置 |
+| `Ctrl+O` | 文件夹模式引导向导 | `Ctrl+,` | 打开首选项与设置 |
+| `Ctrl+G` | 手动叠放 / 合并成堆 | `Ctrl+Shift+G` | 解除叠放 / 展开全部图像 |
+| `Alt+S` | 设定当前图像为堆叠封面 | `C` | 进入多图并排对比模式 |
 | `Delete` | 将选中图片移入系统回收站 | `?` | 呼出快捷键指南 |
 
 ---

@@ -5,6 +5,7 @@
 **[English](README.md)** | **[简体中文](README.zh-CN.md)** | **[繁體中文](README.zh-TW.md)** | **[日本語](README.ja.md)**
 
 [![Website](https://img.shields.io/badge/website-GitHub%20Pages-12b5cb.svg)](https://berryuiki.github.io/Berry-AI-Studio/)
+[![Release](https://img.shields.io/badge/release-v0.2.0-blue.svg)](https://github.com/BerryUIKI/Berry-AI-Studio/releases/tag/v0.2.0)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Tauri](https://img.shields.io/badge/Tauri-2-24c8db)](https://tauri.app)
 [![Rust](https://img.shields.io/badge/Rust-1.7+-orange)](https://www.rust-lang.org)
@@ -29,7 +30,7 @@
 
 **Berry AI Studio** is a modern, desktop-first asset manager built for digital artists, AI creators, and prompt engineers. It indexes and parses prompt metadata and generation parameters across all major AI image platforms into a fast, local SQLite database, providing an **All-in-One 3-Pane Studio Workspace** with smooth virtual grid navigation, tokenized prompt inspectors, instant full-screen lightbox preview, and smart categorization.
 
-> 🚀 **Clean-Slate Architecture**: Berry v0.1.0+ is a ground-up rewrite in **Tauri 2 + Rust + Vue 3**. The legacy C#/.NET codebase is archived in the `archive/old-main` tag and `old/main` branch.
+> 🚀 **v0.2.0 Release**: Introducing local CLIP semantic search, AI auto-tagging, LoRA trigger word library, multi-mode ingestion pipelines, burst image stacking, and a virtualized waterfall gallery.
 
 ---
 
@@ -79,7 +80,9 @@ Automatically extracts and indexes generation parameters (Prompt, Negative Promp
 | `F` | Toggle Favorite | `B` | Toggle Left Navigation Sidebar |
 | `I` | Toggle Right Property Inspector | `/` or `Ctrl+F` | Focus Search Bar |
 | `Ctrl+A` | Select All Visible Images | `Esc` | Clear Selection / Close Modals |
-| `Ctrl+O` | Add Image Folder | `Ctrl+,` | Preferences & Settings |
+| `Ctrl+O` | Folder Creation Wizard | `Ctrl+,` | Preferences & Settings |
+| `Ctrl+G` | Group / Merge Stacks | `Ctrl+Shift+G` | Unstack / Dissolve Stack |
+| `Alt+S` | Set Stack Hero Cover | `C` | Side-by-Side Compare Mode |
 | `Delete` | Move Selected to Recycle Bin | `?` | Keyboard Shortcuts Guide |
 
 ---
