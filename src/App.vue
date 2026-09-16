@@ -116,6 +116,7 @@ const activeFilterCount = computed(() => countActiveFilters(activeCriteria.value
 // Selection
 const selectedFile = ref<ImageFile | null>(null);
 const selectedFilePaths = ref<Set<string>>(new Set());
+const selectionAnchorPath = ref<string | null>(null);
 
 // Fast lookup map computed once per files change (O(1) lookups on selection)
 const filePathMap = computed(() => {
@@ -377,7 +378,7 @@ function handleWindowKeyDown(e: KeyboardEvent) {
     if (selectedFilesList.value.length > 0 || selectedFile.value) {
       e.preventDefault();
       if (selectedFilesList.value.length === 0 && selectedFile.value) {
-        selectedFilePaths.value.add(selectedFile.value.path);
+        selectedFilePaths.value = new Set([selectedFile.value.path]);
       }
       onBatchTrash();
       return;
@@ -565,27 +566,43 @@ async function onFolderScanned(_folderId: number) {
 }
 
 function onFileSelected(file: ImageFile, event?: MouseEvent) {
-  selectedFile.value = file;
-  if (event?.metaKey || event?.ctrlKey) {
-    toggleSelectFile(file);
-  } else if (event?.shiftKey && selectedFilesList.value.length > 0) {
-    const lastFile = selectedFilesList.value[selectedFilesList.value.length - 1];
-    const idx1 = files.value.findIndex((f) => f.path === lastFile.path);
-    const idx2 = files.value.findIndex((f) => f.path === file.path);
-    if (idx1 !== -1 && idx2 !== -1) {
-      const [start, end] = idx1 < idx2 ? [idx1, idx2] : [idx2, idx1];
-      for (let i = start; i <= end; i++) {
-        selectedFilePaths.value.add(files.value[i].path);
+  if (event?.shiftKey && selectionAnchorPath.value) {
+    const anchorIndex = files.value.findIndex((candidate) => candidate.path === selectionAnchorPath.value);
+    const targetIndex = files.value.findIndex((candidate) => candidate.path === file.path);
+    if (anchorIndex !== -1 && targetIndex !== -1) {
+      const [start, end] = anchorIndex < targetIndex
+        ? [anchorIndex, targetIndex]
+        : [targetIndex, anchorIndex];
+      const nextSelection = new Set(selectedFilePaths.value);
+      for (let index = start; index <= end; index++) {
+        nextSelection.add(files.value[index].path);
       }
+      selectedFilePaths.value = nextSelection;
+      selectedFile.value = file;
+      return;
     }
+  }
+
+  selectedFile.value = file;
+  selectionAnchorPath.value = file.path;
+
+  if (event?.metaKey || event?.ctrlKey) {
+    toggleSelectFile(file, false);
+  } else {
+    selectedFilePaths.value = new Set();
   }
 }
 
-function toggleSelectFile(file: ImageFile) {
-  if (selectedFilePaths.value.has(file.path)) {
-    selectedFilePaths.value.delete(file.path);
+function toggleSelectFile(file: ImageFile, updateAnchor = true) {
+  const nextSelection = new Set(selectedFilePaths.value);
+  if (nextSelection.has(file.path)) {
+    nextSelection.delete(file.path);
   } else {
-    selectedFilePaths.value.add(file.path);
+    nextSelection.add(file.path);
+  }
+  selectedFilePaths.value = nextSelection;
+  if (updateAnchor) {
+    selectionAnchorPath.value = file.path;
   }
 }
 
@@ -594,12 +611,13 @@ function onSelectAll() {
 }
 
 function onClearSelection() {
-  selectedFilePaths.value.clear();
+  selectedFilePaths.value = new Set();
+  selectionAnchorPath.value = selectedFile.value?.path ?? null;
 }
 
 function onToggleAll() {
   if (selectedFilePaths.value.size === files.value.length) {
-    selectedFilePaths.value.clear();
+    selectedFilePaths.value = new Set();
   } else {
     onSelectAll();
   }
@@ -777,7 +795,7 @@ function onBatchAddToAlbum() {
 }
 
 function onAddedToAlbum(_album: Album) {
-  selectedFilePaths.value.clear();
+  selectedFilePaths.value = new Set();
 }
 
 function onOpenTagModal(fileIds?: number[]) {
@@ -870,7 +888,7 @@ function onBatchTrash() {
 }
 
 async function onFileOpCompleted() {
-  selectedFilePaths.value.clear();
+  selectedFilePaths.value = new Set();
   await refreshCounts();
   await loadFiles();
 }
@@ -894,7 +912,8 @@ async function loadFiles() {
   similaritySourceFile.value = null;
   rawSimilarityFiles.value = [];
   filesLoading.value = true;
-  selectedFilePaths.value.clear();
+  selectedFilePaths.value = new Set();
+  selectionAnchorPath.value = null;
   try {
     const q = searchQuery.value.trim();
     if (q) {
@@ -1031,7 +1050,8 @@ async function handleFindSimilar(file: ImageFile) {
       }
     }
     similaritySourceFile.value = file;
-    selectedFilePaths.value.clear();
+    selectedFilePaths.value = new Set();
+    selectionAnchorPath.value = null;
     rawSimilarityFiles.value = items.map((item) => ({
       ...item.file,
       similarity_score: item.score,

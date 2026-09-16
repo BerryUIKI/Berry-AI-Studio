@@ -95,11 +95,11 @@ collapsed stack expands only when the user clicks it.
 
 ### Phase 2 — Selection logic refinement
 
-- [ ] Add an explicit selection anchor independent of the multi-selection set.
-- [ ] Make plain-click, modifier-click, and Shift-click transitions deterministic.
-- [ ] Apply the behavior consistently to grid and table views through the shared App
+- [x] Add an explicit selection anchor independent of the multi-selection set.
+- [x] Make plain-click, modifier-click, and Shift-click transitions deterministic.
+- [x] Apply the behavior consistently to grid and table views through the shared App
   handler.
-- [ ] Update shortcut/user documentation with the refined range behavior.
+- [x] Update shortcut/user documentation with the refined range behavior.
 
 ### Phase 3 — Non-blocking stack mutations
 
@@ -144,3 +144,6 @@ collapsed stack expands only when the user clicks it.
   anchor, mutable selection sets, thumbnail-cache invalidation on array replacement,
   and ambiguous collapsed-stack interaction. Created the phased remediation plan.
 - **2026-09-16 — Baseline verified:** `pnpm build` passes before implementation.
+- **2026-09-16 — Phase 2 implemented:** selection now has an explicit anchor; the
+  first Shift-click selects the full inclusive range, modifier-click uses immutable
+  state updates, and grid/table behavior is shared.

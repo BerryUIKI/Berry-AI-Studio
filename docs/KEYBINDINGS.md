@@ -17,6 +17,10 @@ Berry AI Studio is designed with desktop productivity in mind. Most major operat
 | `F` | Global | Toggle Favorite status on selected image(s) |
 | `Delete` | Global | Move selected image(s) to system Recycle Bin / Trash |
 
+Range selection follows standard desktop behavior: click an image to establish the
+anchor, then Shift-click another image to select the inclusive range immediately.
+Ctrl/Cmd-click toggles individual images and establishes a new range anchor.
+
 ---
 
 ## 🪟 Workspace & Panes
