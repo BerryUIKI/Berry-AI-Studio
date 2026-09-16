@@ -123,10 +123,10 @@ preferences. The redesign will use:
 
 ### Phase 5 — Settings redesign
 
-- [ ] Reorganize settings into task-oriented categories and grouped sections.
+- [x] Reorganize settings into task-oriented categories and grouped sections.
 - [x] Add Grid, Waterfall, and Table default-view choices.
 - [x] Add the multi-open stack preference with clear default behavior.
-- [ ] Improve responsive layout, focus visibility, action hierarchy, and immediate-action
+- [x] Improve responsive layout, focus visibility, action hierarchy, and immediate-action
   feedback.
 
 ### Phase 6 — Verification and close-out
@@ -169,3 +169,9 @@ preferences. The redesign will use:
   mounts only viewport-adjacent cards, preserves original aspect ratios without
   cropping, and remains compatible with selection, stack gestures, zoom sizing,
   thumbnail prefetch, drag behavior, and keyboard scrolling.
+- **2026-09-16 — Phase 5 implemented:** Settings now uses task-oriented General,
+  Gallery, Stacks, Metadata, and Storage categories; concise purpose text; accessible
+  tab semantics and focus states; switch controls; distinct immediate actions; a
+  stronger Save hierarchy; and a narrow-window horizontal navigation layout. Default
+  view choices include Grid, Waterfall, and Table, and the multi-open stack preference
+  is persisted with the other stack controls.
