@@ -131,7 +131,7 @@ preferences. The redesign will use:
 
 ### Phase 6 — Verification and close-out
 
-- [ ] Run frontend build, Rust tests, formatting, and Clippy.
+- [x] Run frontend build, Rust tests, formatting, and Clippy.
 - [ ] Visually verify stack gestures, cover labels, all gallery modes, and Settings.
 - [ ] Test narrow-window and reduced-motion behavior.
 - [ ] Record outcomes and any deferred large-library profiling.
@@ -175,3 +175,7 @@ preferences. The redesign will use:
   stronger Save hierarchy; and a narrow-window horizontal navigation layout. Default
   view choices include Grid, Waterfall, and Table, and the multi-open stack preference
   is persisted with the other stack controls.
+- **2026-09-16 — Automated verification complete:** the production frontend build,
+  137 Rust unit tests plus doc tests, Rust formatting check, and warning-denied Clippy
+  check all pass. Per the user's preference, final visual and hands-on interaction
+  acceptance remains for user review rather than an additional automated UI pass.
