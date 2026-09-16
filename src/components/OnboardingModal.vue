@@ -66,13 +66,12 @@ async function finishSetup() {
         autoHarvest: true,
       });
     }
-
-    emit("complete");
-    emit("update:open", false);
   } catch (e) {
-    error.value = String(e);
+    console.warn("Error during onboarding pipeline creation:", e);
   } finally {
     submitting.value = false;
+    emit("complete");
+    emit("update:open", false);
   }
 }
 
@@ -83,8 +82,11 @@ function skip() {
 </script>
 
 <template>
-  <div v-if="open" class="modal-backdrop">
+  <div v-if="open" class="modal-backdrop" @click.self="skip">
     <div class="modal-dialog">
+      <!-- Close button -->
+      <button type="button" class="btn-modal-close" aria-label="Close" @click="skip">✕</button>
+
       <!-- Header -->
       <div class="modal-header">
         <div class="header-badge">🚀 {{ t.onboarding.badge }}</div>
@@ -261,7 +263,42 @@ function skip() {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  position: relative;
   animation: zoomIn 0.2s ease-out;
+}
+
+.btn-modal-close {
+  position: absolute;
+  top: 1rem;
+  right: 1.2rem;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 1.2rem;
+  cursor: pointer;
+  z-index: 10;
+  border-radius: 4px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.btn-modal-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+@media (prefers-color-scheme: light) {
+  .btn-modal-close {
+    color: rgba(0, 0, 0, 0.5);
+  }
+  .btn-modal-close:hover {
+    background: rgba(0, 0, 0, 0.08);
+    color: #000;
+  }
 }
 
 @media (prefers-color-scheme: light) {

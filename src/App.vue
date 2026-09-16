@@ -302,6 +302,18 @@ function handleWindowKeyDown(e: KeyboardEvent) {
       clipModalOpen.value = false;
       return;
     }
+    if (onboardingModalOpen.value) {
+      onboardingModalOpen.value = false;
+      return;
+    }
+    if (addFolderModalOpen.value) {
+      addFolderModalOpen.value = false;
+      return;
+    }
+    if (compareModalOpen.value) {
+      compareModalOpen.value = false;
+      return;
+    }
     if (loraModalOpen.value) {
       loraModalOpen.value = false;
       return;
@@ -731,6 +743,7 @@ async function onCompareSetHero(img: ImageFile) {
 }
 
 async function onOnboardingComplete() {
+  onboardingModalOpen.value = false;
   try {
     const cfg = await loadAppConfig();
     await saveAppConfig({
