@@ -5,6 +5,7 @@
 **[English](README.md)** | **[简体中文](README.zh-CN.md)** | **[繁體中文](README.zh-TW.md)** | **[日本語](README.ja.md)**
 
 [![Website](https://img.shields.io/badge/公式HP-GitHub%20Pages-12b5cb.svg)](https://berryuiki.github.io/Berry-AI-Studio/)
+[![Release](https://img.shields.io/badge/リリース-v0.2.0-blue.svg)](https://github.com/BerryUIKI/Berry-AI-Studio/releases/tag/v0.2.0)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Tauri](https://img.shields.io/badge/Tauri-2-24c8db)](https://tauri.app)
 [![Rust](https://img.shields.io/badge/Rust-1.7+-orange)](https://www.rust-lang.org)
@@ -29,7 +30,7 @@
 
 **Berry AI Studio** は、AI画像クリエイターやプロンプトエンジニア向けに設計されたデスクトップ特化型画像アセット管理スタジオです。主要なAI画像生成ツールで作成された画像メタデータ（プロンプト、モデル名、サンプラー、ステップ数、CFG、シード値、ワークフローJSON）をローカルのSQLiteに高速インデックス化。**3ペインスタジオワークスペース**、スムーズな仮想スクロールグリッド、トークン化プロンプトインスペクター、全画面ライトボックスビューア、スマート整理機能を提供します。
 
-> 🚀 **新アーキテクチャへの刷新**: Berry v0.1.0+ は **Tauri 2 + Rust + Vue 3** を採用してゼロから再構築されました。従来の旧 C#/.NET 版は `archive/old-main` タグおよび `old/main` ブランチにアーカイブされています。
+> 🚀 **v0.2.0 リリース**: ローカル CLIP セマンティック検索、AI 自動タグ付け、LoRA トリガーワードライブラリ、マルチモード取り込みパイプライン、連写スタック、仮想ウォーターフォールギャラリーを新たに搭載。
 
 ---
 
@@ -79,7 +80,9 @@
 | `F` | お気に入りの切り替え | `B` | 左側サイドバーの表示/非表示 |
 | `I` | 右側インスペクターの表示/非表示 | `/` または `Ctrl+F` | 検索バーにフォーカス |
 | `Ctrl+A` | 現在のビューの画像をすべて選択 | `Esc` | 選択解除 / ダイアログ・ライトボックスを閉じる |
-| `Ctrl+O` | 画像フォルダを追加 | `Ctrl+,` | 設定画面を開く |
+| `Ctrl+O` | フォルダ作成ウィザード | `Ctrl+,` | 設定画面を開く |
+| `Ctrl+G` | 手動スタック / スタック統合 | `Ctrl+Shift+G` | スタック解除 / 全画像展開 |
+| `Alt+S` | 現在の画像をスタックカバーに設定 | `C` | 左右並列比較モード |
 | `Delete` | 選択した画像をゴミ箱へ移動 | `?` | ショートカット一覧を表示 |
 
 ---
