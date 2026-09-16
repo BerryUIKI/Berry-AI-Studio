@@ -677,13 +677,33 @@ function onOpenAlbumModal(fileIds?: number[]) {
 }
 
 async function onStackSelected() {
-  const ids = selectedFilesList.value
+  const selectedFiles = files.value.filter((file) => selectedFilePaths.value.has(file.path));
+  const ids = selectedFiles
     .map((f) => f.id)
     .filter((id): id is number => id != null);
   if (ids.length < 2) return;
   try {
-    await invoke("stack_images", { fileIds: ids });
-    await loadFiles();
+    const stackId = await invoke<string>("stack_images", { fileIds: ids });
+    const selectedIds = new Set(ids);
+    const hero = selectedFiles.find((file) => file.id === ids[0]);
+    if (!hero) {
+      await loadFiles();
+      return;
+    }
+
+    files.value = files.value
+      .map((file) => {
+        if (file.id == null || !selectedIds.has(file.id)) return file;
+        return { ...file, stack_id: stackId, stack_order: ids.indexOf(file.id) };
+      })
+      .filter((file) => file.stack_id !== stackId || file.id === hero.id);
+    stackMap.value = {
+      ...stackMap.value,
+      [stackId]: { count: ids.length, heroId: hero.id ?? null },
+    };
+    selectedFile.value = files.value.find((file) => file.id === hero.id) ?? hero;
+    selectedFilePaths.value = new Set();
+    selectionAnchorPath.value = hero.path;
   } catch (err) {
     error.value = String(err);
   }
@@ -692,10 +712,26 @@ async function onStackSelected() {
 async function onUnstackSelected() {
   const file = selectedFile.value || (selectedFilesList.value.length > 0 ? selectedFilesList.value[0] : null);
   if (!file?.stack_id) return;
+  const stackId = file.stack_id;
   try {
-    await invoke("unstack_images", { stackId: file.stack_id });
-    expandedStacks.value.delete(file.stack_id);
-    await loadFiles();
+    const members = await invoke<ImageFile[]>("get_stack_members", { stackId });
+    await invoke("unstack_images", { stackId });
+    const unstacked = members.map((member) => ({
+      ...member,
+      stack_id: null,
+      stack_order: 0,
+    }));
+    const insertionIndex = files.value.findIndex((candidate) => candidate.stack_id === stackId);
+    const nextFiles = files.value.filter((candidate) => candidate.stack_id !== stackId);
+    nextFiles.splice(insertionIndex >= 0 ? insertionIndex : nextFiles.length, 0, ...unstacked);
+    files.value = nextFiles;
+    const nextStackMap = { ...stackMap.value };
+    delete nextStackMap[stackId];
+    stackMap.value = nextStackMap;
+    expandedStacks.value = new Set(
+      [...expandedStacks.value].filter((expandedId) => expandedId !== stackId),
+    );
+    selectedFile.value = unstacked.find((member) => member.id === file.id) ?? unstacked[0] ?? null;
   } catch (err) {
     error.value = String(err);
   }
@@ -703,22 +739,72 @@ async function onUnstackSelected() {
 
 async function onSetHeroSelected() {
   const file = selectedFile.value || (selectedFilesList.value.length > 0 ? selectedFilesList.value[0] : null);
-  if (!file?.stack_id || file.id == null) return;
+  if (!file) return;
+  await setStackHero(file);
+}
+
+async function setStackHero(file: ImageFile) {
+  if (!file.stack_id || file.id == null) return;
+  const stackId = file.stack_id;
   try {
-    await invoke("set_stack_hero", { stackId: file.stack_id, heroFileId: file.id });
-    await loadFiles();
+    await invoke("set_stack_hero", { stackId, heroFileId: file.id });
+    const members = await invoke<ImageFile[]>("get_stack_members", { stackId });
+    if (members.length === 0) {
+      await loadFiles();
+      return;
+    }
+    const insertionIndex = files.value.findIndex((candidate) => candidate.stack_id === stackId);
+    const nextFiles = files.value.filter((candidate) => candidate.stack_id !== stackId);
+    const visibleMembers = expandedStacks.value.has(stackId) ? members : members.slice(0, 1);
+    nextFiles.splice(insertionIndex >= 0 ? insertionIndex : nextFiles.length, 0, ...visibleMembers);
+    files.value = nextFiles;
+    stackMap.value = {
+      ...stackMap.value,
+      [stackId]: { count: members.length, heroId: members[0].id ?? null },
+    };
+    selectedFile.value = members.find((member) => member.id === file.id) ?? members[0];
   } catch (err) {
     error.value = String(err);
   }
 }
 
-function onToggleStackExpand(stackId: string) {
+async function onToggleStackExpand(stackId: string) {
   if (expandedStacks.value.has(stackId)) {
-    expandedStacks.value.delete(stackId);
-  } else {
-    expandedStacks.value.add(stackId);
+    const info = stackMap.value[stackId];
+    const hiddenMemberPaths = new Set(
+      files.value
+        .filter((file) => file.stack_id === stackId && file.id !== info?.heroId)
+        .map((file) => file.path),
+    );
+    files.value = files.value.filter((file) => {
+      if (file.stack_id !== stackId) return true;
+      return file.stack_order === 0 || (file.id != null && file.id === info?.heroId);
+    });
+    const hero = files.value.find((file) => file.stack_id === stackId);
+    if (selectedFile.value?.stack_id === stackId && selectedFile.value.id !== hero?.id) {
+      selectedFile.value = hero ?? null;
+      selectionAnchorPath.value = hero?.path ?? null;
+    }
+    selectedFilePaths.value = new Set(
+      [...selectedFilePaths.value].filter((path) => !hiddenMemberPaths.has(path)),
+    );
+    expandedStacks.value = new Set(
+      [...expandedStacks.value].filter((expandedId) => expandedId !== stackId),
+    );
+    return;
   }
-  void loadFiles();
+
+  try {
+    const members = await invoke<ImageFile[]>("get_stack_members", { stackId });
+    if (members.length === 0) return;
+    const insertionIndex = files.value.findIndex((file) => file.stack_id === stackId);
+    const nextFiles = files.value.filter((file) => file.stack_id !== stackId);
+    nextFiles.splice(insertionIndex >= 0 ? insertionIndex : nextFiles.length, 0, ...members);
+    files.value = nextFiles;
+    expandedStacks.value = new Set([...expandedStacks.value, stackId]);
+  } catch (err) {
+    error.value = String(err);
+  }
 }
 
 async function onTriggerCompare(customStackId?: string) {
@@ -753,13 +839,7 @@ async function onTriggerCompare(customStackId?: string) {
 }
 
 async function onCompareSetHero(img: ImageFile) {
-  if (!img.stack_id || img.id == null) return;
-  try {
-    await invoke("set_stack_hero", { stackId: img.stack_id, heroFileId: img.id });
-    await loadFiles();
-  } catch (err) {
-    console.error("Failed to set hero in compare:", err);
-  }
+  await setStackHero(img);
 }
 
 async function onOnboardingComplete() {
