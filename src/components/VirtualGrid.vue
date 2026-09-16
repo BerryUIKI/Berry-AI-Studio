@@ -79,6 +79,8 @@ function updateDimensions() {
 
 let resizeObserver: ResizeObserver | null = null;
 let resizeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+const recentStackClicks = new Set<string>();
+const stackClickTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 onMounted(() => {
   if (containerRef.value) {
@@ -97,6 +99,8 @@ onMounted(() => {
 onUnmounted(() => {
   if (resizeDebounceTimer) clearTimeout(resizeDebounceTimer);
   if (prefetchDebounceTimer) clearTimeout(prefetchDebounceTimer);
+  for (const timer of stackClickTimers.values()) clearTimeout(timer);
+  stackClickTimers.clear();
   resizeObserver?.disconnect();
   window.removeEventListener("keydown", handleKeyDown);
 });
@@ -214,7 +218,35 @@ function toggleSelect(file: ImageFile) {
   emit("toggleSelect", file);
 }
 
+function isStacked(file: ImageFile): boolean {
+  return Boolean(file.stack_id && (props.stackMap?.[file.stack_id]?.count ?? 1) > 1);
+}
+
+function isStackExpanded(file: ImageFile): boolean {
+  return Boolean(file.stack_id && props.expandedStacks?.has(file.stack_id));
+}
+
+function isCollapsedStack(file: ImageFile): boolean {
+  return isStacked(file) && !isStackExpanded(file);
+}
+
+function onCardClick(file: ImageFile, event: MouseEvent) {
+  if (file.stack_id && isCollapsedStack(file) && !event.ctrlKey && !event.metaKey && !event.shiftKey) {
+    recentStackClicks.add(file.stack_id);
+    const existingTimer = stackClickTimers.get(file.stack_id);
+    if (existingTimer) clearTimeout(existingTimer);
+    stackClickTimers.set(file.stack_id, setTimeout(() => {
+      recentStackClicks.delete(file.stack_id!);
+      stackClickTimers.delete(file.stack_id!);
+    }, 500));
+    emit("toggleStackExpand", file.stack_id);
+    return;
+  }
+  selectFile(file, event);
+}
+
 function activateFile(file: ImageFile) {
+  if (isCollapsedStack(file) || (file.stack_id && recentStackClicks.has(file.stack_id))) return;
   emit("activate", file);
 }
 
@@ -356,12 +388,13 @@ function onDragStart(e: DragEvent, file: ImageFile) {
             :class="{
               active: selectedFile?.path === file.path,
               'multi-selected': selectedFilePaths?.has(file.path),
-              'is-stacked': file.stack_id && (stackMap?.[file.stack_id]?.count ?? 1) > 1,
-              'stack-expanded': file.stack_id && expandedStacks?.has(file.stack_id),
+              'is-stacked': isStacked(file),
+              'is-collapsed-stack': isCollapsedStack(file),
+              'stack-expanded': isStackExpanded(file),
             }"
             draggable="true"
             @dragstart="onDragStart($event, file)"
-            @click="selectFile(file, $event)"
+            @click="onCardClick(file, $event)"
             @dblclick="activateFile(file)"
             @contextmenu.prevent="emit('findSimilar', file)"
           >
@@ -483,14 +516,22 @@ function onDragStart(e: DragEvent, file: ImageFile) {
 
                 <!-- Stacking badge -->
                 <button
-                  v-if="file.stack_id && (stackMap?.[file.stack_id]?.count ?? 1) > 1"
+                  v-if="
+                    file.stack_id &&
+                    (stackMap?.[file.stack_id]?.count ?? 1) > 1 &&
+                    (!expandedStacks?.has(file.stack_id) || file.stack_order === 0)
+                  "
                   type="button"
                   class="card-badge badge-stack"
                   :class="{ expanded: expandedStacks?.has(file.stack_id) }"
                   :title="t.stack.toggleExpand || 'Toggle Stack Expansion'"
+                  :aria-label="`${stackMap?.[file.stack_id]?.count} ${t.stack.stackCount}`"
+                  :aria-expanded="expandedStacks?.has(file.stack_id)"
                   @click.stop="emit('toggleStackExpand', file.stack_id)"
+                  @dblclick.stop
                 >
-                  📚 {{ stackMap?.[file.stack_id]?.count }}
+                  <span class="stack-badge-icon" aria-hidden="true"></span>
+                  <span>{{ stackMap?.[file.stack_id]?.count }}</span>
                 </button>
 
                 <!-- Stack compare trigger button -->
@@ -570,6 +611,7 @@ function onDragStart(e: DragEvent, file: ImageFile) {
 }
 
 .grid-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   background: #fff;
@@ -594,27 +636,66 @@ function onDragStart(e: DragEvent, file: ImageFile) {
   border-color: rgba(47, 111, 237, 0.4);
 }
 
-/* Poker Deck Stack Shadow Effect */
-.grid-card.is-stacked {
-  box-shadow: 3px 3px 0 0 rgba(0, 0, 0, 0.12), 6px 6px 0 0 rgba(0, 0, 0, 0.06);
-  border-color: rgba(47, 111, 237, 0.35);
+/* Collapsed stacks use full card-shaped backing layers instead of a flat shadow. */
+.grid-card.is-collapsed-stack {
+  overflow: visible;
+  isolation: isolate;
+  border-color: rgba(47, 111, 237, 0.42);
+  box-shadow: 0 5px 16px rgba(15, 23, 42, 0.16);
 }
 
-@media (prefers-color-scheme: dark) {
-  .grid-card.is-stacked {
-    box-shadow: 3px 3px 0 0 rgba(255, 255, 255, 0.08), 6px 6px 0 0 rgba(255, 255, 255, 0.04);
-    border-color: rgba(47, 111, 237, 0.45);
-  }
+.grid-card.is-collapsed-stack::before,
+.grid-card.is-collapsed-stack::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid rgba(100, 116, 139, 0.34);
+  border-radius: 8px;
+  background: linear-gradient(145deg, #f8fafc, #e2e8f0);
+  pointer-events: none;
 }
 
-.grid-card.is-stacked:hover {
-  transform: translateY(-3px);
-  box-shadow: 4px 4px 0 0 rgba(0, 0, 0, 0.15), 8px 8px 0 0 rgba(0, 0, 0, 0.08);
+.grid-card.is-collapsed-stack::before {
+  z-index: -2;
+  transform: translate(7px, 5px) rotate(1.8deg);
+  opacity: 0.72;
+}
+
+.grid-card.is-collapsed-stack::after {
+  z-index: -1;
+  transform: translate(4px, 3px) rotate(0.8deg);
+  opacity: 0.9;
+}
+
+.grid-card.is-collapsed-stack:hover {
+  transform: translateY(-3px) rotate(-0.25deg);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.2);
+}
+
+.grid-card.is-collapsed-stack .thumbnail-wrapper {
+  border-radius: 7px 7px 0 0;
+}
+
+.grid-card.is-collapsed-stack .card-info {
+  border-radius: 0 0 7px 7px;
 }
 
 .grid-card.stack-expanded {
-  border-style: dashed;
-  border-color: #2f6fed;
+  border-color: rgba(47, 111, 237, 0.5);
+  box-shadow: inset 0 3px 0 rgba(47, 111, 237, 0.32);
+}
+
+@media (prefers-color-scheme: dark) {
+  .grid-card.is-collapsed-stack {
+    border-color: rgba(96, 165, 250, 0.58);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.42);
+  }
+
+  .grid-card.is-collapsed-stack::before,
+  .grid-card.is-collapsed-stack::after {
+    border-color: rgba(148, 163, 184, 0.3);
+    background: linear-gradient(145deg, #334155, #1e293b);
+  }
 }
 
 .grid-card.active {
@@ -764,9 +845,15 @@ function onDragStart(e: DragEvent, file: ImageFile) {
 .badge-stack {
   top: 6px;
   right: 6px;
-  background: rgba(30, 41, 59, 0.85);
+  min-width: 42px;
+  min-height: 25px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.86);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #38bdf8;
+  color: #e0f2fe;
   font-weight: 700;
   font-size: 0.72em;
   padding: 0.15rem 0.45rem;
@@ -774,6 +861,36 @@ function onDragStart(e: DragEvent, file: ImageFile) {
   cursor: pointer;
   z-index: 2;
   transition: all 0.15s ease;
+}
+
+.stack-badge-icon {
+  position: relative;
+  width: 11px;
+  height: 9px;
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+}
+
+.stack-badge-icon::before,
+.stack-badge-icon::after {
+  content: "";
+  position: absolute;
+  width: 9px;
+  height: 7px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  z-index: -1;
+}
+
+.stack-badge-icon::before {
+  top: -4px;
+  left: 2px;
+}
+
+.stack-badge-icon::after {
+  top: -7px;
+  left: 4px;
+  opacity: 0.7;
 }
 
 .badge-stack:hover {
@@ -815,6 +932,17 @@ function onDragStart(e: DragEvent, file: ImageFile) {
 .card-stack-compare-btn:hover {
   background: #4f46e5;
   border-color: #818cf8;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grid-card,
+  .grid-card.is-collapsed-stack,
+  .card-select-btn,
+  .badge-stack,
+  .card-stack-compare-btn,
+  .card-similar-btn {
+    transition: none;
+  }
 }
 
 .card-similar-btn {

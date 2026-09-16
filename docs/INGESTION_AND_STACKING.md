@@ -90,8 +90,8 @@ Image Stacking groups similar images (such as multi-seed batch generation, seed 
 
 ### 3.2 Stack Navigation & Hero Selection
 - **Poker Deck Display**:
-  - Collapsed state displays the **Hero Cover image** with a layered deck shadow and item counter badge (e.g. `📚 8`).
-  - Double-click or badge click toggles **Inline Expansion**, presenting all stack members sequentially.
+  - Collapsed state displays the **Hero Cover image** above two offset card surfaces with a compact stack icon and numeric count.
+  - A single click on the collapsed card or its count badge toggles **Inline Expansion**, presenting all stack members sequentially.
 - **Hero Cover Selection**:
   - Select any member inside a stack and press **`Alt+S`** or choose **"Set as Stack Cover"** from the context menu to designate it as the primary cover image.
 - **Side-by-Side Compare Mode (`C`)**:

@@ -106,6 +106,7 @@ const compareImages = ref<ImageFile[]>([]);
 // Image Stacking State
 const stackMap = ref<Record<string, { count: number; heroId: number | null }>>({});
 const expandedStacks = ref<Set<string>>(new Set());
+const pendingStackExpansions = new Set<string>();
 
 // Filter Metadata
 const distinctModels = ref<string[]>([]);
@@ -794,6 +795,8 @@ async function onToggleStackExpand(stackId: string) {
     return;
   }
 
+  if (pendingStackExpansions.has(stackId)) return;
+  pendingStackExpansions.add(stackId);
   try {
     const members = await invoke<ImageFile[]>("get_stack_members", { stackId });
     if (members.length === 0) return;
@@ -804,6 +807,8 @@ async function onToggleStackExpand(stackId: string) {
     expandedStacks.value = new Set([...expandedStacks.value, stackId]);
   } catch (err) {
     error.value = String(err);
+  } finally {
+    pendingStackExpansions.delete(stackId);
   }
 }
 
