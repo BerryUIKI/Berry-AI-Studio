@@ -86,6 +86,9 @@ Image Stacking groups similar images (such as multi-seed batch generation, seed 
   - **Time Window**: Batch clustering constraint ensuring images generated within a time window (e.g. 30 minutes) are grouped together, preventing false clustering with historical outputs from months prior.
 - **Manual Stacking**:
   - Select multiple images in the gallery and press **`Ctrl+G`** (`Cmd+G`) to stack them immediately.
+  - Stacks cannot be nested. If the selection contains stacks, Berry warns before
+    flattening every source stack and selected standalone image into the first selected
+    stack. The target retains its cover and existing member order.
   - Select a stack and press **`Ctrl+Shift+G`** (`Cmd+Shift+G`) to dissolve the stack back into individual items.
 
 ### 3.2 Stack Navigation & Hero Selection

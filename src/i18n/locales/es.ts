@@ -488,6 +488,13 @@ export const es: typeof en = {
     unstack: "Desapilar grupo",
     setHero: "Establecer como portada",
     cullDrafts: "Eliminar borradores de baja puntuación",
+    mergeWarningTitle: "¿Combinar las pilas seleccionadas?",
+    mergeWarningMessage: "Has seleccionado {stacks} pila(s) y {images} imagen(es) independiente(s).",
+    mergeWarningTarget: "La primera pila seleccionada seguirá siendo el destino. Todas las pilas de origen e imágenes se combinarán en ella.",
+    mergeWarningNoNesting: "Las pilas no pueden anidarse. Las pilas de origen se convertirán en imágenes individuales.",
+    dontShowAgain: "No volver a mostrar esta advertencia",
+    cancelMerge: "Cancelar",
+    confirmMerge: "Combinar en la pila",
   },
   sort: {
     title: "Ordenar por",

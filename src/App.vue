@@ -46,10 +46,17 @@ import LoraManagerModal from "./components/LoraManagerModal.vue";
 import AddFolderModal from "./components/AddFolderModal.vue";
 import OnboardingModal from "./components/OnboardingModal.vue";
 import CompareModal from "./components/CompareModal.vue";
+import StackMergeWarningModal from "./components/StackMergeWarningModal.vue";
 import { t } from "./i18n";
 import { countActiveFilters, criteriaToQuery } from "./utils/search";
 import { requestBatchThumbnails } from "./utils/thumbnail";
-import { loadAppConfig, saveAppConfig } from "./utils/config";
+import {
+  isWarningSuppressed,
+  loadAppConfig,
+  saveAppConfig,
+  STACK_MERGE_WARNING_ID,
+  suppressWarning,
+} from "./utils/config";
 import { checkForUpdates } from "./utils/updater";
 
 const info = ref<AppInfo | null>(null);
@@ -102,6 +109,20 @@ const onboardingModalOpen = ref(false);
 let onboardingDismissedThisSession = false;
 const compareModalOpen = ref(false);
 const compareImages = ref<ImageFile[]>([]);
+const stackMergeWarningOpen = ref(false);
+
+interface StackMergePlan {
+  targetStackId: string;
+  sourceStackIds: string[];
+  standaloneFileIds: number[];
+}
+
+interface StackMergeResult {
+  stack_id: string;
+  members: ImageFile[];
+}
+
+const pendingStackMerge = ref<StackMergePlan | null>(null);
 
 // Image Stacking State
 const stackMap = ref<Record<string, { count: number; heroId: number | null }>>({});
@@ -679,6 +700,35 @@ function onOpenAlbumModal(fileIds?: number[]) {
 
 async function onStackSelected() {
   const selectedFiles = files.value.filter((file) => selectedFilePaths.value.has(file.path));
+  if (selectedFiles.length < 2 || stackMergeWarningOpen.value) return;
+
+  const selectedStackIds = [...new Set(
+    selectedFiles
+      .map((file) => file.stack_id)
+      .filter((stackId): stackId is string => Boolean(stackId)),
+  )];
+  if (selectedStackIds.length > 0) {
+    const standaloneFileIds = selectedFiles
+      .filter((file) => !file.stack_id)
+      .map((file) => file.id)
+      .filter((id): id is number => id != null);
+    const plan: StackMergePlan = {
+      targetStackId: selectedStackIds[0],
+      sourceStackIds: selectedStackIds.slice(1),
+      standaloneFileIds,
+    };
+    if (plan.sourceStackIds.length === 0 && plan.standaloneFileIds.length === 0) return;
+
+    const config = await loadAppConfig();
+    if (isWarningSuppressed(config, STACK_MERGE_WARNING_ID)) {
+      await executeStackMerge(plan);
+    } else {
+      pendingStackMerge.value = plan;
+      stackMergeWarningOpen.value = true;
+    }
+    return;
+  }
+
   const ids = selectedFiles
     .map((f) => f.id)
     .filter((id): id is number => id != null);
@@ -703,6 +753,72 @@ async function onStackSelected() {
       [stackId]: { count: ids.length, heroId: hero.id ?? null },
     };
     selectedFile.value = files.value.find((file) => file.id === hero.id) ?? hero;
+    selectedFilePaths.value = new Set();
+    selectionAnchorPath.value = hero.path;
+  } catch (err) {
+    error.value = String(err);
+  }
+}
+
+function cancelStackMerge() {
+  stackMergeWarningOpen.value = false;
+  pendingStackMerge.value = null;
+}
+
+async function confirmStackMerge(suppressFutureWarnings: boolean) {
+  const plan = pendingStackMerge.value;
+  stackMergeWarningOpen.value = false;
+  pendingStackMerge.value = null;
+  if (!plan) return;
+
+  if (suppressFutureWarnings) {
+    try {
+      await suppressWarning(STACK_MERGE_WARNING_ID);
+    } catch (err) {
+      console.warn("Failed to suppress the stack merge warning:", err);
+    }
+  }
+  await executeStackMerge(plan);
+}
+
+async function executeStackMerge(plan: StackMergePlan) {
+  const affectedStackIds = new Set([plan.targetStackId, ...plan.sourceStackIds]);
+  const standaloneIds = new Set(plan.standaloneFileIds);
+  const targetIndex = files.value.findIndex((file) => file.stack_id === plan.targetStackId);
+  const shouldRemove = (file: ImageFile) =>
+    Boolean(file.stack_id && affectedStackIds.has(file.stack_id)) ||
+    (file.id != null && standaloneIds.has(file.id));
+  const insertionIndex = targetIndex < 0
+    ? files.value.filter((file) => !shouldRemove(file)).length
+    : files.value.slice(0, targetIndex).filter((file) => !shouldRemove(file)).length;
+
+  try {
+    const result = await invoke<StackMergeResult>("merge_stacks", {
+      targetStackId: plan.targetStackId,
+      sourceStackIds: plan.sourceStackIds,
+      standaloneFileIds: plan.standaloneFileIds,
+    });
+    const hero = result.members[0];
+    if (!hero) {
+      await loadFiles();
+      return;
+    }
+
+    const nextFiles = files.value.filter((file) => !shouldRemove(file));
+    nextFiles.splice(insertionIndex, 0, hero);
+    files.value = nextFiles;
+
+    const nextStackMap = { ...stackMap.value };
+    for (const sourceStackId of plan.sourceStackIds) delete nextStackMap[sourceStackId];
+    nextStackMap[result.stack_id] = {
+      count: result.members.length,
+      heroId: hero.id ?? null,
+    };
+    stackMap.value = nextStackMap;
+    expandedStacks.value = new Set(
+      [...expandedStacks.value].filter((stackId) => !affectedStackIds.has(stackId)),
+    );
+    selectedFile.value = hero;
     selectedFilePaths.value = new Set();
     selectionAnchorPath.value = hero.path;
   } catch (err) {
@@ -1755,6 +1871,14 @@ function onResetZoom() {
       :images="compareImages"
       @close="compareModalOpen = false"
       @set-hero="onCompareSetHero"
+    />
+
+    <StackMergeWarningModal
+      :show="stackMergeWarningOpen"
+      :stack-count="(pendingStackMerge?.sourceStackIds.length ?? 0) + 1"
+      :image-count="pendingStackMerge?.standaloneFileIds.length ?? 0"
+      @cancel="cancelStackMerge"
+      @confirm="confirmStackMerge"
     />
   </div>
 </template>

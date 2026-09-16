@@ -488,6 +488,13 @@ export const zhCN: typeof en = {
     unstack: "解散堆栈",
     setHero: "设为封面 Hero",
     cullDrafts: "清理低分草稿",
+    mergeWarningTitle: "合并所选堆栈？",
+    mergeWarningMessage: "您选择了 {stacks} 个堆栈和 {images} 张独立图片。",
+    mergeWarningTarget: "第一个选中的堆栈将作为目标。所有来源堆栈和所选图片都会合并到其中。",
+    mergeWarningNoNesting: "堆栈不能嵌套。来源堆栈将展开为独立图片。",
+    dontShowAgain: "不再显示此警告",
+    cancelMerge: "取消",
+    confirmMerge: "合并到堆栈",
   },
   sort: {
     title: "排序方式",

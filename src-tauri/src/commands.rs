@@ -1946,6 +1946,20 @@ impl Default for AppConfig {
     }
 }
 
+#[cfg(test)]
+mod app_config_tests {
+    use super::AppConfig;
+
+    #[test]
+    fn legacy_config_defaults_to_no_suppressed_warnings() {
+        let mut value = serde_json::to_value(AppConfig::default()).unwrap();
+        value.as_object_mut().unwrap().remove("suppressed_warnings");
+
+        let config: AppConfig = serde_json::from_value(value).unwrap();
+        assert!(config.suppressed_warnings.is_empty());
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoragePaths {
     pub data_dir: String,

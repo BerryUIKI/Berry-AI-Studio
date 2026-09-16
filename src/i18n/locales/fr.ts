@@ -488,6 +488,13 @@ export const fr: typeof en = {
     unstack: "Dissocier la pile",
     setHero: "Définir comme couverture",
     cullDrafts: "Élaguer les brouillons mal notés",
+    mergeWarningTitle: "Fusionner les piles sélectionnées ?",
+    mergeWarningMessage: "Vous avez sélectionné {stacks} pile(s) et {images} image(s) indépendante(s).",
+    mergeWarningTarget: "La première pile sélectionnée restera la cible. Toutes les piles sources et images y seront fusionnées.",
+    mergeWarningNoNesting: "Les piles ne peuvent pas être imbriquées. Les piles sources seront aplaties en images individuelles.",
+    dontShowAgain: "Ne plus afficher cet avertissement",
+    cancelMerge: "Annuler",
+    confirmMerge: "Fusionner dans la pile",
   },
   sort: {
     title: "Trier par",

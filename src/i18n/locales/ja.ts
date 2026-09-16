@@ -488,6 +488,13 @@ export const ja: typeof en = {
     unstack: "スタックを解除",
     setHero: "表紙に設定",
     cullDrafts: "低評価の下書きを整理",
+    mergeWarningTitle: "選択したスタックを結合しますか？",
+    mergeWarningMessage: "{stacks} 個のスタックと {images} 枚の単独画像を選択しています。",
+    mergeWarningTarget: "最初に選択したスタックが結合先になります。すべての元スタックと画像がそこへ結合されます。",
+    mergeWarningNoNesting: "スタックは入れ子にできません。元スタックは個別の画像に展開されます。",
+    dontShowAgain: "今後この警告を表示しない",
+    cancelMerge: "キャンセル",
+    confirmMerge: "スタックに結合",
   },
   sort: {
     title: "並び替え",
