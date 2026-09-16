@@ -5,12 +5,11 @@ import { t } from "../i18n";
 import type { ImageFile } from "../types";
 
 const props = defineProps<{
-  open: boolean;
   images: ImageFile[];
 }>();
 
 const emit = defineEmits<{
-  (e: "update:open", val: boolean): void;
+  (e: "close"): void;
   (e: "setHero", image: ImageFile): void;
 }>();
 
@@ -71,14 +70,13 @@ function onMouseUp() {
 }
 
 function onKeyDown(e: KeyboardEvent) {
-  if (!props.open) return;
   if (e.key === "Escape") {
     close();
   }
 }
 
 function close() {
-  emit("update:open", false);
+  emit("close");
 }
 
 function setHero(img: ImageFile) {
@@ -87,7 +85,7 @@ function setHero(img: ImageFile) {
 </script>
 
 <template>
-  <div v-if="open" class="compare-overlay" @click.self="close">
+  <div class="compare-overlay" @click.self="close">
     <div class="compare-toolbar">
       <div class="toolbar-left">
         <span class="toolbar-icon">⚖️</span>

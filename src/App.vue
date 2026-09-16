@@ -1634,25 +1634,21 @@ function onResetZoom() {
     <!-- Multi-Mode Add Folder Modal -->
     <AddFolderModal
       v-if="addFolderModalOpen"
-      :open="addFolderModalOpen"
-      @update:open="addFolderModalOpen = $event"
+      @close="addFolderModalOpen = false"
       @folder-added="onFolderAdded"
     />
 
     <!-- Onboarding Setup Wizard Modal -->
     <OnboardingModal
       v-if="onboardingModalOpen"
-      :open="onboardingModalOpen"
-      @update:open="!$event && onOnboardingComplete()"
-      @complete="onOnboardingComplete"
+      @close="onOnboardingComplete"
     />
 
     <!-- Side-by-Side Compare Modal -->
     <CompareModal
       v-if="compareModalOpen"
-      :open="compareModalOpen"
       :images="compareImages"
-      @update:open="compareModalOpen = $event"
+      @close="compareModalOpen = false"
       @set-hero="onCompareSetHero"
     />
   </div>

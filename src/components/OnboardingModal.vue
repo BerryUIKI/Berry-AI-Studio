@@ -5,13 +5,8 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { t } from "../i18n";
 import type { Folder, PipelineDetectedPath } from "../types";
 
-defineProps<{
-  open: boolean;
-}>();
-
 const emit = defineEmits<{
-  (e: "update:open", val: boolean): void;
-  (e: "complete"): void;
+  (e: "close"): void;
 }>();
 
 const step = ref<1 | 2 | 3>(1);
@@ -70,19 +65,17 @@ async function finishSetup() {
     console.warn("Error during onboarding pipeline creation:", e);
   } finally {
     submitting.value = false;
-    emit("complete");
-    emit("update:open", false);
+    emit("close");
   }
 }
 
 function skip() {
-  emit("complete");
-  emit("update:open", false);
+  emit("close");
 }
 </script>
 
 <template>
-  <div v-if="open" class="modal-backdrop" @click.self="skip">
+  <div class="modal-backdrop" @click.self="skip">
     <div class="modal-dialog">
       <!-- Close button -->
       <button type="button" class="btn-modal-close" aria-label="Close" @click="skip">✕</button>

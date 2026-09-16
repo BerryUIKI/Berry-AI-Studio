@@ -5,12 +5,8 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { t } from "../i18n";
 import type { Folder, FolderType, IngestAction, PipelineDetectedPath } from "../types";
 
-defineProps<{
-  open: boolean;
-}>();
-
 const emit = defineEmits<{
-  (e: "update:open", val: boolean): void;
+  (e: "close"): void;
   (e: "folderAdded", folder: Folder): void;
 }>();
 
@@ -110,12 +106,12 @@ function close() {
   folderPath.value = "";
   sourcePath.value = "";
   error.value = "";
-  emit("update:open", false);
+  emit("close");
 }
 </script>
 
 <template>
-  <div v-if="open" class="modal-backdrop" @click.self="close">
+  <div class="modal-backdrop" @click.self="close">
     <div class="modal-dialog">
       <!-- Header -->
       <div class="modal-header">
