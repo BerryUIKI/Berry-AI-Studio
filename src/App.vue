@@ -1633,6 +1633,7 @@ function onResetZoom() {
 
     <!-- Multi-Mode Add Folder Modal -->
     <AddFolderModal
+      v-if="addFolderModalOpen"
       :open="addFolderModalOpen"
       @update:open="addFolderModalOpen = $event"
       @folder-added="onFolderAdded"
@@ -1648,6 +1649,7 @@ function onResetZoom() {
 
     <!-- Side-by-Side Compare Modal -->
     <CompareModal
+      v-if="compareModalOpen"
       :open="compareModalOpen"
       :images="compareImages"
       @update:open="compareModalOpen = $event"

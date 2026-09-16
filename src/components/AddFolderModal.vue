@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { t } from "../i18n";
@@ -28,6 +28,7 @@ const error = ref("");
 
 onMounted(() => {
   void scanLocalAiPaths();
+  window.addEventListener("keydown", onKeydown);
 });
 
 async function scanLocalAiPaths() {
@@ -93,6 +94,17 @@ async function onSubmit() {
     submitting.value = false;
   }
 }
+
+function onKeydown(e: KeyboardEvent) {
+  if (e.key === "Escape") {
+    e.stopPropagation();
+    close();
+  }
+}
+
+onUnmounted(() => {
+  window.removeEventListener("keydown", onKeydown);
+});
 
 function close() {
   folderPath.value = "";
