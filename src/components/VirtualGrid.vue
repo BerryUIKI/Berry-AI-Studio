@@ -320,14 +320,6 @@ function onDragStart(e: DragEvent, file: ImageFile) {
   }
 }
 
-// When files change or reset, scroll to top and reset thumbnail cache
-watch(
-  () => props.files,
-  () => {
-    failedImages.value.clear();
-    thumbnailMap.value = {};
-  },
-);
 </script>
 
 <template>

@@ -103,11 +103,11 @@ collapsed stack expands only when the user clicks it.
 
 ### Phase 3 — Non-blocking stack mutations
 
-- [ ] Return/use the stack identifier from the existing stack command.
-- [ ] Patch affected files and stack summaries locally after Ctrl/Cmd+G.
-- [ ] Preserve the current gallery, scroll position, and thumbnail cache.
-- [ ] Make expand/collapse a local projection instead of a loading-state reload.
-- [ ] Retain a safe reload fallback for unexpected or stale data.
+- [x] Return/use the stack identifier from the existing stack command.
+- [x] Patch affected files and stack summaries locally after Ctrl/Cmd+G.
+- [x] Preserve the current gallery, scroll position, and thumbnail cache.
+- [x] Make expand/collapse a local projection instead of a loading-state reload.
+- [x] Retain a safe reload fallback for unexpected or stale data.
 
 ### Phase 4 — Stack-card redesign
 
@@ -147,3 +147,7 @@ collapsed stack expands only when the user clicks it.
 - **2026-09-16 — Phase 2 implemented:** selection now has an explicit anchor; the
   first Shift-click selects the full inclusive range, modifier-click uses immutable
   state updates, and grid/table behavior is shared.
+- **2026-09-16 — Phase 3 implemented:** manual stack creation patches the active
+  gallery in place; expand/collapse fetches only stack members and never enters the
+  gallery loading state; unstack and hero changes also use targeted updates; resolved
+  thumbnail URLs survive `files` array replacement.
