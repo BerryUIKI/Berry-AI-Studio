@@ -10,8 +10,9 @@ use std::sync::MutexGuard;
 
 use berry_clip::{ClipEngine, ClipModelInfo};
 use berry_domain::{
-    Album, CheckpointModelStat, DatabaseStats, DetectedLora, FileSortField, Folder, ImageFile,
-    LoraModel, ModelCacheEntry, PromptStat, SearchCriteria, SimilarityMatch, SortDirection, Tag,
+    Album, CheckpointModelStat, CleanupQueueItem, DatabaseStats, DetectedLora, FileSortField,
+    Folder, ImageFile, LoraModel, ModelCacheEntry, PipelineDetectedPath, PromptStat, SearchCriteria,
+    SimilarityMatch, SortDirection, StackSummary, Tag,
 };
 use berry_scan::{ScanStats, Scanner};
 use berry_storage::Database;
@@ -96,17 +97,52 @@ pub fn get_app_info(state: State<'_, AppState>) -> Result<AppInfo, String> {
 /// directories, or are already registered.
 #[tauri::command]
 pub fn add_folder(path: String, state: State<'_, AppState>) -> Result<Folder, String> {
-    let path = canonicalize_folder(&path)?;
+    add_folder_with_options(path, None, None, None, None, None, state)
+}
+
+/// Register a folder with explicit mode ('link', 'managed', 'pipeline') and pipeline options.
+#[tauri::command]
+pub fn add_folder_with_options(
+    path: String,
+    folder_type: Option<String>,
+    source_path: Option<String>,
+    ingest_action: Option<String>,
+    grace_period_hours: Option<i32>,
+    auto_harvest: Option<bool>,
+    state: State<'_, AppState>,
+) -> Result<Folder, String> {
+    let ftype = folder_type.unwrap_or_else(|| "link".to_string());
+    if ftype == "managed" {
+        std::fs::create_dir_all(&path)
+            .map_err(|e| format!("Failed to create managed folder directory: {e}"))?;
+    }
+
+    let canonical = canonicalize_folder(&path)?;
     let db = db(&state)?;
     if db
-        .find_folder_by_path(&path)
+        .find_folder_by_path(&canonical)
         .map_err(|e| e.to_string())?
         .is_some()
     {
         return Err("folder is already added".to_string());
     }
-    db.add_folder(&path).map_err(|e| e.to_string())
+
+    let src = match source_path {
+        Some(s) if !s.trim().is_empty() => Some(canonicalize_folder(&s)?),
+        _ => None,
+    };
+
+    db.add_folder_with_mode(
+        &canonical,
+        &ftype,
+        src.as_deref(),
+        ingest_action.as_deref(),
+        grace_period_hours,
+        auto_harvest.unwrap_or(true),
+    )
+    .map_err(|e| e.to_string())
 }
+
 
 /// All registered folders, ordered by id.
 #[tauri::command]
@@ -1866,6 +1902,26 @@ pub struct AppConfig {
     pub similarity_limit: u32,
     pub auto_check_update: bool,
     pub silent_install: bool,
+    #[serde(default)]
+    pub has_completed_onboarding: bool,
+    #[serde(default = "default_auto_stack")]
+    pub auto_stack: bool,
+    #[serde(default = "default_stack_similarity")]
+    pub stack_similarity_threshold: f64,
+    #[serde(default = "default_stack_time_window")]
+    pub stack_time_window_minutes: i64,
+}
+
+fn default_auto_stack() -> bool {
+    false
+}
+
+fn default_stack_similarity() -> f64 {
+    0.85
+}
+
+fn default_stack_time_window() -> i64 {
+    180
 }
 
 impl Default for AppConfig {
@@ -1880,6 +1936,10 @@ impl Default for AppConfig {
             similarity_limit: 50,
             auto_check_update: true,
             silent_install: false,
+            has_completed_onboarding: false,
+            auto_stack: false,
+            stack_similarity_threshold: 0.85,
+            stack_time_window_minutes: 180,
         }
     }
 }
@@ -2207,4 +2267,446 @@ pub fn install_update(app: AppHandle, installer_path: String, silent: Option<boo
 
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// AIGC Ingestion Pipeline & Local AI Tool Autodetection
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub fn autodetect_local_ai_paths() -> Result<Vec<PipelineDetectedPath>, String> {
+    let mut detected = Vec::new();
+
+    #[cfg(target_os = "windows")]
+    let drive_roots: Vec<String> = (b'C'..=b'Z')
+        .map(|d| format!("{}:\\", d as char))
+        .filter(|root| Path::new(root).exists())
+        .collect();
+
+    #[cfg(not(target_os = "windows"))]
+    let drive_roots: Vec<String> = vec![
+        std::env::var("HOME").unwrap_or_else(|_| "/root".to_string()),
+        "/opt".to_string(),
+        "/media".to_string(),
+    ];
+
+    let patterns = [
+        ("Stable Diffusion WebUI", "stable-diffusion-webui/outputs/txt2img-images", "txt2img"),
+        ("Stable Diffusion WebUI", "stable-diffusion-webui/outputs/img2img-images", "img2img"),
+        ("Stable Diffusion WebUI", "sd.webui/outputs/txt2img-images", "txt2img"),
+        ("Stable Diffusion WebUI (Aki)", "sd-webui-aki/outputs/txt2img-images", "txt2img"),
+        ("Stable Diffusion WebUI (Aki)", "sd-webui-aki/outputs/img2img-images", "img2img"),
+        ("ComfyUI", "ComfyUI/output", "output"),
+        ("ComfyUI (Portable)", "ComfyUI_windows_portable/ComfyUI/output", "output"),
+        ("ComfyUI (Aki)", "ComfyUI-aki/ComfyUI/output", "output"),
+        ("Fooocus", "Fooocus/outputs", "outputs"),
+        ("Fooocus (MRE)", "Fooocus-MRE/outputs", "outputs"),
+        ("InvokeAI", "invokeai/outputs", "outputs"),
+    ];
+
+    for root in drive_roots {
+        let root_path = Path::new(&root);
+        for (tool, rel_path, cat) in &patterns {
+            let candidate = root_path.join(rel_path);
+            if candidate.is_dir() {
+                let p = candidate.display().to_string();
+                if !detected.iter().any(|d: &PipelineDetectedPath| d.path == p) {
+                    detected.push(PipelineDetectedPath {
+                        tool_name: tool.to_string(),
+                        path: p,
+                        category: cat.to_string(),
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(detected)
+}
+
+#[tauri::command]
+pub fn harvest_pipeline_folder(folder_id: i64, state: State<'_, AppState>) -> Result<usize, String> {
+    let folder = {
+        let db = db(&state)?;
+        db.find_folder_by_id(folder_id)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "folder not found".to_string())?
+    };
+
+    if folder.folder_type != "pipeline" {
+        return Err("folder is not an ingestion pipeline".to_string());
+    }
+
+    let source_path_str = match &folder.source_path {
+        Some(s) if !s.is_empty() => s.clone(),
+        _ => return Err("pipeline folder has no source path configured".to_string()),
+    };
+
+    let source_dir = Path::new(&source_path_str);
+    if !source_dir.is_dir() {
+        return Err(format!("pipeline source path does not exist: {source_path_str}"));
+    }
+
+    let dest_dir = Path::new(&folder.path);
+    std::fs::create_dir_all(dest_dir)
+        .map_err(|e| format!("failed to create destination directory: {e}"))?;
+
+    let supported_exts = ["png", "jpg", "jpeg", "webp", "mp4"];
+    let mut harvested_count = 0;
+
+    let entries = std::fs::read_dir(source_dir)
+        .map_err(|e| format!("failed to read source directory: {e}"))?;
+
+    let now_ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64;
+
+    for entry in entries.flatten() {
+        let file_path = entry.path();
+        if !file_path.is_file() {
+            continue;
+        }
+
+        let ext = file_path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+
+        if !supported_exts.contains(&ext.as_str()) {
+            continue;
+        }
+
+        let meta = match file_path.metadata() {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+
+        if meta.len() == 0 {
+            continue;
+        }
+
+        let file_mtime = meta
+            .modified()
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+
+        if now_ts.saturating_sub(file_mtime) < 1 {
+            // Still being written to, debounce
+            continue;
+        }
+
+        let file_name = match file_path.file_name() {
+            Some(n) => n.to_string_lossy().to_string(),
+            None => continue,
+        };
+
+        let target_path = dest_dir.join(&file_name);
+        let src_str = file_path.display().to_string();
+        let tgt_str = target_path.display().to_string();
+
+        if target_path.exists() {
+            if let Ok(t_meta) = target_path.metadata() {
+                if t_meta.len() == meta.len() {
+                    continue;
+                }
+            }
+        }
+
+        if let Err(e) = std::fs::copy(&file_path, &target_path) {
+            eprintln!("Failed to copy {src_str} to {tgt_str}: {e}");
+            continue;
+        }
+
+        let src_txt = file_path.with_extension("txt");
+        if src_txt.exists() {
+            let tgt_txt = target_path.with_extension("txt");
+            let _ = std::fs::copy(&src_txt, &tgt_txt);
+        }
+
+        let container = match ext.as_str() {
+            "png" => berry_domain::Container::Png,
+            "jpg" | "jpeg" => berry_domain::Container::Jpeg,
+            "webp" => berry_domain::Container::WebP,
+            "mp4" => berry_domain::Container::Mp4,
+            _ => continue,
+        };
+
+        let metadata = berry_metadata::extract_metadata(container, &target_path);
+
+        let image_file = ImageFile {
+            id: None,
+            folder_id,
+            path: tgt_str.clone(),
+            size_bytes: meta.len(),
+            modified_at: file_mtime,
+            container,
+            metadata,
+            rating: None,
+            aesthetic_score: None,
+            is_favorite: false,
+            is_nsfw: false,
+            stack_id: None,
+            stack_order: 0,
+        };
+
+        let db = db(&state)?;
+        if let Ok(inserted_id) = db.upsert_file(&image_file) {
+            harvested_count += 1;
+
+            if folder.ingest_action.as_deref() == Some("move") {
+                let grace = folder.grace_period_hours.unwrap_or(24);
+                if grace <= 0 {
+                    let _ = trash::delete(&file_path);
+                    if src_txt.exists() {
+                        let _ = trash::delete(&src_txt);
+                    }
+                } else {
+                    let _ = db.enqueue_cleanup(&src_str, inserted_id, grace);
+                }
+            }
+        }
+    }
+
+    Ok(harvested_count)
+}
+
+#[tauri::command]
+pub fn process_pipeline_cleanups(state: State<'_, AppState>) -> Result<u64, String> {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64;
+
+    let db = db(&state)?;
+    let due_items = db.list_due_cleanups(now).map_err(|e| e.to_string())?;
+    let mut deleted_count = 0;
+
+    for item in due_items {
+        let p = Path::new(&item.source_file_path);
+        if p.exists() {
+            if let Err(e) = trash::delete(p) {
+                eprintln!("Failed to trash expired pipeline file {}: {e}", item.source_file_path);
+                let _ = db.update_cleanup_status(item.id, "failed");
+                continue;
+            }
+        }
+        let txt = p.with_extension("txt");
+        if txt.exists() {
+            let _ = trash::delete(&txt);
+        }
+
+        let _ = db.update_cleanup_status(item.id, "deleted");
+        deleted_count += 1;
+    }
+
+    Ok(deleted_count)
+}
+
+#[tauri::command]
+pub fn get_pipeline_cleanup_queue(
+    limit: Option<usize>,
+    state: State<'_, AppState>,
+) -> Result<Vec<CleanupQueueItem>, String> {
+    let db = db(&state)?;
+    db.get_cleanup_queue(limit.unwrap_or(50)).map_err(|e| e.to_string())
+}
+
+// ---------------------------------------------------------------------------
+// Image Stacking & Burst Grouping
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub fn stack_images(
+    file_ids: Vec<i64>,
+    custom_stack_id: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let db = db(&state)?;
+    db.stack_images(&file_ids, custom_stack_id.as_deref())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn unstack_images(stack_id: String, state: State<'_, AppState>) -> Result<u64, String> {
+    let db = db(&state)?;
+    db.unstack_images(&stack_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn set_stack_hero(
+    stack_id: String,
+    hero_file_id: i64,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let db = db(&state)?;
+    db.set_stack_hero(&stack_id, hero_file_id)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_stack_members(stack_id: String, state: State<'_, AppState>) -> Result<Vec<ImageFile>, String> {
+    let db = db(&state)?;
+    db.get_stack_members(&stack_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn list_stacks(
+    folder_id: Option<i64>,
+    state: State<'_, AppState>,
+) -> Result<Vec<StackSummary>, String> {
+    let db = db(&state)?;
+    db.list_stacks(folder_id).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn cull_stack_drafts(
+    stack_id: String,
+    min_rating: u8,
+    state: State<'_, AppState>,
+) -> Result<u64, String> {
+    let db = db(&state)?;
+    let cull_ids = db
+        .get_stack_cull_candidate_ids(&stack_id, min_rating)
+        .map_err(|e| e.to_string())?;
+
+    let mut trashed = 0;
+    for id in cull_ids {
+        if let Ok(Some(file)) = db.get_file_by_id(id) {
+            let p = Path::new(&file.path);
+            if p.exists() {
+                let _ = trash::delete(p);
+            }
+            let txt = p.with_extension("txt");
+            if txt.exists() {
+                let _ = trash::delete(&txt);
+            }
+            let _ = db.delete_file_by_id(id);
+            trashed += 1;
+        }
+    }
+
+    Ok(trashed)
+}
+
+fn tokenize_prompt(prompt: &str) -> std::collections::HashSet<String> {
+    prompt
+        .split(|c: char| c == ',' || c == '\n' || c == '\r' || c == '\t')
+        .map(|s| s.trim().to_lowercase())
+        .filter(|s| !s.is_empty())
+        .collect()
+}
+
+fn prompt_jaccard_similarity(
+    tokens1: &std::collections::HashSet<String>,
+    tokens2: &std::collections::HashSet<String>,
+) -> f32 {
+    if tokens1.is_empty() && tokens2.is_empty() {
+        return 1.0;
+    }
+    let intersection = tokens1.intersection(tokens2).count();
+    let union = tokens1.union(tokens2).count();
+    if union == 0 {
+        1.0
+    } else {
+        intersection as f32 / union as f32
+    }
+}
+
+#[tauri::command]
+pub fn auto_stack_images(
+    folder_id: Option<i64>,
+    similarity_threshold: Option<f32>,
+    time_window_minutes: Option<i64>,
+    state: State<'_, AppState>,
+) -> Result<usize, String> {
+    let db = db(&state)?;
+    let threshold = similarity_threshold.unwrap_or(0.90);
+    let time_window_secs = time_window_minutes.unwrap_or(30) * 60;
+
+    let criteria = SearchCriteria {
+        folder_id,
+        sort: Some(FileSortField::ModifiedAt),
+        direction: Some(SortDirection::Asc),
+        ..Default::default()
+    };
+    let files = db.search_files(&criteria).map_err(|e| e.to_string())?;
+
+    if files.len() < 2 {
+        return Ok(0);
+    }
+
+    let mut file_tokens: Vec<(ImageFile, std::collections::HashSet<String>)> = Vec::new();
+    for f in files {
+        let p_str = f
+            .metadata
+            .as_ref()
+            .and_then(|m| m.prompt.as_deref())
+            .unwrap_or("");
+        let tokens = tokenize_prompt(p_str);
+        file_tokens.push((f, tokens));
+    }
+
+    let mut clusters: Vec<Vec<i64>> = Vec::new();
+    let mut assigned = std::collections::HashSet::new();
+
+    for i in 0..file_tokens.len() {
+        let (file_a, tokens_a) = &file_tokens[i];
+        let id_a = match file_a.id {
+            Some(id) => id,
+            None => continue,
+        };
+
+        if assigned.contains(&id_a) || file_a.stack_id.is_some() {
+            continue;
+        }
+
+        let mut cluster = vec![id_a];
+
+        for j in (i + 1)..file_tokens.len() {
+            let (file_b, tokens_b) = &file_tokens[j];
+            let id_b = match file_b.id {
+                Some(id) => id,
+                None => continue,
+            };
+
+            if assigned.contains(&id_b) || file_b.stack_id.is_some() {
+                continue;
+            }
+
+            let time_diff = (file_b.modified_at - file_a.modified_at).abs();
+            if time_window_secs > 0 && time_diff > time_window_secs {
+                continue;
+            }
+
+            let model_a = file_a.metadata.as_ref().and_then(|m| m.model_name.as_deref());
+            let model_b = file_b.metadata.as_ref().and_then(|m| m.model_name.as_deref());
+            if model_a.is_some() && model_b.is_some() && model_a != model_b {
+                continue;
+            }
+
+            let sim = prompt_jaccard_similarity(tokens_a, tokens_b);
+            if sim >= threshold {
+                cluster.push(id_b);
+                assigned.insert(id_b);
+            }
+        }
+
+        if cluster.len() >= 2 {
+            assigned.insert(id_a);
+            clusters.push(cluster);
+        }
+    }
+
+    let mut created_stacks = 0;
+    for cluster in clusters {
+        let _ = db.stack_images(&cluster, None);
+        created_stacks += 1;
+    }
+
+    Ok(created_stacks)
+}
+
 

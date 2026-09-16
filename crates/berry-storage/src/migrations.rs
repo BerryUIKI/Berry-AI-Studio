@@ -130,7 +130,33 @@ pub const MIGRATIONS: &[&str] = &[
     CREATE INDEX idx_loras_name ON loras(name);
     CREATE INDEX idx_loras_hash ON loras(hash);
     "#,
+    // v9: multi-mode folders, image stacking, and pipeline cleanup queue.
+    r#"
+    ALTER TABLE folders ADD COLUMN folder_type TEXT NOT NULL DEFAULT 'link';
+    ALTER TABLE folders ADD COLUMN source_path TEXT;
+    ALTER TABLE folders ADD COLUMN ingest_action TEXT DEFAULT 'copy';
+    ALTER TABLE folders ADD COLUMN grace_period_hours INTEGER DEFAULT 24;
+    ALTER TABLE folders ADD COLUMN auto_harvest INTEGER NOT NULL DEFAULT 1;
+
+    ALTER TABLE files ADD COLUMN stack_id TEXT;
+    ALTER TABLE files ADD COLUMN stack_order INTEGER NOT NULL DEFAULT 0;
+
+    CREATE INDEX IF NOT EXISTS idx_files_stack_id ON files(stack_id);
+    CREATE INDEX IF NOT EXISTS idx_folders_type ON folders(folder_type);
+
+    CREATE TABLE pipeline_cleanup_queue (
+        id                  INTEGER PRIMARY KEY,
+        source_file_path    TEXT NOT NULL UNIQUE,
+        target_file_id      INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+        scheduled_delete_at INTEGER NOT NULL,
+        created_at          INTEGER NOT NULL,
+        status              TEXT NOT NULL DEFAULT 'pending'
+    ) STRICT;
+
+    CREATE INDEX idx_cleanup_schedule ON pipeline_cleanup_queue(scheduled_delete_at, status);
+    "#,
 ];
 
 /// The schema version the current code migrates databases to.
 pub const LATEST_VERSION: i64 = MIGRATIONS.len() as i64;
+

@@ -42,7 +42,7 @@ const emit = defineEmits<{
   }): void;
 }>();
 
-const activeTab = ref<"general" | "display" | "parsers" | "about">("general");
+const activeTab = ref<"general" | "display" | "stacking" | "parsers" | "about">("general");
 
 // Settings state (backed by persistent config.json)
 const selectedLocale = ref<LocaleSetting>(currentLocaleSetting.value);
@@ -52,6 +52,9 @@ const blurNsfwDefault = ref(true);
 const showCardBadges = ref(true);
 const defaultView = ref<"grid" | "table">("grid");
 const thumbnailMaxEdge = ref(getThumbnailMaxEdge());
+const autoStack = ref(false);
+const stackSimilarityThreshold = ref(0.85);
+const stackTimeWindowMinutes = ref(180);
 
 // Storage paths state
 const storagePaths = ref<StoragePaths | null>(null);
@@ -79,6 +82,9 @@ async function loadSettingsAndPaths() {
     showCardBadges.value = config.show_card_badges;
     defaultView.value = config.default_view || "grid";
     thumbnailMaxEdge.value = config.thumbnail_max_edge || getThumbnailMaxEdge();
+    autoStack.value = config.auto_stack ?? false;
+    stackSimilarityThreshold.value = config.stack_similarity_threshold ?? 0.85;
+    stackTimeWindowMinutes.value = config.stack_time_window_minutes ?? 180;
 
     storagePaths.value = await getStoragePaths();
   } catch (e) {
@@ -127,7 +133,9 @@ async function saveSettings() {
 
   // Write to persistent config.json
   try {
+    const existing = await loadAppConfig();
     await saveAppConfig({
+      ...existing,
       locale: selectedLocale.value,
       auto_scan: autoScanOnStartup.value,
       blur_nsfw: blurNsfwDefault.value,
@@ -137,6 +145,9 @@ async function saveSettings() {
       similarity_limit: Number(localStorage.getItem("berry_similarity_limit")) || 50,
       auto_check_update: autoCheckUpdate.value,
       silent_install: localStorage.getItem("berry_silent_install") === "true",
+      auto_stack: autoStack.value,
+      stack_similarity_threshold: stackSimilarityThreshold.value,
+      stack_time_window_minutes: stackTimeWindowMinutes.value,
     });
   } catch (e) {
     console.error("Failed to save config.json:", e);
@@ -185,6 +196,14 @@ async function saveSettings() {
             @click="activeTab = 'display'"
           >
             {{ t.settings.tabs.display }}
+          </button>
+          <button
+            type="button"
+            class="tab-btn"
+            :class="{ active: activeTab === 'stacking' }"
+            @click="activeTab = 'stacking'"
+          >
+            {{ t.settings.tabs.stacking || 'Stacking & Bursts' }}
           </button>
           <button
             type="button"
@@ -306,6 +325,51 @@ async function saveSettings() {
               >
                 {{ clearingCache ? t.settings.clearing : t.settings.clearCache }}
               </button>
+            </div>
+          </div>
+
+          <!-- Tab: Stacking & Bursts -->
+          <div v-if="activeTab === 'stacking'" class="settings-panel">
+            <h4 class="panel-title">{{ t.settings.stackingTitle || 'Image Stacking & Burst Grouping' }}</h4>
+
+            <div class="setting-row">
+              <div class="row-info">
+                <span class="row-label">{{ t.settings.autoStack || 'Enable Automatic Stacking' }}</span>
+                <span class="row-desc">{{ t.settings.autoStackDesc || 'Automatically group consecutive images generated with identical or similar prompts into stacked cards' }}</span>
+              </div>
+              <input v-model="autoStack" type="checkbox" class="toggle-checkbox" />
+            </div>
+
+            <div class="setting-row">
+              <div class="row-info">
+                <span class="row-label">{{ t.settings.stackThreshold || 'Prompt Similarity Threshold' }}</span>
+                <span class="row-desc">{{ t.settings.stackThresholdDesc || 'Minimum tokenized prompt similarity to group images (Current: ' + Math.round(stackSimilarityThreshold * 100) + '%)' }}</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <input
+                  v-model.number="stackSimilarityThreshold"
+                  type="range"
+                  min="0.5"
+                  max="1.0"
+                  step="0.05"
+                  class="range-input"
+                />
+                <span style="font-size: 0.85em; min-width: 40px;">{{ Math.round(stackSimilarityThreshold * 100) }}%</span>
+              </div>
+            </div>
+
+            <div class="setting-row">
+              <div class="row-info">
+                <span class="row-label">{{ t.settings.stackTimeWindow || 'Max Time Window Between Generations' }}</span>
+                <span class="row-desc">{{ t.settings.stackTimeWindowDesc || 'Group images only if generated within this time range' }}</span>
+              </div>
+              <select v-model.number="stackTimeWindowMinutes" class="select-input">
+                <option :value="30">30 minutes</option>
+                <option :value="60">1 hour</option>
+                <option :value="180">3 hours</option>
+                <option :value="360">6 hours</option>
+                <option :value="1440">24 hours</option>
+              </select>
             </div>
           </div>
 

@@ -250,6 +250,8 @@ impl Scanner {
                 aesthetic_score: None,
                 is_favorite: false,
                 is_nsfw: false,
+                stack_id: None,
+                stack_order: 0,
             });
 
             if cache.is_some() {

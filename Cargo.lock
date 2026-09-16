@@ -369,6 +369,7 @@ dependencies = [
  "tauri-plugin-opener",
  "trash",
  "ureq 2.12.1",
+ "uuid",
 ]
 
 [[package]]
@@ -425,6 +426,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror 2.0.20",
+ "uuid",
 ]
 
 [[package]]

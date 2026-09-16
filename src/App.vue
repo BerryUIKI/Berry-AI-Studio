@@ -16,6 +16,7 @@ import type {
   SimilarFileItem,
   SortDirection,
   Tag,
+  StackSummary,
 } from "./types";
 import { getFileName } from "./utils/image";
 import TitleBar from "./components/TitleBar.vue";
@@ -42,10 +43,13 @@ import UpdateModal from "./components/UpdateModal.vue";
 import AutoTagModal from "./components/AutoTagModal.vue";
 import ClipManagerModal from "./components/ClipManagerModal.vue";
 import LoraManagerModal from "./components/LoraManagerModal.vue";
+import AddFolderModal from "./components/AddFolderModal.vue";
+import OnboardingModal from "./components/OnboardingModal.vue";
+import CompareModal from "./components/CompareModal.vue";
 import { t } from "./i18n";
 import { countActiveFilters, criteriaToQuery } from "./utils/search";
 import { requestBatchThumbnails } from "./utils/thumbnail";
-import { loadAppConfig } from "./utils/config";
+import { loadAppConfig, saveAppConfig } from "./utils/config";
 import { checkForUpdates } from "./utils/updater";
 
 const info = ref<AppInfo | null>(null);
@@ -92,6 +96,14 @@ const tagTargetFileIds = ref<number[]>([]);
 const autoTagModalOpen = ref(false);
 const autoTagTargetFile = ref<ImageFile | null>(null);
 const inspectorRef = ref<InstanceType<typeof InspectorPane> | null>(null);
+const addFolderModalOpen = ref(false);
+const onboardingModalOpen = ref(false);
+const compareModalOpen = ref(false);
+const compareImages = ref<ImageFile[]>([]);
+
+// Image Stacking State
+const stackMap = ref<Record<string, { count: number; heroId: number | null }>>({});
+const expandedStacks = ref<Set<string>>(new Set());
 
 // Filter Metadata
 const distinctModels = ref<string[]>([]);
@@ -198,6 +210,38 @@ function handleWindowKeyDown(e: KeyboardEvent) {
   if ((e.key === "b" || e.key === "B") && !e.ctrlKey && !e.metaKey && !e.altKey) {
     e.preventDefault();
     sidebarOpen.value = !sidebarOpen.value;
+    return;
+  }
+
+  // Open Add Folder Modal: Cmd+O / Ctrl+O
+  if ((e.ctrlKey || e.metaKey) && (e.key === "o" || e.key === "O")) {
+    e.preventDefault();
+    addFolderModalOpen.value = true;
+    return;
+  }
+
+  // Stacking: Group (Ctrl+G) or Ungroup (Ctrl+Shift+G)
+  if ((e.ctrlKey || e.metaKey) && (e.key === "g" || e.key === "G")) {
+    e.preventDefault();
+    if (e.shiftKey) {
+      void onUnstackSelected();
+    } else {
+      void onStackSelected();
+    }
+    return;
+  }
+
+  // Set Hero Cover for Stack: Alt+S
+  if (e.altKey && (e.key === "s" || e.key === "S")) {
+    e.preventDefault();
+    void onSetHeroSelected();
+    return;
+  }
+
+  // Compare Mode: C (without modifiers)
+  if ((e.key === "c" || e.key === "C") && !e.ctrlKey && !e.metaKey && !e.altKey && !lightboxFile.value) {
+    e.preventDefault();
+    void onTriggerCompare();
     return;
   }
 
@@ -347,6 +391,13 @@ onMounted(async () => {
     await reloadFiltersMeta();
     await loadAlbumsAndTags();
     await loadFiles();
+
+    if (!cfg.has_completed_onboarding) {
+      onboardingModalOpen.value = true;
+    }
+
+    // Safely process any due pipeline trash cleanups
+    void invoke("process_pipeline_cleanups").catch(() => {});
 
     if (cfg.auto_scan && folders.value.length > 0) {
       void runBackgroundStartupScan();
@@ -593,6 +644,107 @@ function onOpenAlbumModal(fileIds?: number[]) {
   albumModalOpen.value = true;
 }
 
+async function onStackSelected() {
+  const ids = selectedFilesList.value
+    .map((f) => f.id)
+    .filter((id): id is number => id != null);
+  if (ids.length < 2) return;
+  try {
+    await invoke("stack_images", { fileIds: ids });
+    await loadFiles();
+  } catch (err) {
+    error.value = String(err);
+  }
+}
+
+async function onUnstackSelected() {
+  const file = selectedFile.value || (selectedFilesList.value.length > 0 ? selectedFilesList.value[0] : null);
+  if (!file?.stack_id) return;
+  try {
+    await invoke("unstack_images", { stackId: file.stack_id });
+    expandedStacks.value.delete(file.stack_id);
+    await loadFiles();
+  } catch (err) {
+    error.value = String(err);
+  }
+}
+
+async function onSetHeroSelected() {
+  const file = selectedFile.value || (selectedFilesList.value.length > 0 ? selectedFilesList.value[0] : null);
+  if (!file?.stack_id || file.id == null) return;
+  try {
+    await invoke("set_stack_hero", { stackId: file.stack_id, heroFileId: file.id });
+    await loadFiles();
+  } catch (err) {
+    error.value = String(err);
+  }
+}
+
+function onToggleStackExpand(stackId: string) {
+  if (expandedStacks.value.has(stackId)) {
+    expandedStacks.value.delete(stackId);
+  } else {
+    expandedStacks.value.add(stackId);
+  }
+  void loadFiles();
+}
+
+async function onTriggerCompare(customStackId?: string) {
+  if (customStackId) {
+    try {
+      const members = await invoke<ImageFile[]>("get_stack_members", { stackId: customStackId });
+      if (members.length > 0) {
+        compareImages.value = members;
+        compareModalOpen.value = true;
+        return;
+      }
+    } catch (err) {
+      console.warn("Failed to load stack members for compare:", err);
+    }
+  }
+
+  // Otherwise compare selected files
+  if (selectedFilesList.value.length >= 2) {
+    compareImages.value = selectedFilesList.value;
+    compareModalOpen.value = true;
+  } else if (selectedFile.value?.stack_id) {
+    try {
+      const members = await invoke<ImageFile[]>("get_stack_members", { stackId: selectedFile.value.stack_id });
+      if (members.length > 0) {
+        compareImages.value = members;
+        compareModalOpen.value = true;
+      }
+    } catch (err) {
+      console.warn("Failed to load stack members for compare:", err);
+    }
+  }
+}
+
+async function onCompareSetHero(img: ImageFile) {
+  if (!img.stack_id || img.id == null) return;
+  try {
+    await invoke("set_stack_hero", { stackId: img.stack_id, heroFileId: img.id });
+    await loadFiles();
+  } catch (err) {
+    console.error("Failed to set hero in compare:", err);
+  }
+}
+
+async function onOnboardingComplete() {
+  try {
+    const cfg = await loadAppConfig();
+    await saveAppConfig({
+      ...cfg,
+      has_completed_onboarding: true,
+    });
+    await reloadFolders();
+    await refreshCounts();
+    await loadFiles();
+  } catch (err) {
+    console.warn("Failed to mark onboarding complete:", err);
+  }
+}
+
 function onBatchAddToAlbum() {
   const ids = selectedFilesList.value
     .map((f) => f.id)
@@ -768,6 +920,32 @@ async function loadFiles() {
       }
       files.value = await invoke<ImageFile[]>("search_files", { criteria });
     }
+
+    // Refresh stack summaries for active folder or all
+    try {
+      const folderId = activeTarget.value.type === "folder" ? activeTarget.value.folder.id : null;
+      const stacks = await invoke<StackSummary[]>("list_stacks", { folderId });
+      const map: Record<string, { count: number; heroId: number | null }> = {};
+      for (const s of stacks) {
+        map[s.stack_id] = { count: s.count, heroId: s.hero_image_id };
+      }
+      stackMap.value = map;
+
+      // Filter out non-hero stack members unless that stack is expanded
+      if (files.value.length > 0) {
+        files.value = files.value.filter((f) => {
+          if (!f.stack_id) return true;
+          const info = stackMap.value[f.stack_id];
+          if (!info || info.count <= 1) return true;
+          if (expandedStacks.value.has(f.stack_id)) return true;
+          // Only show the Hero Cover (stack_order === 0 or matches hero_image_id)
+          return f.stack_order === 0 || (f.id != null && f.id === info.heroId);
+        });
+      }
+    } catch (stackErr) {
+      console.warn("Failed to load stack metadata:", stackErr);
+    }
+
     // Background async batch generation for initial slice of files
     if (files.value.length > 0) {
       void requestBatchThumbnails(files.value.slice(0, 200));
@@ -1088,6 +1266,7 @@ function onResetZoom() {
         @open-model-manager="modelManagerModalOpen = true"
         @open-db-manager="dbManagerModalOpen = true"
         @open-shortcuts-help="shortcutsHelpModalOpen = true"
+        @open-add-folder-modal="addFolderModalOpen = true"
         @move-files-to-folder="onDropMoveFiles"
         @add-files-to-album="onDropAddFilesToAlbum"
         @tag-files="onDropTagFiles"
@@ -1243,10 +1422,14 @@ function onResetZoom() {
             :item-min-width="gridItemWidth"
             :blur-nsfw="blurNsfw"
             :show-card-badges="showCardBadges"
+            :stack-map="stackMap"
+            :expanded-stacks="expandedStacks"
             @select="onFileSelected"
             @activate="onActivateFile"
             @toggle-select="toggleSelectFile"
             @find-similar="handleFindSimilar"
+            @toggle-stack-expand="onToggleStackExpand"
+            @compare-stack="onTriggerCompare"
           />
 
           <FileList
@@ -1424,6 +1607,28 @@ function onResetZoom() {
       :show="updateModalOpen"
       :current-version="info?.app_version || '0.1.1'"
       @close="updateModalOpen = false"
+    />
+
+    <!-- Multi-Mode Add Folder Modal -->
+    <AddFolderModal
+      :open="addFolderModalOpen"
+      @update:open="addFolderModalOpen = $event"
+      @folder-added="onFolderAdded"
+    />
+
+    <!-- Onboarding Setup Wizard Modal -->
+    <OnboardingModal
+      :open="onboardingModalOpen"
+      @update:open="onboardingModalOpen = $event"
+      @complete="onOnboardingComplete"
+    />
+
+    <!-- Side-by-Side Compare Modal -->
+    <CompareModal
+      :open="compareModalOpen"
+      :images="compareImages"
+      @update:open="compareModalOpen = $event"
+      @set-hero="onCompareSetHero"
     />
   </div>
 </template>

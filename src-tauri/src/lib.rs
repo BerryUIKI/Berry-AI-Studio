@@ -123,6 +123,18 @@ pub fn run() {
             commands::open_storage_dir,
             commands::download_update,
             commands::install_update,
+            commands::add_folder_with_options,
+            commands::autodetect_local_ai_paths,
+            commands::harvest_pipeline_folder,
+            commands::process_pipeline_cleanups,
+            commands::get_pipeline_cleanup_queue,
+            commands::stack_images,
+            commands::unstack_images,
+            commands::set_stack_hero,
+            commands::get_stack_members,
+            commands::list_stacks,
+            commands::cull_stack_drafts,
+            commands::auto_stack_images,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

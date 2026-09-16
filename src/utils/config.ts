@@ -10,6 +10,10 @@ export interface AppConfig {
   similarity_limit: number;
   auto_check_update: boolean;
   silent_install: boolean;
+  has_completed_onboarding: boolean;
+  auto_stack: boolean;
+  stack_similarity_threshold: number;
+  stack_time_window_minutes: number;
 }
 
 export interface StoragePaths {
@@ -31,6 +35,10 @@ const DEFAULT_CONFIG: AppConfig = {
   similarity_limit: 50,
   auto_check_update: true,
   silent_install: false,
+  has_completed_onboarding: false,
+  auto_stack: false,
+  stack_similarity_threshold: 0.85,
+  stack_time_window_minutes: 180,
 };
 
 /**
