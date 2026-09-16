@@ -483,6 +483,7 @@ export const fr: typeof en = {
     noImage: "Aucune image sélectionnée pour cet emplacement",
   },
   stack: {
+    imageStack: "Pile d’images",
     toggleExpand: "Cliquer pour déployer/replier toutes les images de cette pile",
     stackCount: "images dans la pile",
     unstack: "Dissocier la pile",

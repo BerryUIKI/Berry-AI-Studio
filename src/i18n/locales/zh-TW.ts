@@ -483,6 +483,7 @@ export const zhTW: typeof en = {
     noImage: "該側未選擇比對圖片",
   },
   stack: {
+    imageStack: "圖片堆疊",
     toggleExpand: "點擊展開/折疊堆疊中的全部圖片",
     stackCount: "張圖片在堆疊中",
     unstack: "解散堆疊",

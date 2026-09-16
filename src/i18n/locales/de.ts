@@ -483,6 +483,7 @@ export const de: typeof en = {
     noImage: "Kein Bild für diesen Bereich ausgewählt",
   },
   stack: {
+    imageStack: "Bilderstapel",
     toggleExpand: "Klicken, um alle Bilder dieses Stapels aufzuklappen/einzuklappen",
     stackCount: "Bilder im Stapel",
     unstack: "Stapel auflösen",

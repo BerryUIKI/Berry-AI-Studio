@@ -108,9 +108,9 @@ preferences. The redesign will use:
 
 ### Phase 3 — Stack cover content refinement
 
-- [ ] Hide filenames on collapsed covers.
-- [ ] Add a localized generic stack label and member count.
-- [ ] Retain the hero image as the zero-cost cover source.
+- [x] Hide filenames on collapsed covers.
+- [x] Add a localized generic stack label and member count.
+- [x] Retain the hero image as the zero-cost cover source.
 
 ### Phase 4 — Virtualized waterfall layout
 
@@ -161,3 +161,6 @@ preferences. The redesign will use:
 - **2026-09-16 — Phase 2 implemented:** stack covers now arbitrate deferred single-click
   toggles against double-click zoom, new contexts explicitly reset expansion, and the
   persisted multi-open preference controls whether opening a stack collapses its peer.
+- **2026-09-16 — Phase 3 implemented:** collapsed covers retain the cached hero
+  thumbnail but replace filename/path presentation with a localized Image Stack label,
+  member count, and neutral STACK type marker.
