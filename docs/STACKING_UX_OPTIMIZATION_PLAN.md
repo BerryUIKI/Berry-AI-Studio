@@ -171,3 +171,93 @@ active query, apart from an explicit recovery fallback when returned data is
 inconsistent. A future profiling pass with a large real library should capture
 interaction latency at several collection sizes; that measurement is useful release
 evidence but is not required for the logic correction.
+
+## Stack Merge Safety Extension
+
+### Problem Statement
+
+The storage model assigns a single `stack_id` directly to each image, so it does not
+support nested stack entities. However, invoking Ctrl/Cmd+G with selected stack covers
+currently treats those covers as ordinary images. This can detach a cover from its
+existing members and leave behind a partial stack, which behaves like an accidental
+and ambiguous nested-stack operation from the user's perspective.
+
+### Merge Invariant
+
+- A stack can contain images only; it can never contain another stack.
+- Every selected item with a `stack_id` represents its complete stack, whether the
+  selected item is the collapsed cover or an expanded member.
+- The first selected stack in current visual order is the target stack.
+- The target stack keeps its identifier, current cover, and existing member order.
+- Other selected stacks are flattened into their image members and dissolved as part
+  of the same database transaction.
+- Selected standalone images are appended after the target stack members.
+- Duplicate images and repeated selections from the same expanded stack are removed.
+- Selecting only members of one existing stack is a no-op.
+
+### Warning Interaction
+
+- If Ctrl/Cmd+G would combine multiple stacks or add standalone images to a stack,
+  show a dedicated warning dialog before mutation.
+- Explain which stack remains the target and that all source stacks will be flattened
+  into it.
+- Provide **Cancel** and **Merge into Stack** actions.
+- Include a **Do not show this warning again** checkbox.
+- Persist suppression only when the user confirms the merge; cancelling never changes
+  preferences.
+- Suppression uses a stable warning identifier in the application configuration rather
+  than a one-off boolean, allowing future suppressible warnings to share the system.
+- Settings provides **Reset Suppressed Warnings**, which clears every stored warning
+  identifier and reports the result without changing unrelated preferences.
+
+### Extension Roadmap
+
+#### Phase 6 — Documentation and merge-domain contract
+
+- [x] Document flat merge semantics, target selection, ordering, deduplication, and
+  warning behavior before implementation.
+- [ ] Add a transactional storage operation that flattens source stacks into a target
+  stack without leaving partial source stacks.
+- [ ] Add storage tests for stack+image, stack+stack, duplicate-member, and target-cover
+  preservation cases.
+
+#### Phase 7 — Warning preference infrastructure
+
+- [ ] Add backward-compatible `suppressed_warnings` configuration storage.
+- [ ] Add reusable helpers for checking, suppressing, and resetting named warnings.
+- [ ] Add the Settings reset control with success/error feedback.
+
+#### Phase 8 — Merge warning and Ctrl/Cmd+G integration
+
+- [ ] Resolve the selected visual items into a deterministic flat merge request.
+- [ ] Show an accessible warning dialog only for stack-affecting merges.
+- [ ] Apply the successful merge locally without a gallery-wide reload.
+- [ ] Update stack summaries, expanded state, selection, and thumbnail-preserving view
+  state consistently.
+
+#### Phase 9 — Verification and close-out
+
+- [ ] Run frontend type-check/build and relevant Rust tests.
+- [ ] Verify dialog keyboard behavior, suppression, reset, and merge scenarios.
+- [ ] Update this document with final outcomes and any deferred profiling work.
+
+### Extension Acceptance Criteria
+
+1. Ctrl/Cmd+G with standalone images retains the existing direct-stack behavior and
+   does not show the merge warning.
+2. A selected stack plus standalone images shows the warning unless it is suppressed.
+3. Two or more selected stacks show the warning unless it is suppressed.
+4. Cancelling leaves database, gallery, selection, and warning preferences unchanged.
+5. Confirming produces exactly one flat stack containing every unique member.
+6. The first selected stack keeps its stack ID and cover image.
+7. No source stack remains partially populated after a successful merge.
+8. Choosing not to show the warning again persists across application restarts.
+9. Resetting suppressed warnings in Settings causes the merge warning to appear again.
+10. Stack merging never enters the gallery-wide loading state or clears stable
+    thumbnails.
+
+### Extension Progress Log
+
+- **2026-09-16 — Extension audit complete:** confirmed the existing command can
+  reassign a selected cover without including its hidden members. Defined a
+  transactionally flat merge contract and a reusable warning-suppression model.
