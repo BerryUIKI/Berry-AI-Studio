@@ -24,6 +24,7 @@ import MenuBar from "./components/MenuBar.vue";
 import Sidebar from "./components/Sidebar.vue";
 import FileList from "./components/FileList.vue";
 import VirtualGrid from "./components/VirtualGrid.vue";
+import { collapseStackMembers, resolveStackHeroPaths } from "./utils/stack";
 import SortBar from "./components/SortBar.vue";
 import SearchBar from "./components/SearchBar.vue";
 import InspectorPane from "./components/InspectorPane.vue";
@@ -929,16 +930,13 @@ async function onToggleStackExpand(stackId: string) {
 }
 
 function collapseStackLocally(stackId: string) {
-  const info = stackMap.value[stackId];
+  const heroPath = resolveStackHeroPaths(files.value, stackMap.value).get(stackId);
   const hiddenMemberPaths = new Set(
     files.value
-      .filter((file) => file.stack_id === stackId && file.id !== info?.heroId)
+      .filter((file) => file.stack_id === stackId && file.path !== heroPath)
       .map((file) => file.path),
   );
-  files.value = files.value.filter((file) => {
-    if (file.stack_id !== stackId) return true;
-    return file.stack_order === 0 || (file.id != null && file.id === info?.heroId);
-  });
+  files.value = collapseStackMembers(files.value, stackMap.value, stackId);
   const hero = files.value.find((file) => file.stack_id === stackId);
   if (selectedFile.value?.stack_id === stackId && selectedFile.value.id !== hero?.id) {
     selectedFile.value = hero ?? null;
@@ -1201,14 +1199,7 @@ async function loadFiles() {
 
       // Filter out non-hero stack members unless that stack is expanded
       if (files.value.length > 0) {
-        files.value = files.value.filter((f) => {
-          if (!f.stack_id) return true;
-          const info = stackMap.value[f.stack_id];
-          if (!info || info.count <= 1) return true;
-          if (expandedStacks.value.has(f.stack_id)) return true;
-          // Only show the Hero Cover (stack_order === 0 or matches hero_image_id)
-          return f.stack_order === 0 || (f.id != null && f.id === info.heroId);
-        });
+        files.value = collapseStackMembers(files.value, stackMap.value);
       }
     } catch (stackErr) {
       console.warn("Failed to load stack metadata:", stackErr);

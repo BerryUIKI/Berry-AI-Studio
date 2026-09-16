@@ -14,6 +14,7 @@ import {
   requestBatchThumbnails,
 } from "../utils/thumbnail";
 import { t } from "../i18n";
+import { resolveStackHeroPaths } from "../utils/stack";
 
 const props = withDefaults(
   defineProps<{
@@ -298,8 +299,14 @@ function isCollapsedStack(file: ImageFile): boolean {
   return isStacked(file) && !isStackExpanded(file);
 }
 
+const stackHeroPaths = computed(() => resolveStackHeroPaths(props.files, props.stackMap ?? {}));
+
 function isStackCover(file: ImageFile): boolean {
-  return isStacked(file) && file.stack_order === 0;
+  return Boolean(
+    file.stack_id &&
+    isStacked(file) &&
+    stackHeroPaths.value.get(file.stack_id) === file.path,
+  );
 }
 
 function onCardClick(file: ImageFile, event: MouseEvent) {
