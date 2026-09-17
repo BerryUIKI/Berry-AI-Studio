@@ -10,8 +10,8 @@ use std::sync::MutexGuard;
 
 use berry_clip::{ClipEngine, ClipModelInfo};
 use berry_domain::{
-    Album, CheckpointModelStat, CleanupQueueItem, DatabaseStats, DetectedLora, FileSortField,
-    Folder, ImageFile, LoraModel, ModelCacheEntry, PipelineDetectedPath, PromptStat,
+    Album, CheckpointModelStat, CleanupQueueItem, DatabaseStats, DetectedLora, FilePage,
+    FileSortField, Folder, ImageFile, LoraModel, ModelCacheEntry, PipelineDetectedPath, PromptStat,
     SearchCriteria, SimilarityMatch, SortDirection, StackSummary, Tag,
 };
 use berry_scan::{ScanStats, Scanner};
@@ -192,6 +192,17 @@ pub async fn search_files(
         .map_err(|e| e.to_string())
 }
 
+/// Search a bounded result page and return its exact filtered total.
+#[tauri::command]
+pub async fn search_files_page(
+    criteria: SearchCriteria,
+    state: State<'_, AppState>,
+) -> Result<FilePage, String> {
+    db(&state)?
+        .search_files_page(&criteria)
+        .map_err(|e| e.to_string())
+}
+
 /// Search indexed files using a parsed query string.
 #[tauri::command]
 pub async fn search_files_by_query(
@@ -213,6 +224,28 @@ pub async fn search_files_by_query(
     }
     db(&state)?
         .search_files(&criteria)
+        .map_err(|e| e.to_string())
+}
+
+/// Parse a free-form query and return one bounded page of matching files.
+#[tauri::command]
+pub async fn search_files_by_query_page(
+    query: String,
+    folder_id: Option<i64>,
+    sort: Option<FileSortField>,
+    direction: Option<SortDirection>,
+    limit: usize,
+    offset: usize,
+    state: State<'_, AppState>,
+) -> Result<FilePage, String> {
+    let mut criteria = SearchCriteria::from_query(&query);
+    criteria.folder_id = folder_id;
+    criteria.sort = sort;
+    criteria.direction = direction;
+    criteria.limit = Some(limit);
+    criteria.offset = Some(offset);
+    db(&state)?
+        .search_files_page(&criteria)
         .map_err(|e| e.to_string())
 }
 

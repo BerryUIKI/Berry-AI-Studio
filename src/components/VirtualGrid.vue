@@ -22,6 +22,8 @@ const props = withDefaults(
     selectedFile?: ImageFile | null;
     selectedFilePaths?: Set<string>;
     loading?: boolean;
+    loadingMore?: boolean;
+    hasMore?: boolean;
     itemMinWidth?: number;
     gap?: number;
     overscan?: number;
@@ -34,6 +36,8 @@ const props = withDefaults(
   {
     selectedFile: null,
     loading: false,
+    loadingMore: false,
+    hasMore: false,
     itemMinWidth: 180,
     gap: 16,
     overscan: 4,
@@ -50,6 +54,7 @@ const emit = defineEmits<{
   (e: "findSimilar", file: ImageFile): void;
   (e: "toggleStackExpand", stackId: string): void;
   (e: "compareStack", stackId: string): void;
+  (e: "loadMore"): void;
 }>();
 
 const containerRef = ref<HTMLElement | null>(null);
@@ -118,6 +123,7 @@ function onScroll(e: Event) {
   scrollFrame = requestAnimationFrame(() => {
     scrollTop.value = target.scrollTop;
     scrollFrame = null;
+    maybeRequestMore();
   });
 }
 
@@ -194,6 +200,19 @@ const totalHeight = computed(() => {
   if (totalRows.value === 0) return 0;
   return totalRows.value * rowHeight.value - props.gap;
 });
+
+function maybeRequestMore() {
+  if (!props.hasMore || props.loading || props.loadingMore) return;
+  const threshold = Math.max(800, containerHeight.value * 2);
+  if (totalHeight.value - scrollTop.value - containerHeight.value <= threshold) {
+    emit("loadMore");
+  }
+}
+
+watch(
+  [totalHeight, containerHeight, () => props.hasMore, () => props.loadingMore],
+  () => queueMicrotask(maybeRequestMore),
+);
 
 // Visible row range
 const startRow = computed(() => {
@@ -705,6 +724,9 @@ function onDragStart(e: DragEvent, file: ImageFile) {
           </div>
         </div>
       </div>
+      <div v-if="loadingMore" class="load-more-indicator" role="status">
+        {{ t.view.loading }}
+      </div>
     </div>
   </div>
 </template>
@@ -728,6 +750,21 @@ function onDragStart(e: DragEvent, file: ImageFile) {
   position: relative;
   outline: none;
   border-radius: 8px;
+}
+
+.load-more-indicator {
+  position: sticky;
+  left: 50%;
+  bottom: 12px;
+  width: max-content;
+  margin: 0 auto;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-bg-tertiary) 88%, transparent);
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  pointer-events: none;
+  z-index: 5;
 }
 
 .virtual-grid-container:focus-visible {
