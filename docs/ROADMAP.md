@@ -97,6 +97,8 @@ This roadmap documents completed milestones and future engineering goals for **B
 - [x] Animation-frame scroll coalescing and per-column Waterfall visibility search.
 - [x] Deduplicated, serialized thumbnail look-ahead scheduling.
 - [x] Startup scan cooldown with opt-in scanning for new installations.
-- [ ] Keyset-paginated gallery queries and lightweight gallery DTOs.
+- [x] Bounded incremental gallery queries with exact totals and stale-response protection.
+- [ ] Replace offset traversal with keyset cursors if deep-page benchmarks require it.
+- [ ] Introduce lightweight gallery DTOs and load full metadata on selection.
 - [ ] Persistent filesystem watcher journal with periodic recovery scans.
 - [ ] Size-tiered thumbnail manifest, disk budget, priority, and cancellation.
