@@ -10,9 +10,10 @@ use std::sync::MutexGuard;
 
 use berry_clip::{ClipEngine, ClipModelInfo};
 use berry_domain::{
-    Album, CheckpointModelStat, CleanupQueueItem, DatabaseStats, DetectedLora, FilePage,
-    FileSortField, Folder, ImageFile, LoraModel, ModelCacheEntry, PipelineDetectedPath, PromptStat,
-    SearchCriteria, SimilarityMatch, SortDirection, StackSummary, Tag,
+    plan_prompt_stacks, Album, CheckpointModelStat, CleanupQueueItem, DatabaseStats, DetectedLora,
+    FilePage, FileSortField, Folder, ImageFile, LoraModel, ModelCacheEntry, PipelineDetectedPath,
+    PromptStackCandidate, PromptStat, SearchCriteria, SimilarityMatch, SortDirection, StackSummary,
+    Tag,
 };
 use berry_scan::{ScanStats, Scanner};
 use berry_storage::Database;
@@ -2735,28 +2736,12 @@ pub fn cull_stack_drafts(
     Ok(trashed)
 }
 
-fn tokenize_prompt(prompt: &str) -> std::collections::HashSet<String> {
-    prompt
-        .split([',', '\n', '\r', '\t'])
-        .map(|s| s.trim().to_lowercase())
-        .filter(|s| !s.is_empty())
-        .collect()
-}
-
-fn prompt_jaccard_similarity(
-    tokens1: &std::collections::HashSet<String>,
-    tokens2: &std::collections::HashSet<String>,
-) -> f32 {
-    if tokens1.is_empty() && tokens2.is_empty() {
-        return 1.0;
-    }
-    let intersection = tokens1.intersection(tokens2).count();
-    let union = tokens1.union(tokens2).count();
-    if union == 0 {
-        1.0
-    } else {
-        intersection as f32 / union as f32
-    }
+#[derive(Debug, Clone, Serialize)]
+pub struct AutoStackResult {
+    pub created_stacks: usize,
+    pub stacked_images: usize,
+    pub eligible_images: usize,
+    pub skipped_without_prompt: usize,
 }
 
 #[tauri::command]
@@ -2765,10 +2750,10 @@ pub fn auto_stack_images(
     similarity_threshold: Option<f32>,
     time_window_minutes: Option<i64>,
     state: State<'_, AppState>,
-) -> Result<usize, String> {
+) -> Result<AutoStackResult, String> {
     let db = db(&state)?;
-    let threshold = similarity_threshold.unwrap_or(0.90);
-    let time_window_secs = time_window_minutes.unwrap_or(30) * 60;
+    let threshold = similarity_threshold.unwrap_or(0.85);
+    let time_window_secs = time_window_minutes.unwrap_or(180).max(0).saturating_mul(60);
 
     let criteria = SearchCriteria {
         folder_id,
@@ -2778,82 +2763,37 @@ pub fn auto_stack_images(
     };
     let files = db.search_files(&criteria).map_err(|e| e.to_string())?;
 
-    if files.len() < 2 {
-        return Ok(0);
+    let candidates = files
+        .into_iter()
+        .filter_map(|file| {
+            Some(PromptStackCandidate {
+                file_id: file.id?,
+                folder_id: file.folder_id,
+                modified_at: file.modified_at,
+                prompt: file
+                    .metadata
+                    .as_ref()
+                    .and_then(|metadata| metadata.prompt.clone())
+                    .unwrap_or_default(),
+                model_name: file
+                    .metadata
+                    .as_ref()
+                    .and_then(|metadata| metadata.model_name.clone()),
+                is_stacked: file.stack_id.is_some(),
+            })
+        })
+        .collect::<Vec<_>>();
+    let plan = plan_prompt_stacks(&candidates, threshold, time_window_secs);
+    let stacked_images = plan.groups.iter().map(Vec::len).sum();
+    for group in &plan.groups {
+        db.stack_images(group, None)
+            .map_err(|error| error.to_string())?;
     }
 
-    let mut file_tokens: Vec<(ImageFile, std::collections::HashSet<String>)> = Vec::new();
-    for f in files {
-        let p_str = f
-            .metadata
-            .as_ref()
-            .and_then(|m| m.prompt.as_deref())
-            .unwrap_or("");
-        let tokens = tokenize_prompt(p_str);
-        file_tokens.push((f, tokens));
-    }
-
-    let mut clusters: Vec<Vec<i64>> = Vec::new();
-    let mut assigned = std::collections::HashSet::new();
-
-    for i in 0..file_tokens.len() {
-        let (file_a, tokens_a) = &file_tokens[i];
-        let id_a = match file_a.id {
-            Some(id) => id,
-            None => continue,
-        };
-
-        if assigned.contains(&id_a) || file_a.stack_id.is_some() {
-            continue;
-        }
-
-        let mut cluster = vec![id_a];
-
-        for (file_b, tokens_b) in file_tokens.iter().skip(i + 1) {
-            let id_b = match file_b.id {
-                Some(id) => id,
-                None => continue,
-            };
-
-            if assigned.contains(&id_b) || file_b.stack_id.is_some() {
-                continue;
-            }
-
-            let time_diff = (file_b.modified_at - file_a.modified_at).abs();
-            if time_window_secs > 0 && time_diff > time_window_secs {
-                continue;
-            }
-
-            let model_a = file_a
-                .metadata
-                .as_ref()
-                .and_then(|m| m.model_name.as_deref());
-            let model_b = file_b
-                .metadata
-                .as_ref()
-                .and_then(|m| m.model_name.as_deref());
-            if model_a.is_some() && model_b.is_some() && model_a != model_b {
-                continue;
-            }
-
-            let sim = prompt_jaccard_similarity(tokens_a, tokens_b);
-            if sim >= threshold {
-                cluster.push(id_b);
-                assigned.insert(id_b);
-            }
-        }
-
-        if cluster.len() >= 2 {
-            assigned.insert(id_a);
-            clusters.push(cluster);
-        }
-    }
-
-    let mut created_stacks = 0;
-    for cluster in clusters {
-        let _ = db.stack_images(&cluster, None);
-        created_stacks += 1;
-    }
-
-    Ok(created_stacks)
+    Ok(AutoStackResult {
+        created_stacks: plan.groups.len(),
+        stacked_images,
+        eligible_images: plan.eligible_images,
+        skipped_without_prompt: plan.skipped_without_prompt,
+    })
 }
