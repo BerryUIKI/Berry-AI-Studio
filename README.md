@@ -40,6 +40,7 @@
 - **Frameless Window with Native Quality**: Custom frameless title bar with integrated desktop menu bar (`File`, `Edit`, `View`, `Tools`, `Help`), drag region, and window controls.
 - **Left Navigation Sidebar**: Quick filters (All Images, Favorites, Sensitive 18+), hierarchical folder tree with real-time scan indicators, color-coded tags, and smart albums.
 - **Center Canvas, Virtual Grid & Waterfall**: Ultra-fast virtual scrolling rendering tens of thousands of images, masonry Waterfall view mode, smooth thumbnail zoom slider (130px–360px), and Grid (⊞) / Waterfall (▦) / Table (☰) view switcher.
+- **Stable Responsive Density**: Grid and Waterfall preserve the selected card width as the window changes, adding or removing columns instead of stretching images.
 - **Right Property Inspector**: Dedicated inspector pane displaying large preview cards, star ratings (0–5), favorite toggle, tokenized prompt chips with one-click copy, detected LoRA tags, generation specs, and collapsible raw workflow JSON.
 - **Immersive Quick Look (Lightbox)**: Full-screen viewer (`Space` / `Enter`) with smooth mouse-wheel zoom, pan, and keyboard navigation.
 
@@ -69,6 +70,15 @@ Automatically extracts and indexes generation parameters (Prompt, Negative Promp
 - **7 Languages Supported**: English, 简体中文, 繁體中文, 日本語, Deutsch, Français, Español.
 - **Auto System Language Detection**: Follows OS language by default (`Auto`).
 - **GitHub Releases Updater**: Check for updates directly from **Help > Check for Updates...** with release notes and one-click download.
+
+### ⚡ Large-Library Performance
+
+- **Fast First Paint**: The indexed SQLite library is shown before optional filesystem reconciliation begins.
+- **Controlled Startup Scans**: Startup scanning is opt-in for new installations and uses a configurable per-folder cooldown.
+- **Demand-Driven Thumbnails**: Visible images are prioritized; deduplicated background look-ahead starts only after scrolling settles.
+- **Bounded Virtualization**: Scroll updates are frame-coalesced, and Waterfall visibility uses per-column search rather than a full-library scan.
+
+See the [performance architecture and optimization plan](docs/PERFORMANCE.md) for benchmarks, tradeoffs, and prioritized follow-up work.
 
 ---
 
