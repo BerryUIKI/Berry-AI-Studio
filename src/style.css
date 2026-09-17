@@ -1,4 +1,5 @@
 :root {
+  color-scheme: dark;
   /* Layout Dimensions */
   --sidebar-width: 280px;
   --panel-width: 350px;
@@ -39,6 +40,87 @@
   --radius-lg: 12px;
 }
 
+:root[data-theme="graphite"] {
+  --color-bg-app: #1b1c1f;
+  --color-bg-primary: #24262a;
+  --color-bg-secondary: #2d3035;
+  --color-bg-tertiary: #383c42;
+  --color-accent: #9ca3af;
+  --color-accent-hover: #d1d5db;
+}
+
+:root[data-theme="violet"] {
+  --color-bg-app: #100d18;
+  --color-bg-primary: #1b1627;
+  --color-bg-secondary: #272036;
+  --color-bg-tertiary: #342a48;
+  --color-accent: #a855f7;
+  --color-accent-hover: #c084fc;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --color-bg-app: #eef1f5;
+  --color-bg-primary: #ffffff;
+  --color-bg-secondary: #f5f6f8;
+  --color-bg-tertiary: #e5e7eb;
+  --color-bg-hover: rgba(15, 23, 42, 0.06);
+  --color-bg-active: rgba(15, 23, 42, 0.1);
+  --color-text-primary: #111827;
+  --color-text-secondary: #475569;
+  --color-text-muted: #64748b;
+  --border-color: rgba(15, 23, 42, 0.12);
+  --border-color-strong: rgba(15, 23, 42, 0.22);
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-theme="system"] {
+    color-scheme: light;
+    --color-bg-app: #eef1f5;
+    --color-bg-primary: #ffffff;
+    --color-bg-secondary: #f5f6f8;
+    --color-bg-tertiary: #e5e7eb;
+    --color-bg-hover: rgba(15, 23, 42, 0.06);
+    --color-bg-active: rgba(15, 23, 42, 0.1);
+    --color-text-primary: #111827;
+    --color-text-secondary: #475569;
+    --color-text-muted: #64748b;
+    --border-color: rgba(15, 23, 42, 0.12);
+    --border-color-strong: rgba(15, 23, 42, 0.22);
+  }
+}
+
+:root[data-theme="light"] .grid-card,
+:root[data-theme="light"] .settings-dialog,
+:root[data-theme="light"] .settings-tabs,
+:root[data-theme="light"] .setting-row,
+:root[data-theme="light"] .about-card,
+:root[data-theme="light"] .parser-item {
+  background: var(--color-bg-primary) !important;
+  border-color: var(--border-color) !important;
+}
+
+:root[data-theme="light"] .settings-tabs,
+:root[data-theme="light"] .setting-row,
+:root[data-theme="light"] .parser-item {
+  background: var(--color-bg-secondary) !important;
+}
+
+:root[data-theme="light"] .dialog-title,
+:root[data-theme="light"] .panel-title,
+:root[data-theme="light"] .row-label,
+:root[data-theme="light"] .parser-name,
+:root[data-theme="light"] .card-title {
+  color: var(--color-text-primary) !important;
+}
+
+:root[data-theme="light"] .panel-subtitle,
+:root[data-theme="light"] .row-desc,
+:root[data-theme="light"] .card-meta,
+:root[data-theme="light"] .tab-btn {
+  color: var(--color-text-secondary) !important;
+}
+
 *,
 *::before,
 *::after {
@@ -52,8 +134,8 @@ body {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  background-color: #0d0d10;
-  color: #f1f5f9;
+  background-color: var(--color-bg-app);
+  color: var(--color-text-primary);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
     Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
   -webkit-font-smoothing: antialiased;

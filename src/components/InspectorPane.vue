@@ -556,7 +556,7 @@ const promptTokens = computed(() => {
   max-width: 280px;
   flex-shrink: 0;
   height: 100%;
-  background: #17171a;
+  background: var(--color-bg-primary);
   border-left: 1px solid rgba(255, 255, 255, 0.06);
   display: flex;
   flex-direction: column;

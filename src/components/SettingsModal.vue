@@ -24,6 +24,7 @@ import {
   resetSuppressedWarnings,
   type StoragePaths,
 } from "../utils/config";
+import { applyTheme, normalizeTheme, type AppTheme } from "../utils/theme";
 
 const props = defineProps<{
   show: boolean;
@@ -35,6 +36,8 @@ const emit = defineEmits<{
   (e: "save", settings: {
     locale: LocaleSetting;
     autoScan: boolean;
+    startupScanIntervalMinutes: number;
+    theme: AppTheme;
     blurNsfw: boolean;
     showCardBadges: boolean;
     defaultView: "grid" | "masonry" | "table";
@@ -48,7 +51,9 @@ const activeTab = ref<"general" | "display" | "stacking" | "parsers" | "about">(
 
 // Settings state (backed by persistent config.json)
 const selectedLocale = ref<LocaleSetting>(currentLocaleSetting.value);
-const autoScanOnStartup = ref(true);
+const autoScanOnStartup = ref(false);
+const startupScanIntervalMinutes = ref(360);
+const selectedTheme = ref<AppTheme>(normalizeTheme(localStorage.getItem("berry_theme")));
 const autoCheckUpdate = ref(true);
 const blurNsfwDefault = ref(true);
 const showCardBadges = ref(true);
@@ -83,6 +88,8 @@ async function loadSettingsAndPaths() {
     const config = await loadAppConfig();
     selectedLocale.value = (config.locale as LocaleSetting) || currentLocaleSetting.value;
     autoScanOnStartup.value = config.auto_scan;
+    startupScanIntervalMinutes.value = config.startup_scan_interval_minutes ?? 360;
+    selectedTheme.value = normalizeTheme(config.theme);
     autoCheckUpdate.value = config.auto_check_update;
     blurNsfwDefault.value = config.blur_nsfw;
     showCardBadges.value = config.show_card_badges;
@@ -155,6 +162,7 @@ onMounted(() => {
 async function saveSettings() {
   setLocale(selectedLocale.value);
   setThumbnailMaxEdge(thumbnailMaxEdge.value);
+  applyTheme(selectedTheme.value);
 
   // Write to persistent config.json
   try {
@@ -163,6 +171,8 @@ async function saveSettings() {
       ...existing,
       locale: selectedLocale.value,
       auto_scan: autoScanOnStartup.value,
+      startup_scan_interval_minutes: startupScanIntervalMinutes.value,
+      theme: selectedTheme.value,
       blur_nsfw: blurNsfwDefault.value,
       show_card_badges: showCardBadges.value,
       default_view: defaultView.value,
@@ -182,6 +192,8 @@ async function saveSettings() {
   emit("save", {
     locale: selectedLocale.value,
     autoScan: autoScanOnStartup.value,
+    startupScanIntervalMinutes: startupScanIntervalMinutes.value,
+    theme: selectedTheme.value,
     blurNsfw: blurNsfwDefault.value,
     showCardBadges: showCardBadges.value,
     defaultView: defaultView.value,
@@ -305,6 +317,19 @@ async function saveSettings() {
               <input v-model="autoScanOnStartup" type="checkbox" class="toggle-checkbox" />
             </div>
 
+            <div v-if="autoScanOnStartup" class="setting-row">
+              <div class="row-info">
+                <span class="row-label">{{ t.settings.startupScanInterval }}</span>
+                <span class="row-desc">{{ t.settings.startupScanIntervalDesc }}</span>
+              </div>
+              <select v-model.number="startupScanIntervalMinutes" class="select-input">
+                <option :value="30">{{ t.settings.scan30Minutes }}</option>
+                <option :value="60">{{ t.settings.scan1Hour }}</option>
+                <option :value="360">{{ t.settings.scan6Hours }}</option>
+                <option :value="1440">{{ t.settings.scan24Hours }}</option>
+              </select>
+            </div>
+
             <div class="setting-row">
               <div class="row-info">
                 <span class="row-label">{{ t.settings.autoCheckUpdate }}</span>
@@ -337,6 +362,20 @@ async function saveSettings() {
             <div class="panel-heading">
               <h4 class="panel-title">{{ t.settings.displayTitle }}</h4>
               <p class="panel-subtitle">{{ t.settings.displaySubtitle }}</p>
+            </div>
+
+            <div class="setting-row">
+              <div class="row-info">
+                <span class="row-label">{{ t.settings.theme }}</span>
+                <span class="row-desc">{{ t.settings.themeDesc }}</span>
+              </div>
+              <select v-model="selectedTheme" class="select-input">
+                <option value="system">{{ t.settings.themeSystem }}</option>
+                <option value="midnight">{{ t.settings.themeMidnight }}</option>
+                <option value="graphite">{{ t.settings.themeGraphite }}</option>
+                <option value="violet">{{ t.settings.themeViolet }}</option>
+                <option value="light">{{ t.settings.themeLight }}</option>
+              </select>
             </div>
 
             <div class="setting-row">
@@ -569,7 +608,7 @@ async function saveSettings() {
 .settings-dialog {
   width: min(840px, 92vw);
   height: min(640px, 88vh);
-  background: #17171b;
+  background: var(--color-bg-primary);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 14px;
   display: flex;
@@ -638,7 +677,7 @@ async function saveSettings() {
 
 .settings-tabs {
   width: 205px;
-  background: #141417;
+  background: var(--color-bg-app);
   border-right: 1px solid rgba(255, 255, 255, 0.06);
   padding: 16px 12px;
   display: flex;
@@ -735,7 +774,7 @@ async function saveSettings() {
   gap: 12px;
   min-height: 54px;
   padding: 12px 14px;
-  background: #202025;
+  background: var(--color-bg-secondary);
   border-radius: 9px;
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
@@ -787,7 +826,7 @@ async function saveSettings() {
 }
 
 .select-input {
-  background: #18181c;
+  background: var(--color-bg-primary);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #e2e8f0;
   border-radius: 5px;
@@ -843,7 +882,7 @@ async function saveSettings() {
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
-  background: #202024;
+  background: var(--color-bg-secondary);
   border-radius: 5px;
   border: 1px solid rgba(255, 255, 255, 0.05);
   font-size: 0.74rem;
@@ -874,7 +913,7 @@ async function saveSettings() {
   align-items: center;
   gap: 14px;
   padding: 12px;
-  background: #202024;
+  background: var(--color-bg-secondary);
   border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
@@ -924,7 +963,7 @@ async function saveSettings() {
   justify-content: flex-end;
   gap: 8px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
-  background: #141417;
+  background: var(--color-bg-app);
 }
 
 .btn {
@@ -964,7 +1003,7 @@ async function saveSettings() {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: #19191e;
+  background: var(--color-bg-primary);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 8px;
   padding: 14px;
@@ -996,7 +1035,7 @@ async function saveSettings() {
   justify-content: space-between;
   gap: 12px;
   padding: 8px 10px;
-  background: #202025;
+  background: var(--color-bg-secondary);
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.04);
 }
