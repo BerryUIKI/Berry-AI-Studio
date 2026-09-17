@@ -73,6 +73,8 @@ This roadmap documents completed milestones and future engineering goals for **B
   - Folder Creation Mode Wizard modal (`AddFolderModal.vue`).
 - [x] **AIGC Image Stacking & Gallery Engine**:
   - Auto-stacking based on prompt similarity threshold and generation time window.
+  - Discoverable scan-and-organize actions for the current folder or the full library, with localized progress and result feedback.
+  - Empty-prompt safeguards, prompt-weight normalization, and folder/model boundaries for higher-quality automatic groups.
   - Manual grouping (`Ctrl+G`), unstacking (`Ctrl+Shift+G`), and hero cover selection (`Alt+S`).
   - Poker deck visual cards with badge counts, inline expand/collapse, and side-by-side compare mode (`C`).
   - Flat stack merge safety with warning confirmation dialog and suppressible settings.
