@@ -30,7 +30,7 @@ pub use lora::{DetectedLora, LoraModel};
 pub use metadata_format::MetadataFormat;
 pub use pipeline::{CleanupQueueItem, PipelineDetectedPath};
 pub use prompt_stat::PromptStat;
-pub use search::SearchCriteria;
+pub use search::{FilePage, SearchCriteria};
 pub use search_parser::parse_query;
 pub use similarity::SimilarityMatch;
 pub use stack::StackSummary;

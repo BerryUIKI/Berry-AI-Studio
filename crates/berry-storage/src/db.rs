@@ -5,8 +5,8 @@ use std::path::{Path, PathBuf};
 
 use berry_domain::{
     Album, CheckpointModelStat, CleanupQueueItem, Container, DatabaseStats, ExtractedMetadata,
-    FileSortField, Folder, ImageFile, LoraModel, ModelCacheEntry, PromptStat, SearchCriteria,
-    SimilarityMatch, SortDirection, StackSummary, Tag,
+    FilePage, FileSortField, Folder, ImageFile, LoraModel, ModelCacheEntry, PromptStat,
+    SearchCriteria, SimilarityMatch, SortDirection, StackSummary, Tag,
 };
 use rusqlite::{params, Connection, OpenFlags};
 use uuid::Uuid;
@@ -574,6 +574,13 @@ impl Database {
 
     /// Search files matching various criteria (text, parameters, ratings, folders, sorting, pagination).
     pub fn search_files(&self, criteria: &SearchCriteria) -> Result<Vec<ImageFile>, DatabaseError> {
+        Ok(self.search_files_page(criteria)?.items)
+    }
+
+    /// Search a bounded page while returning the exact filtered row count in
+    /// the same SQLite query. `COUNT(*) OVER()` avoids a second filter pass and
+    /// does not materialize the complete result set.
+    pub fn search_files_page(&self, criteria: &SearchCriteria) -> Result<FilePage, DatabaseError> {
         let mut conditions = Vec::new();
         let mut params: Vec<rusqlite::types::Value> = Vec::new();
 
@@ -729,18 +736,28 @@ impl Database {
         };
 
         let sql = format!(
-            "SELECT id, folder_id, path, container, size_bytes, modified_at, metadata, rating, aesthetic_score, is_favorite, is_nsfw, stack_id, stack_order
+            "SELECT id, folder_id, path, container, size_bytes, modified_at, metadata, rating, aesthetic_score, is_favorite, is_nsfw, stack_id, stack_order, COUNT(*) OVER() AS total_count
              FROM files{where_clause} ORDER BY {order_clause}{limit_clause}"
         );
 
         let mut stmt = self.conn.prepare(&sql)?;
-        let rows = stmt.query_and_then(rusqlite::params_from_iter(&params), Self::map_row)?;
-
+        let mut rows = stmt.query(rusqlite::params_from_iter(&params))?;
         let mut files = Vec::new();
-        for file in rows {
-            files.push(file?);
+        let mut total = 0usize;
+        while let Some(row) = rows.next()? {
+            if files.is_empty() {
+                total = row.get::<_, i64>(13)? as usize;
+            }
+            files.push(Self::map_row(row)?);
         }
-        Ok(files)
+        let offset = criteria.offset.unwrap_or(0);
+        let has_more = offset.saturating_add(files.len()) < total;
+        Ok(FilePage {
+            items: files,
+            total,
+            offset,
+            has_more,
+        })
     }
 
     /// List distinct non-empty model names present in indexed metadata.
@@ -2768,6 +2785,33 @@ mod tests {
             .unwrap();
         assert_eq!(res.len(), 1);
         assert_eq!(res[0].rating, Some(8)); // 2nd highest rating (after 9)
+
+        let page = db
+            .search_files_page(&SearchCriteria {
+                sort: Some(FileSortField::Rating),
+                direction: Some(SortDirection::Desc),
+                limit: Some(2),
+                offset: Some(0),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(page.items.len(), 2);
+        assert_eq!(page.total, 3);
+        assert_eq!(page.offset, 0);
+        assert!(page.has_more);
+
+        let final_page = db
+            .search_files_page(&SearchCriteria {
+                sort: Some(FileSortField::Rating),
+                direction: Some(SortDirection::Desc),
+                limit: Some(2),
+                offset: Some(2),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(final_page.items.len(), 1);
+        assert_eq!(final_page.total, 3);
+        assert!(!final_page.has_more);
 
         // 9. Distinct models and samplers
         let models = db.list_distinct_models().unwrap();
