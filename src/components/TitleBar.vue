@@ -137,7 +137,7 @@ async function onClose() {
 .titlebar {
   height: 38px;
   min-height: 38px;
-  background: #141416;
+  background: var(--color-bg-app);
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   display: flex;
   align-items: center;

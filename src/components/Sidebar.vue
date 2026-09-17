@@ -396,7 +396,7 @@ function onDropOnTag(e: DragEvent, tag: Tag) {
   max-width: 220px;
   flex-shrink: 0;
   height: 100%;
-  background: #17171a;
+  background: var(--color-bg-primary);
   border-right: 1px solid rgba(255, 255, 255, 0.06);
   display: flex;
   flex-direction: column;
@@ -620,7 +620,7 @@ function onDropOnTag(e: DragEvent, tag: Tag) {
 .sidebar-footer {
   padding: 8px 8px 6px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
-  background: #141417;
+  background: var(--color-bg-app);
   display: flex;
   flex-direction: column;
   gap: 6px;
