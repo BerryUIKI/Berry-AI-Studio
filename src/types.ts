@@ -98,6 +98,13 @@ export interface StackSummary {
   hero_image_id: number | null;
 }
 
+export interface AutoStackResult {
+  created_stacks: number;
+  stacked_images: number;
+  eligible_images: number;
+  skipped_without_prompt: number;
+}
+
 export interface SimilarityMatch {
   file_id: number;
   score: number;
@@ -294,5 +301,4 @@ export interface DetectedLora {
   weight: number;
   model?: LoraModel | null;
 }
-
 
