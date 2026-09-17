@@ -13,6 +13,8 @@ Berry AI Studio should remain interactive with large local libraries while keepi
 - Waterfall geometry is cached until files, card width, gap, or viewport width changes.
 - Visible Waterfall items are found with a binary search in each column instead of filtering the entire result set on every scroll update.
 - Only the viewport plus overscan is mounted.
+- Library and structured-search results arrive in 400-item pages. Grid, Waterfall, and Table request another page near the loaded boundary while retaining an exact filtered total.
+- Stale page responses are discarded when the user changes folder, search, or sort context.
 
 ### Thumbnail pipeline
 
@@ -46,9 +48,9 @@ Use browser performance traces for WebView work, Rust timing spans for commands,
 
 ## Prioritized Follow-Up Work
 
-### P0: Query pagination and incremental result delivery
+### P0: Query pagination and incremental result delivery — Phase 1 complete
 
-Several library commands still materialize complete `Vec<ImageFile>` results and serialize them across IPC. Virtual rendering limits DOM cost but not database allocation, JSON serialization, transfer, or frontend memory. Add cursor or keyset pagination, fetch an initial window, and extend it as the viewport approaches the end. Keep exact total counts in separate lightweight queries.
+The gallery now fetches bounded pages and extends them near the viewport boundary. SQLite returns the exact filtered total with the page through a window count, avoiding a second filter query and full IPC materialization. Offset paging remains intentionally isolated behind the page API; replace it with sort-aware keyset cursors after representative deep-page benchmarks show that SQLite offset traversal is material.
 
 ### P0: Filesystem change journal or watcher
 
@@ -82,4 +84,3 @@ Stream directory entries instead of collecting the full tree before indexing, re
 - Provide System, Midnight, Graphite, Violet, and Light themes. Use semantic color tokens so every panel follows the selected theme.
 - Add a small background-activity popover for scans, thumbnail generation, tagging, and embeddings, with pause/cancel controls where supported.
 - Preserve scroll position independently per folder/search context so navigation does not force users back to the beginning.
-
