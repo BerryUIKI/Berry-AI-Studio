@@ -1,8 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { AppTheme } from "./theme";
 
 export interface AppConfig {
   locale: string;
   auto_scan: boolean;
+  startup_scan_interval_minutes: number;
+  theme: AppTheme;
   blur_nsfw: boolean;
   show_card_badges: boolean;
   default_view: "grid" | "masonry" | "table";
@@ -31,7 +34,9 @@ export interface StoragePaths {
 
 const DEFAULT_CONFIG: AppConfig = {
   locale: "auto",
-  auto_scan: true,
+  auto_scan: false,
+  startup_scan_interval_minutes: 360,
+  theme: "system",
   blur_nsfw: true,
   show_card_badges: true,
   default_view: "grid",
@@ -66,6 +71,14 @@ export async function loadAppConfig(): Promise<AppConfig> {
     const legacyAutoScan = localStorage.getItem("berry_autoscan");
     if (legacyAutoScan !== null) {
       config.auto_scan = legacyAutoScan !== "false";
+    }
+
+    const legacyTheme = localStorage.getItem("berry_theme");
+    if (
+      legacyTheme === "system" || legacyTheme === "midnight" || legacyTheme === "graphite" ||
+      legacyTheme === "light" || legacyTheme === "violet"
+    ) {
+      config.theme = legacyTheme;
     }
 
     const legacyBlur = localStorage.getItem("berry_blur_nsfw");
@@ -156,6 +169,7 @@ function syncConfigToLocalStorage(config: AppConfig): void {
   try {
     localStorage.setItem("berry_locale", config.locale);
     localStorage.setItem("berry_autoscan", String(config.auto_scan));
+    localStorage.setItem("berry_theme", config.theme);
     localStorage.setItem("berry_blur_nsfw", String(config.blur_nsfw));
     localStorage.setItem("berry_card_badges", String(config.show_card_badges));
     localStorage.setItem("berry_default_view", config.default_view);

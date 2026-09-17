@@ -1894,6 +1894,10 @@ pub fn scan_loras_directory(dir_path: String, state: State<'_, AppState>) -> Res
 pub struct AppConfig {
     pub locale: String,
     pub auto_scan: bool,
+    #[serde(default = "default_startup_scan_interval")]
+    pub startup_scan_interval_minutes: u32,
+    #[serde(default = "default_theme")]
+    pub theme: String,
     pub blur_nsfw: bool,
     pub show_card_badges: bool,
     pub default_view: String,
@@ -1919,6 +1923,14 @@ fn default_auto_stack() -> bool {
     false
 }
 
+fn default_startup_scan_interval() -> u32 {
+    360
+}
+
+fn default_theme() -> String {
+    "system".to_string()
+}
+
 fn default_stack_similarity() -> f64 {
     0.85
 }
@@ -1931,7 +1943,9 @@ impl Default for AppConfig {
     fn default() -> Self {
         Self {
             locale: "auto".to_string(),
-            auto_scan: true,
+            auto_scan: false,
+            startup_scan_interval_minutes: default_startup_scan_interval(),
+            theme: default_theme(),
             blur_nsfw: true,
             show_card_badges: true,
             default_view: "grid".to_string(),
@@ -1954,12 +1968,19 @@ mod app_config_tests {
     use super::AppConfig;
 
     #[test]
-    fn legacy_config_defaults_to_no_suppressed_warnings() {
+    fn legacy_config_receives_defaults_for_new_preferences() {
         let mut value = serde_json::to_value(AppConfig::default()).unwrap();
         value.as_object_mut().unwrap().remove("suppressed_warnings");
+        value
+            .as_object_mut()
+            .unwrap()
+            .remove("startup_scan_interval_minutes");
+        value.as_object_mut().unwrap().remove("theme");
 
         let config: AppConfig = serde_json::from_value(value).unwrap();
         assert!(config.suppressed_warnings.is_empty());
+        assert_eq!(config.startup_scan_interval_minutes, 360);
+        assert_eq!(config.theme, "system");
     }
 }
 

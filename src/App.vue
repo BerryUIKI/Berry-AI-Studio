@@ -59,6 +59,7 @@ import {
   suppressWarning,
 } from "./utils/config";
 import { checkForUpdates } from "./utils/updater";
+import { applyTheme, normalizeTheme, type AppTheme } from "./utils/theme";
 
 const info = ref<AppInfo | null>(null);
 const folders = ref<Folder[]>([]);
@@ -171,6 +172,8 @@ const viewMode = ref<GalleryViewMode>(
 );
 const blurNsfw = ref(localStorage.getItem("berry_blur_nsfw") !== "false");
 const showCardBadges = ref(localStorage.getItem("berry_card_badges") !== "false");
+const appTheme = ref<AppTheme>(normalizeTheme(localStorage.getItem("berry_theme")));
+applyTheme(appTheme.value);
 
 function setViewMode(mode: GalleryViewMode) {
   viewMode.value = mode;
@@ -184,11 +187,16 @@ function onSettingsSaved(settings: {
   showCardBadges: boolean;
   defaultView: GalleryViewMode;
   thumbnailMaxEdge?: number;
+  theme?: AppTheme;
   autoCheckUpdate?: boolean;
   allowMultipleStacksOpen?: boolean;
 }) {
   blurNsfw.value = settings.blurNsfw;
   showCardBadges.value = settings.showCardBadges;
+  if (settings.theme) {
+    appTheme.value = settings.theme;
+    applyTheme(settings.theme);
+  }
   if (settings.allowMultipleStacksOpen !== undefined) {
     allowMultipleStacksOpen.value = settings.allowMultipleStacksOpen;
     if (!settings.allowMultipleStacksOpen && expandedStacks.value.size > 1) {
@@ -437,6 +445,8 @@ onMounted(async () => {
     viewMode.value = cfg.default_view || "grid";
     blurNsfw.value = cfg.blur_nsfw;
     showCardBadges.value = cfg.show_card_badges;
+    appTheme.value = normalizeTheme(cfg.theme);
+    applyTheme(appTheme.value);
     allowMultipleStacksOpen.value = cfg.allow_multiple_open_stacks ?? false;
 
     await reloadFolders();
@@ -453,7 +463,7 @@ onMounted(async () => {
     void invoke("process_pipeline_cleanups").catch(() => {});
 
     if (cfg.auto_scan && folders.value.length > 0) {
-      void runBackgroundStartupScan();
+      void runBackgroundStartupScan(cfg.startup_scan_interval_minutes ?? 360);
     }
 
     if (cfg.auto_check_update && info.value?.app_version) {
@@ -500,10 +510,18 @@ async function reloadFolders() {
   folders.value = await invoke<Folder[]>("list_folders");
 }
 
-async function runBackgroundStartupScan() {
+const STARTUP_SCAN_STAMP_PREFIX = "berry_last_startup_scan_";
+
+async function runBackgroundStartupScan(intervalMinutes: number) {
+  const minimumAgeMs = Math.max(0, intervalMinutes) * 60_000;
+  const now = Date.now();
   for (const f of folders.value) {
+    const stampKey = `${STARTUP_SCAN_STAMP_PREFIX}${f.id}`;
+    const lastScan = Number(localStorage.getItem(stampKey)) || 0;
+    if (minimumAgeMs > 0 && now - lastScan < minimumAgeMs) continue;
     try {
       await invoke("scan_folder", { folderId: f.id });
+      localStorage.setItem(stampKey, String(Date.now()));
     } catch (e) {
       console.warn(`Startup auto-scan skipped for folder ${f.path}:`, e);
     }
@@ -1958,7 +1976,7 @@ function onResetZoom() {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  background: #18181c;
+  background: var(--color-bg-primary);
   position: relative;
 }
 
@@ -1970,8 +1988,8 @@ function onResetZoom() {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  background: #18181c;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: var(--color-bg-primary);
+  border-bottom: 1px solid var(--border-color);
   z-index: 10;
   overflow: hidden;
 }
