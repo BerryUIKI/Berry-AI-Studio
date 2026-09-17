@@ -6,6 +6,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   Album,
   AppInfo,
+  AutoStackResult,
   FileSortField,
   FilePage,
   Folder,
@@ -219,6 +220,9 @@ const sortField = ref<FileSortField>("modified_at");
 const sortDirection = ref<SortDirection>("desc");
 const progress = ref<ScanProgress | null>(null);
 const error = ref("");
+const organizeLibraryRunning = ref(false);
+const organizeLibraryNotice = ref("");
+let organizeLibraryNoticeTimer: ReturnType<typeof setTimeout> | null = null;
 
 let unlisten: UnlistenFn | null = null;
 
@@ -509,6 +513,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener("keydown", handleWindowKeyDown);
+  if (organizeLibraryNoticeTimer) clearTimeout(organizeLibraryNoticeTimer);
   unlisten?.();
   unlistenThumb?.();
 });
@@ -1518,6 +1523,56 @@ async function onRescanAllFromMenu() {
   await loadFiles();
 }
 
+function setOrganizeLibraryNotice(message: string, autoHide = true) {
+  if (organizeLibraryNoticeTimer) clearTimeout(organizeLibraryNoticeTimer);
+  organizeLibraryNotice.value = message;
+  organizeLibraryNoticeTimer = null;
+  if (autoHide) {
+    organizeLibraryNoticeTimer = setTimeout(() => {
+      organizeLibraryNotice.value = "";
+      organizeLibraryNoticeTimer = null;
+    }, 6000);
+  }
+}
+
+async function onOrganizeLibrary(scope: "current" | "all") {
+  if (organizeLibraryRunning.value) return;
+  const currentFolder = activeTarget.value.type === "folder" ? activeTarget.value.folder : null;
+  if (scope === "current" && !currentFolder) return;
+  const targetFolders = scope === "current" && currentFolder ? [currentFolder] : folders.value;
+  if (targetFolders.length === 0) return;
+
+  organizeLibraryRunning.value = true;
+  setOrganizeLibraryNotice(t.value.menu.organizingPrompts, false);
+  try {
+    const config = await loadAppConfig();
+    for (const folder of targetFolders) {
+      await invoke("scan_folder", { folderId: folder.id });
+    }
+    const result = await invoke<AutoStackResult>("auto_stack_images", {
+      folderId: scope === "current" ? currentFolder?.id ?? null : null,
+      similarityThreshold: config.stack_similarity_threshold,
+      timeWindowMinutes: config.stack_time_window_minutes,
+    });
+    await refreshCounts();
+    await reloadFiltersMeta();
+    await loadAlbumsAndTags();
+    await loadFiles();
+
+    const message = result.created_stacks > 0
+      ? t.value.menu.organizeComplete
+          .replace("{stacks}", String(result.created_stacks))
+          .replace("{images}", String(result.stacked_images))
+      : t.value.menu.organizeNoMatches;
+    setOrganizeLibraryNotice(message);
+  } catch (organizeError) {
+    setOrganizeLibraryNotice(t.value.menu.organizeFailed);
+    error.value = String(organizeError);
+  } finally {
+    organizeLibraryRunning.value = false;
+  }
+}
+
 function onZoomIn() {
   gridItemWidth.value = Math.min(360, gridItemWidth.value + 20);
 }
@@ -1556,6 +1611,9 @@ function onResetZoom() {
 
       <template #menu>
         <MenuBar
+          :can-organize-current="activeTarget.type === 'folder'"
+          :can-organize-all="folders.length > 0"
+          :organizing="organizeLibraryRunning"
           @add-folder="onAddFolderFromMenu"
           @scan-active="onScanActiveFromMenu"
           @rescan-all="onRescanAllFromMenu"
@@ -1574,6 +1632,7 @@ function onResetZoom() {
           @open-model-manager="modelManagerModalOpen = true"
           @open-clip-manager="clipModalOpen = true"
           @open-lora-manager="loraModalOpen = true"
+          @organize-library="onOrganizeLibrary"
           @open-shortcuts-help="shortcutsHelpModalOpen = true"
           @open-updater="updateModalOpen = true"
           @open-about="settingsModalOpen = true"
@@ -1595,6 +1654,13 @@ function onResetZoom() {
         </button>
       </template>
     </TitleBar>
+
+    <Transition name="organize-notice">
+      <div v-if="organizeLibraryNotice" class="organize-library-notice" role="status" aria-live="polite">
+        <span v-if="organizeLibraryRunning" class="organize-library-spinner" aria-hidden="true"></span>
+        {{ organizeLibraryNotice }}
+      </div>
+    </Transition>
 
     <!-- Main Three-Pane Studio Layout -->
     <div class="studio-layout">
@@ -2225,6 +2291,61 @@ function onResetZoom() {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+}
+
+.organize-library-notice {
+  position: fixed;
+  top: 44px;
+  left: 50%;
+  z-index: 2100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(520px, calc(100vw - 32px));
+  padding: 8px 14px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 45%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-bg-secondary) 94%, transparent);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
+  color: var(--color-text-primary);
+  font-size: 0.78rem;
+  transform: translateX(-50%);
+  backdrop-filter: blur(10px);
+}
+
+.organize-library-spinner {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  border: 2px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: organize-spin 0.8s linear infinite;
+}
+
+.organize-notice-enter-active,
+.organize-notice-leave-active {
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.organize-notice-enter-from,
+.organize-notice-leave-to {
+  opacity: 0;
+  transform: translate(-50%, -6px);
+}
+
+@keyframes organize-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .organize-library-spinner {
+    animation: none;
+  }
+  .organize-notice-enter-active,
+  .organize-notice-leave-active {
+    transition: none;
+  }
 }
 
 /* Responsive Adaptive Breakpoints */

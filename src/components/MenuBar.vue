@@ -3,6 +3,16 @@ import { onMounted, onUnmounted, ref } from "vue";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { currentLocaleSetting, setLocale, SUPPORTED_LOCALES, t, type LocaleSetting } from "../i18n";
 
+withDefaults(defineProps<{
+  canOrganizeCurrent?: boolean;
+  canOrganizeAll?: boolean;
+  organizing?: boolean;
+}>(), {
+  canOrganizeCurrent: false,
+  canOrganizeAll: false,
+  organizing: false,
+});
+
 const emit = defineEmits<{
   addFolder: [];
   scanActive: [];
@@ -28,6 +38,7 @@ const emit = defineEmits<{
   openModelManager: [];
   openClipManager: [];
   openLoraManager: [];
+  organizeLibrary: [scope: "current" | "all"];
   openShortcutsHelp: [];
   openUpdater: [];
   openAbout: [];
@@ -35,14 +46,17 @@ const emit = defineEmits<{
 
 const activeMenu = ref<string | null>(null);
 const isLanguageSubmenuOpen = ref(false);
+const isOrganizeSubmenuOpen = ref(false);
 
 function toggleMenu(menu: string) {
   if (activeMenu.value === menu) {
     activeMenu.value = null;
     isLanguageSubmenuOpen.value = false;
+    isOrganizeSubmenuOpen.value = false;
   } else {
     activeMenu.value = menu;
     isLanguageSubmenuOpen.value = false;
+    isOrganizeSubmenuOpen.value = false;
   }
 }
 
@@ -50,12 +64,14 @@ function onMenuHover(menu: string) {
   if (activeMenu.value !== null) {
     activeMenu.value = menu;
     isLanguageSubmenuOpen.value = false;
+    isOrganizeSubmenuOpen.value = false;
   }
 }
 
 function closeAll() {
   activeMenu.value = null;
   isLanguageSubmenuOpen.value = false;
+  isOrganizeSubmenuOpen.value = false;
 }
 
 function handleAction(action: () => void) {
@@ -248,6 +264,38 @@ onUnmounted(() => {
         {{ t.menu.tools }}
       </button>
       <div v-if="activeMenu === 'tools'" class="dropdown-menu">
+        <div
+          class="dropdown-submenu-wrapper"
+          @mouseenter="isOrganizeSubmenuOpen = true"
+          @mouseleave="isOrganizeSubmenuOpen = false"
+        >
+          <button type="button" class="dropdown-item has-submenu">
+            <span class="item-icon">🗂️</span>
+            <span class="item-title">{{ t.menu.organizeByPrompt }}</span>
+            <span class="submenu-arrow">▶</span>
+          </button>
+          <div v-if="isOrganizeSubmenuOpen" class="dropdown-submenu organize-submenu">
+            <button
+              type="button"
+              class="dropdown-item"
+              :disabled="!canOrganizeCurrent || organizing"
+              @click="handleAction(() => emit('organizeLibrary', 'current'))"
+            >
+              <span class="item-icon">📂</span>
+              <span class="item-title">{{ t.menu.organizeCurrentFolder }}</span>
+            </button>
+            <button
+              type="button"
+              class="dropdown-item"
+              :disabled="!canOrganizeAll || organizing"
+              @click="handleAction(() => emit('organizeLibrary', 'all'))"
+            >
+              <span class="item-icon">🗃️</span>
+              <span class="item-title">{{ t.menu.organizeAllFolders }}</span>
+            </button>
+          </div>
+        </div>
+        <div class="menu-divider"></div>
         <button type="button" class="dropdown-item" @click="handleAction(() => emit('openPromptStats'))">
           <span class="item-icon">📊</span>
           <span class="item-title">{{ t.menu.promptStats }}</span>
@@ -402,6 +450,13 @@ onUnmounted(() => {
   color: #ffffff;
 }
 
+.dropdown-item:disabled {
+  cursor: default;
+  opacity: 0.45;
+  background: transparent;
+  color: #64748b;
+}
+
 .dropdown-item.danger:hover {
   background: rgba(239, 68, 68, 0.2);
   color: #fca5a5;
@@ -462,6 +517,10 @@ onUnmounted(() => {
   z-index: 1002;
   display: flex;
   flex-direction: column;
+}
+
+.organize-submenu {
+  min-width: 230px;
 }
 
 .check-icon {
