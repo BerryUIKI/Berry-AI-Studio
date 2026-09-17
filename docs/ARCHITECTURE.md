@@ -93,6 +93,7 @@ The frontend is built with **Vue 3 Composition API** + **TypeScript** + **Vite**
 - Optional startup scans are rate-limited per folder. New installations leave startup scanning disabled by default.
 - Visible thumbnails have priority. Look-ahead generation begins only after scrolling settles, is deduplicated, and runs through serialized bounded batches.
 - The disk cache is populated lazily rather than generated in full during import. See [PERFORMANCE.md](PERFORMANCE.md) for tradeoffs and the remaining optimization plan.
+- Standard library and structured-search queries return `FilePage` batches with an exact filtered total. All three gallery modes request subsequent pages near their loaded boundary and reject stale responses after context changes.
 
 ---
 
