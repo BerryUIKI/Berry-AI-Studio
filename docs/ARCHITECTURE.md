@@ -109,6 +109,7 @@ Berry AI Studio extends conventional folder management into three high-performan
 ## 🗃️ Image Stacking Architecture
 
 To solve the "AI Burst / Roll" gallery clutter problem:
-- **Burst Clustering**: Groups batch generation variants by exact or high-similarity prompts (Jaccard threshold) constrained within a temporal generation window.
+- **Burst Clustering**: `berry-domain` builds a mutation-free grouping plan from normalized prompt fragments. It excludes empty prompts and existing stack members, keeps groups inside one folder/model context, and bounds comparisons by the configured generation window before the Tauri adapter persists each stack.
+- **Discoverable Organization Flow**: `Tools > Organize Library by Prompt` can rescan either the current folder or every registered folder before applying the saved similarity and time-window preferences.
 - **Manual Stacking**: Full keyboard-driven grouping via `Ctrl+G` (stack) and `Ctrl+Shift+G` (unstack).
 - **Poker Deck Presentation**: Collapsed stack presentation with item count badges (`📚 N`), inline expansion, hero cover selection (`Alt+S`), and side-by-side comparison (`C`).
