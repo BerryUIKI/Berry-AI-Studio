@@ -82,6 +82,7 @@ function updateDimensions() {
 
 let resizeObserver: ResizeObserver | null = null;
 let resizeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let scrollFrame: number | null = null;
 const stackClickTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const STACK_CLICK_DELAY_MS = 240;
 
@@ -102,6 +103,7 @@ onMounted(() => {
 onUnmounted(() => {
   if (resizeDebounceTimer) clearTimeout(resizeDebounceTimer);
   if (prefetchDebounceTimer) clearTimeout(prefetchDebounceTimer);
+  if (scrollFrame !== null) cancelAnimationFrame(scrollFrame);
   for (const timer of stackClickTimers.values()) clearTimeout(timer);
   stackClickTimers.clear();
   resizeObserver?.disconnect();
@@ -110,7 +112,13 @@ onUnmounted(() => {
 
 function onScroll(e: Event) {
   const target = e.target as HTMLElement;
-  scrollTop.value = target.scrollTop;
+  // Scrollbar dragging can dispatch hundreds of events per second. Collapse
+  // them to one reactive gallery update per animation frame.
+  if (scrollFrame !== null) return;
+  scrollFrame = requestAnimationFrame(() => {
+    scrollTop.value = target.scrollTop;
+    scrollFrame = null;
+  });
 }
 
 // Columns count based on container width
@@ -121,10 +129,10 @@ const cols = computed(() => {
   return Math.max(1, count);
 });
 
-// Single item dimensions
+// Keep the user's chosen card width stable. Resizing the window changes the
+// number of columns, not the image size (matching Eagle's gallery behavior).
 const itemWidth = computed(() => {
-  const totalGaps = (cols.value - 1) * props.gap;
-  return Math.floor((containerWidth.value - totalGaps) / cols.value);
+  return Math.max(1, Math.min(props.itemMinWidth, containerWidth.value));
 });
 
 // Card height = 1:1 square image + 56px info footer
@@ -140,6 +148,7 @@ interface MasonryItem {
   width: number;
   height: number;
   imageHeight: number;
+  column: number;
 }
 
 const masonryItems = computed<MasonryItem[]>(() => {
@@ -160,10 +169,17 @@ const masonryItems = computed<MasonryItem[]>(() => {
       width: itemWidth.value,
       height,
       imageHeight,
+      column,
     };
     columnHeights[column] += height + props.gap;
     return item;
   });
+});
+
+const masonryColumns = computed(() => {
+  const columns = Array.from({ length: cols.value }, () => [] as MasonryItem[]);
+  for (const item of masonryItems.value) columns[item.column].push(item);
+  return columns;
 });
 
 const masonryHeight = computed(() => {
@@ -207,9 +223,24 @@ const visibleMasonryItems = computed(() => {
   const buffer = Math.max(itemWidth.value, props.overscan * 100);
   const top = Math.max(0, scrollTop.value - buffer);
   const bottom = scrollTop.value + containerHeight.value + buffer;
-  return masonryItems.value.filter(
-    (item) => item.top + item.height >= top && item.top <= bottom,
-  );
+  const visible: MasonryItem[] = [];
+
+  for (const column of masonryColumns.value) {
+    let low = 0;
+    let high = column.length;
+    while (low < high) {
+      const mid = (low + high) >>> 1;
+      if (column[mid].top + column[mid].height < top) low = mid + 1;
+      else high = mid;
+    }
+    for (let index = low; index < column.length; index += 1) {
+      const item = column[index];
+      if (item.top > bottom) break;
+      visible.push(item);
+    }
+  }
+
+  return visible.sort((a, b) => a.index - b.index);
 });
 
 const visibleItems = computed(() => {
@@ -222,23 +253,27 @@ const visibleItems = computed(() => {
     width: 0,
     height: cardHeight.value,
     imageHeight: itemWidth.value,
+    column: 0,
   }));
 });
 
 const translateY = computed(() => startRow.value * rowHeight.value);
 
-const thumbnailMap = ref<Record<number, string>>({});
+// A revision signal keeps rendering reactive without retaining a second,
+// unbounded URL map beside the shared LRU thumbnail cache.
+const thumbnailRevision = ref(0);
 
 function getCardImageSrc(file: ImageFile): string {
+  void thumbnailRevision.value;
   if (!file.id) return assetUrl(file.path);
-  return thumbnailMap.value[file.id] || getThumbnailUrlSync(file) || assetUrl(file.path);
+  return getThumbnailUrlSync(file) || assetUrl(file.path);
 }
 
 async function loadThumbnailFor(file: ImageFile) {
-  if (!file.id || thumbnailMap.value[file.id]) return;
-  const url = await getThumbnailUrl(file);
+  if (!file.id || getThumbnailUrlSync(file)) return;
+  await getThumbnailUrl(file);
   if (file.id) {
-    thumbnailMap.value[file.id] = url;
+    thumbnailRevision.value += 1;
   }
 }
 
@@ -250,15 +285,15 @@ watch(
     const files = items.map((item) => item.file);
     if (!files || files.length === 0) return;
 
-    // 1. Immediately request thumbnails for currently visible items
+    // Resolve visible thumbnails immediately. Do not also submit them to the
+    // batch worker: that used to decode the same image twice during fast scroll.
     for (const f of files) {
-      if (f.id && !thumbnailMap.value[f.id]) {
+      if (f.id && !getThumbnailUrlSync(f)) {
         void loadThumbnailFor(f);
       }
     }
-    void requestBatchThumbnails(files);
-
-    // 2. Proactive Lookahead Preload: pre-generate next 100 items in background
+    // Prefetch only after scrolling settles. This avoids building an I/O queue
+    // for every intermediate position while the scrollbar thumb is dragged.
     if (prefetchDebounceTimer) clearTimeout(prefetchDebounceTimer);
     prefetchDebounceTimer = setTimeout(() => {
       const firstVisibleIndex = items[0]?.index ?? 0;
@@ -274,7 +309,7 @@ watch(
         const behindSlice = props.files.slice(behindStart, firstVisibleIndex);
         void requestBatchThumbnails(behindSlice);
       }
-    }, 40);
+    }, 220);
   },
   { immediate: true },
 );
@@ -465,7 +500,7 @@ function onDragStart(e: DragEvent, file: ImageFile) {
           :class="{ 'masonry-content': layout === 'masonry' }"
           :style="{
             transform: layout === 'grid' ? `translateY(${translateY}px)` : undefined,
-            gridTemplateColumns: layout === 'grid' ? `repeat(${cols}, minmax(0, 1fr))` : undefined,
+            gridTemplateColumns: layout === 'grid' ? `repeat(${cols}, ${itemWidth}px)` : undefined,
             gap: layout === 'grid' ? `${gap}px` : undefined,
           }"
         >
@@ -761,6 +796,7 @@ function onDragStart(e: DragEvent, file: ImageFile) {
   isolation: isolate;
   border-color: rgba(47, 111, 237, 0.42);
   box-shadow: 0 5px 16px rgba(15, 23, 42, 0.16);
+  animation: stack-collapse-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .grid-card.is-collapsed-stack::before,
@@ -802,6 +838,17 @@ function onDragStart(e: DragEvent, file: ImageFile) {
 .grid-card.stack-expanded {
   border-color: rgba(47, 111, 237, 0.5);
   box-shadow: inset 0 3px 0 rgba(47, 111, 237, 0.32);
+  animation: stack-spread-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes stack-spread-in {
+  from { opacity: 0; transform: translateY(-10px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes stack-collapse-in {
+  from { transform: scale(0.97); }
+  to { transform: scale(1); }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -1066,6 +1113,7 @@ function onDragStart(e: DragEvent, file: ImageFile) {
   .card-stack-compare-btn,
   .card-similar-btn {
     transition: none;
+    animation: none;
   }
 }
 

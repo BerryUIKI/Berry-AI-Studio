@@ -13,14 +13,14 @@ const DEFAULT_MAX_EDGE = 384; // 64 * 6, perfect balanced resolution for 130px~3
 const MAX_MEMORY_CACHE_ENTRIES = 3000;
 
 class LruThumbnailCache {
-  private cache = new Map<number, string>();
+  private cache = new Map<string, string>();
   private maxSize: number;
 
   constructor(maxSize = MAX_MEMORY_CACHE_ENTRIES) {
     this.maxSize = maxSize;
   }
 
-  get(key: number): string | undefined {
+  get(key: string): string | undefined {
     const val = this.cache.get(key);
     if (val !== undefined) {
       this.cache.delete(key);
@@ -29,7 +29,7 @@ class LruThumbnailCache {
     return val;
   }
 
-  set(key: number, value: string): void {
+  set(key: string, value: string): void {
     if (this.cache.has(key)) {
       this.cache.delete(key);
     } else if (this.cache.size >= this.maxSize) {
@@ -50,11 +50,23 @@ class LruThumbnailCache {
   }
 }
 
-// In-memory runtime LRU map of file_id -> cached thumbnail asset url
+// In-memory runtime LRU map of file revision + size tier -> asset URL.
 const memoryCache = new LruThumbnailCache(3000);
 
 // Active in-flight promises to deduplicate concurrent requests for the same file
-const inFlightRequests = new Map<number, Promise<string>>();
+const inFlightRequests = new Map<string, Promise<string>>();
+interface QueuedThumbnail {
+  cache_key: string;
+  file_id: number;
+  file_path: string;
+  modified_at: number;
+  max_edge: number;
+}
+
+const queuedBatchItems = new Map<string, QueuedThumbnail>();
+const batchReadyKeys = new Set<string>();
+let batchDrainPromise: Promise<number> | null = null;
+const BATCH_CHUNK_SIZE = 48;
 
 /**
  * Get the user-configured max edge resolution from localStorage.
@@ -80,9 +92,19 @@ export function setThumbnailMaxEdge(maxEdge: number): void {
     localStorage.setItem(THUMBNAIL_SETTING_KEY, String(maxEdge));
     // Clear in-memory cache so images request new resolution
     memoryCache.clear();
+    queuedBatchItems.clear();
+    batchReadyKeys.clear();
   } catch {
     // Ignore errors
   }
+}
+
+/** Stable cache identity for a particular file revision and thumbnail tier. */
+export function getThumbnailCacheKey(
+  file: ImageFile,
+  maxEdge: number = getThumbnailMaxEdge(),
+): string {
+  return `${file.id ?? 0}:${file.modified_at}:${maxEdge}`;
 }
 
 /**
@@ -91,7 +113,7 @@ export function setThumbnailMaxEdge(maxEdge: number): void {
 export function getThumbnailUrlSync(file: ImageFile): string | null {
   const fileId = file.id ?? 0;
   if (!fileId) return null;
-  return memoryCache.get(fileId) ?? null;
+  return memoryCache.get(getThumbnailCacheKey(file)) ?? null;
 }
 
 /**
@@ -103,14 +125,15 @@ export async function getThumbnailUrl(
 ): Promise<string> {
   const fileId = file.id ?? 0;
   if (!fileId) return assetUrl(file.path);
+  const cacheKey = getThumbnailCacheKey(file, maxEdge);
 
   // Check memory cache first
-  const cached = memoryCache.get(fileId);
+  const cached = memoryCache.get(cacheKey);
   if (cached) return cached;
 
   // Deduplicate in-flight requests
-  if (inFlightRequests.has(fileId)) {
-    return inFlightRequests.get(fileId)!;
+  if (inFlightRequests.has(cacheKey)) {
+    return inFlightRequests.get(cacheKey)!;
   }
 
   const promise = (async () => {
@@ -122,19 +145,19 @@ export async function getThumbnailUrl(
         maxEdge,
       });
       const url = assetUrl(diskPath);
-      memoryCache.set(fileId, url);
+      memoryCache.set(cacheKey, url);
       return url;
     } catch {
       // Fallback to original image if downsampling fails (e.g. video)
       const fallbackUrl = assetUrl(file.path);
-      memoryCache.set(fileId, fallbackUrl);
+      memoryCache.set(cacheKey, fallbackUrl);
       return fallbackUrl;
     } finally {
-      inFlightRequests.delete(fileId);
+      inFlightRequests.delete(cacheKey);
     }
   })();
 
-  inFlightRequests.set(fileId, promise);
+  inFlightRequests.set(cacheKey, promise);
   return promise;
 }
 
@@ -147,24 +170,51 @@ export async function requestBatchThumbnails(
 ): Promise<number> {
   if (!files || files.length === 0) return 0;
 
-  const items = files
-    .filter((f) => f.id != null)
-    .map((f) => ({
-      file_id: f.id!,
-      file_path: f.path,
-      modified_at: f.modified_at,
-    }));
-
-  if (items.length === 0) return 0;
-
-  try {
-    return await invoke<number>("batch_generate_thumbnails", {
-      items,
-      maxEdge,
+  for (const file of files) {
+    const cacheKey = getThumbnailCacheKey(file, maxEdge);
+    if (
+      file.id == null ||
+      batchReadyKeys.has(cacheKey) ||
+      inFlightRequests.has(cacheKey) ||
+      memoryCache.get(cacheKey)
+    ) continue;
+    queuedBatchItems.set(cacheKey, {
+      cache_key: cacheKey,
+      file_id: file.id,
+      file_path: file.path,
+      modified_at: file.modified_at,
+      max_edge: maxEdge,
     });
-  } catch {
-    return 0;
   }
+
+  if (queuedBatchItems.size === 0) return 0;
+  if (batchDrainPromise) return batchDrainPromise;
+
+  batchDrainPromise = (async () => {
+    let generated = 0;
+    while (queuedBatchItems.size > 0) {
+      const nextEdge = queuedBatchItems.values().next().value?.max_edge;
+      const items = Array.from(queuedBatchItems.values())
+        .filter((item) => item.max_edge === nextEdge && !inFlightRequests.has(item.cache_key))
+        .slice(0, BATCH_CHUNK_SIZE);
+      if (items.length === 0) break;
+      for (const item of items) queuedBatchItems.delete(item.cache_key);
+      try {
+        generated += await invoke<number>("batch_generate_thumbnails", {
+          items: items.map(({ file_id, file_path, modified_at }) => ({ file_id, file_path, modified_at })),
+          maxEdge: nextEdge,
+        });
+        for (const item of items) batchReadyKeys.add(item.cache_key);
+      } catch {
+        // Visible items can still recover through the single-thumbnail path.
+      }
+    }
+    return generated;
+  })().finally(() => {
+    batchDrainPromise = null;
+  });
+
+  return batchDrainPromise;
 }
 
 /**
@@ -180,5 +230,7 @@ export async function getThumbnailCacheStats(): Promise<ThumbnailCacheStats> {
 export async function clearThumbnailCache(): Promise<number> {
   memoryCache.clear();
   inFlightRequests.clear();
+  queuedBatchItems.clear();
+  batchReadyKeys.clear();
   return await invoke<number>("clear_thumbnail_cache");
 }
