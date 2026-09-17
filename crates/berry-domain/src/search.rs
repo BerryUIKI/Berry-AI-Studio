@@ -1,6 +1,15 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{FileSortField, SortDirection};
+use crate::{FileSortField, ImageFile, SortDirection};
+
+/// One bounded page of files plus the exact size of the filtered result set.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FilePage {
+    pub items: Vec<ImageFile>,
+    pub total: usize,
+    pub offset: usize,
+    pub has_more: bool,
+}
 
 /// Criteria for filtering and querying files in the library.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -97,5 +106,17 @@ mod tests {
         assert!(criteria.prompt.is_none());
         assert!(criteria.min_rating.is_none());
         assert!(criteria.sort.is_none());
+    }
+
+    #[test]
+    fn file_page_serde_roundtrip() {
+        let page = FilePage {
+            items: Vec::new(),
+            total: 25,
+            offset: 10,
+            has_more: true,
+        };
+        let json = serde_json::to_string(&page).unwrap();
+        assert_eq!(serde_json::from_str::<FilePage>(&json).unwrap(), page);
     }
 }

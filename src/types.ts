@@ -70,6 +70,13 @@ export interface ImageFile {
   stack_order?: number;
 }
 
+export interface FilePage {
+  items: ImageFile[];
+  total: number;
+  offset: number;
+  has_more: boolean;
+}
+
 export interface PipelineDetectedPath {
   tool_name: string;
   path: string;
@@ -287,6 +294,5 @@ export interface DetectedLora {
   weight: number;
   model?: LoraModel | null;
 }
-
 
 

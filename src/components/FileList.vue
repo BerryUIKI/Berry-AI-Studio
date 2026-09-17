@@ -12,13 +12,14 @@ import {
 import {
   getThumbnailUrl,
   getThumbnailUrlSync,
-  requestBatchThumbnails,
 } from "../utils/thumbnail";
 import { t } from "../i18n";
 
 const props = defineProps<{
   files: ImageFile[];
   loading: boolean;
+  loadingMore?: boolean;
+  hasMore?: boolean;
   selectedFile?: ImageFile | null;
   selectedFilePaths?: Set<string>;
 }>();
@@ -28,6 +29,7 @@ const emit = defineEmits<{
   (e: "activate", file: ImageFile): void;
   (e: "toggleSelect", file: ImageFile): void;
   (e: "toggleAll"): void;
+  (e: "loadMore"): void;
 }>();
 
 const ROW_HEIGHT = 46;
@@ -36,6 +38,7 @@ const OVERSCAN = 6;
 const containerRef = ref<HTMLElement | null>(null);
 const scrollTop = ref(0);
 const containerHeight = ref(600);
+let scrollFrame: number | null = null;
 
 const startRow = computed(() => {
   const raw = Math.floor(scrollTop.value / ROW_HEIGHT);
@@ -60,8 +63,26 @@ const bottomSpacerHeight = computed(() =>
 
 function onScroll(e: Event) {
   const target = e.target as HTMLElement;
-  scrollTop.value = target.scrollTop;
+  if (scrollFrame !== null) return;
+  scrollFrame = requestAnimationFrame(() => {
+    scrollTop.value = target.scrollTop;
+    scrollFrame = null;
+    maybeRequestMore();
+  });
 }
+
+function maybeRequestMore() {
+  if (!props.hasMore || props.loading || props.loadingMore) return;
+  const totalHeight = props.files.length * ROW_HEIGHT;
+  if (totalHeight - scrollTop.value - containerHeight.value <= containerHeight.value * 2) {
+    emit("loadMore");
+  }
+}
+
+watch(
+  [() => props.files.length, containerHeight, () => props.hasMore, () => props.loadingMore],
+  () => queueMicrotask(maybeRequestMore),
+);
 
 function updateHeight() {
   if (containerRef.value) {
@@ -69,47 +90,29 @@ function updateHeight() {
   }
 }
 
-// Memory map for row thumbnails
-const thumbnailMap = ref<Record<string, string>>({});
+// Keep the table reactive without duplicating the shared bounded thumbnail LRU.
+const thumbnailRevision = ref(0);
 
 // Fast sync or async lookup for row image
 function getRowImageSrc(file: ImageFile): string {
+  void thumbnailRevision.value;
   const syncCached = getThumbnailUrlSync(file);
   if (syncCached) return syncCached;
-  if (thumbnailMap.value[file.path]) {
-    return thumbnailMap.value[file.path];
-  }
   return assetUrl(file.path);
 }
 
 // Prefetch thumbnails for visible rows
 watch(
   visibleFiles,
-  async (batch) => {
+  (batch) => {
     if (!batch || batch.length === 0) return;
-    const filesToGenerate: ImageFile[] = [];
-
     for (const file of batch) {
-      if (file.container !== "mp4" && file.container !== "txt" && !thumbnailMap.value[file.path]) {
-        const syncUrl = getThumbnailUrlSync(file);
-        if (syncUrl) {
-          thumbnailMap.value[file.path] = syncUrl;
-        } else {
-          filesToGenerate.push(file);
-        }
-      }
-    }
-
-    if (filesToGenerate.length > 0) {
-      void requestBatchThumbnails(filesToGenerate.slice(0, 30));
-    }
-
-    for (const file of batch) {
-      if (file.container !== "mp4" && file.container !== "txt" && !thumbnailMap.value[file.path]) {
-        getThumbnailUrl(file).then((url) => {
-          if (url) {
-            thumbnailMap.value[file.path] = url;
-          }
+      if (
+        file.container !== "mp4" && file.container !== "txt" &&
+        !getThumbnailUrlSync(file)
+      ) {
+        void getThumbnailUrl(file).then(() => {
+          thumbnailRevision.value += 1;
         });
       }
     }
@@ -130,6 +133,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  if (scrollFrame !== null) cancelAnimationFrame(scrollFrame);
   if (resizeObserver) {
     resizeObserver.disconnect();
     resizeObserver = null;
@@ -244,6 +248,9 @@ function size(meta: ImageFile["metadata"]): string {
           </tr>
         </tbody>
       </table>
+      <div v-if="loadingMore" class="load-more-indicator" role="status">
+        {{ t.view.loading }}
+      </div>
     </div>
   </section>
 </template>
@@ -312,6 +319,20 @@ function size(meta: ImageFile["metadata"]): string {
   padding: 0 !important;
   border: none !important;
   height: inherit;
+}
+
+.load-more-indicator {
+  position: sticky;
+  left: 50%;
+  bottom: 12px;
+  width: max-content;
+  margin: 0 auto;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-bg-tertiary) 88%, transparent);
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  pointer-events: none;
 }
 
 .data-row {

@@ -7,6 +7,7 @@ import type {
   Album,
   AppInfo,
   FileSortField,
+  FilePage,
   Folder,
   ImageFile,
   LibraryCounts,
@@ -70,6 +71,12 @@ const tags = ref<Tag[]>([]);
 const activeTarget = ref<NavTarget>({ type: "all" });
 const files = shallowRef<ImageFile[]>([]);
 const filesLoading = ref(false);
+const filesLoadingMore = ref(false);
+const galleryTotal = ref(0);
+const galleryHasMore = ref(false);
+const nextGalleryOffset = ref(0);
+const GALLERY_PAGE_SIZE = 400;
+let libraryRequestVersion = 0;
 const searchQuery = ref("");
 const isSemanticSearch = ref(false);
 const clipModalOpen = ref(false);
@@ -1150,13 +1157,18 @@ function onUpdateFile(file: ImageFile) {
 }
 
 async function loadFiles() {
+  const requestVersion = ++libraryRequestVersion;
   similaritySourceFile.value = null;
   rawSimilarityFiles.value = [];
   filesLoading.value = true;
+  filesLoadingMore.value = false;
   expandedStacks.value = new Set();
   pendingStackExpansions.clear();
   selectedFilePaths.value = new Set();
   selectionAnchorPath.value = null;
+  galleryHasMore.value = false;
+  galleryTotal.value = 0;
+  nextGalleryOffset.value = 0;
   try {
     const q = searchQuery.value.trim();
     if (q) {
@@ -1167,48 +1179,50 @@ async function loadFiles() {
             prompt: q,
             limit: similarityLimit.value || 50,
           });
+          if (requestVersion !== libraryRequestVersion) return;
           files.value = matches.map((m) => ({
             ...m.file,
             similarity_score: m.score,
           }));
+          galleryTotal.value = files.value.length;
         } catch (clipErr) {
           // If no model loaded, open CLIP modal so user can load one
           console.warn("Semantic search failed or model not loaded:", clipErr);
           clipModalOpen.value = true;
           files.value = [];
+          galleryTotal.value = 0;
         }
       } else {
         const folderId = activeTarget.value.type === "folder" ? activeTarget.value.folder.id : null;
-        files.value = await invoke<ImageFile[]>("search_files_by_query", {
+        const page = await invoke<FilePage>("search_files_by_query_page", {
           query: q,
           folderId,
           sort: sortField.value,
           direction: sortDirection.value,
+          limit: GALLERY_PAGE_SIZE,
+          offset: 0,
         });
+        if (requestVersion !== libraryRequestVersion) return;
+        files.value = page.items;
+        galleryTotal.value = page.total;
+        galleryHasMore.value = page.has_more;
+        nextGalleryOffset.value = page.offset + page.items.length;
       }
     } else {
-      const criteria: SearchCriteria = {
-        sort: sortField.value,
-        direction: sortDirection.value,
-      };
-      if (activeTarget.value.type === "folder") {
-        criteria.folder_id = activeTarget.value.folder.id;
-      } else if (activeTarget.value.type === "favorites") {
-        criteria.is_favorite = true;
-      } else if (activeTarget.value.type === "nsfw") {
-        criteria.is_nsfw = true;
-      } else if (activeTarget.value.type === "album") {
-        criteria.album_id = activeTarget.value.album.id;
-      } else if (activeTarget.value.type === "tag") {
-        criteria.tag_id = activeTarget.value.tag.id;
-      }
-      files.value = await invoke<ImageFile[]>("search_files", { criteria });
+      const criteria = currentPagedCriteria(0);
+      const page = await invoke<FilePage>("search_files_page", { criteria });
+      if (requestVersion !== libraryRequestVersion) return;
+      files.value = page.items;
+      galleryTotal.value = page.total;
+      galleryHasMore.value = page.has_more;
+      nextGalleryOffset.value = page.offset + page.items.length;
     }
 
     // Refresh stack summaries for active folder or all
     try {
       const folderId = activeTarget.value.type === "folder" ? activeTarget.value.folder.id : null;
       const stacks = await invoke<StackSummary[]>("list_stacks", { folderId });
+      if (requestVersion !== libraryRequestVersion) return;
       const map: Record<string, { count: number; heroId: number | null }> = {};
       for (const s of stacks) {
         map[s.stack_id] = { count: s.count, heroId: s.hero_image_id };
@@ -1228,9 +1242,67 @@ async function loadFiles() {
       void requestBatchThumbnails(files.value.slice(0, 200));
     }
   } catch (e) {
-    error.value = String(e);
+    if (requestVersion === libraryRequestVersion) error.value = String(e);
   } finally {
-    filesLoading.value = false;
+    if (requestVersion === libraryRequestVersion) filesLoading.value = false;
+  }
+}
+
+function currentPagedCriteria(offset: number): SearchCriteria {
+  const criteria: SearchCriteria = {
+    sort: sortField.value,
+    direction: sortDirection.value,
+    limit: GALLERY_PAGE_SIZE,
+    offset,
+  };
+  if (activeTarget.value.type === "folder") criteria.folder_id = activeTarget.value.folder.id;
+  else if (activeTarget.value.type === "favorites") criteria.is_favorite = true;
+  else if (activeTarget.value.type === "nsfw") criteria.is_nsfw = true;
+  else if (activeTarget.value.type === "album") criteria.album_id = activeTarget.value.album.id;
+  else if (activeTarget.value.type === "tag") criteria.tag_id = activeTarget.value.tag.id;
+  return criteria;
+}
+
+function collapseInactiveStacks(items: ImageFile[]): ImageFile[] {
+  const collapsedMap = Object.fromEntries(
+    Object.entries(stackMap.value).filter(([stackId]) => !expandedStacks.value.has(stackId)),
+  );
+  return collapseStackMembers(items, collapsedMap);
+}
+
+async function loadMoreFiles() {
+  if (
+    filesLoading.value || filesLoadingMore.value || !galleryHasMore.value ||
+    isSemanticSearch.value || similaritySourceFile.value
+  ) return;
+
+  const requestVersion = libraryRequestVersion;
+  const offset = nextGalleryOffset.value;
+  filesLoadingMore.value = true;
+  try {
+    const q = searchQuery.value.trim();
+    const page = q
+      ? await invoke<FilePage>("search_files_by_query_page", {
+          query: q,
+          folderId: activeTarget.value.type === "folder" ? activeTarget.value.folder.id : null,
+          sort: sortField.value,
+          direction: sortDirection.value,
+          limit: GALLERY_PAGE_SIZE,
+          offset,
+        })
+      : await invoke<FilePage>("search_files_page", { criteria: currentPagedCriteria(offset) });
+    if (requestVersion !== libraryRequestVersion || offset !== nextGalleryOffset.value) return;
+
+    const seen = new Set(files.value.map((file) => file.id ?? file.path));
+    const appended = page.items.filter((file) => !seen.has(file.id ?? file.path));
+    files.value = collapseInactiveStacks([...files.value, ...appended]);
+    galleryTotal.value = page.total;
+    galleryHasMore.value = page.has_more;
+    nextGalleryOffset.value = page.offset + page.items.length;
+  } catch (e) {
+    if (requestVersion === libraryRequestVersion) error.value = String(e);
+  } finally {
+    if (requestVersion === libraryRequestVersion) filesLoadingMore.value = false;
   }
 }
 
@@ -1248,6 +1320,8 @@ function applySimilarityFilter() {
     .filter((f) => (f.similarity_score ?? 0) >= minScore)
     .sort((a, b) => (b.similarity_score ?? 0) - (a.similarity_score ?? 0));
   files.value = filtered;
+  galleryTotal.value = filtered.length;
+  galleryHasMore.value = false;
   if (filtered.length > 0) {
     if (!selectedFile.value || !filtered.some((f) => f.id === selectedFile.value?.id)) {
       selectedFile.value = filtered[0];
@@ -1558,7 +1632,7 @@ function onResetZoom() {
           <div class="topbar-left">
             <h2 class="target-title">
               {{ targetTitle }}
-              <span class="items-count-badge">({{ files.length }})</span>
+              <span class="items-count-badge">({{ galleryTotal }})</span>
             </h2>
           </div>
 
@@ -1568,7 +1642,7 @@ function onResetZoom() {
               v-model="searchQuery"
               v-model:is-semantic="isSemanticSearch"
               :loading="filesLoading"
-              :result-count="searchQuery.trim() ? files.length : null"
+              :result-count="searchQuery.trim() ? galleryTotal : null"
               @search="onSearch"
               @clear="onClearSearch"
               @open-clip-manager="clipModalOpen = true"
@@ -1706,6 +1780,8 @@ function onResetZoom() {
             :selected-file="selectedFile"
             :selected-file-paths="selectedFilePaths"
             :loading="filesLoading"
+            :loading-more="filesLoadingMore"
+            :has-more="galleryHasMore"
             :item-min-width="gridItemWidth"
             :blur-nsfw="blurNsfw"
             :show-card-badges="showCardBadges"
@@ -1718,6 +1794,7 @@ function onResetZoom() {
             @find-similar="handleFindSimilar"
             @toggle-stack-expand="onToggleStackExpand"
             @compare-stack="onTriggerCompare"
+            @load-more="loadMoreFiles"
           />
 
           <FileList
@@ -1726,10 +1803,13 @@ function onResetZoom() {
             :selected-file="selectedFile"
             :selected-file-paths="selectedFilePaths"
             :loading="filesLoading"
+            :loading-more="filesLoadingMore"
+            :has-more="galleryHasMore"
             @select="onFileSelected"
             @activate="onActivateFile"
             @toggle-select="toggleSelectFile"
             @toggle-all="onToggleAll"
+            @load-more="loadMoreFiles"
           />
 
           <!-- Floating Batch Action Bar -->
@@ -1775,7 +1855,7 @@ function onResetZoom() {
     <!-- Bottom Status Bar -->
     <StatusBar
       :total-count="libraryCounts?.total ?? files.length"
-      :filtered-count="files.length"
+      :filtered-count="galleryTotal"
       :selected-count="selectedFilesList.length"
       :info="info"
       :progress="progress"
