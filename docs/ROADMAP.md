@@ -90,3 +90,13 @@ This roadmap documents completed milestones and future engineering goals for **B
 - [ ] Encrypted WebDAV / S3 / LAN database synchronization.
 - [ ] Batch format conversion (WebP lossless / JPG) and metadata stripping for publishing.
 - [ ] Export curated collections into HTML galleries and ZIP archives.
+
+### 🎯 Milestone 13: Large-Library Performance
+
+- [x] Fixed-width responsive Grid and Waterfall columns.
+- [x] Animation-frame scroll coalescing and per-column Waterfall visibility search.
+- [x] Deduplicated, serialized thumbnail look-ahead scheduling.
+- [x] Startup scan cooldown with opt-in scanning for new installations.
+- [ ] Keyset-paginated gallery queries and lightweight gallery DTOs.
+- [ ] Persistent filesystem watcher journal with periodic recovery scans.
+- [ ] Size-tiered thumbnail manifest, disk budget, priority, and cancellation.

@@ -79,13 +79,20 @@ The frontend is built with **Vue 3 Composition API** + **TypeScript** + **Vite**
 - **Frameless Window (`TitleBar.vue`)**: Implements custom Windows/macOS/Linux frameless window controls with `@tauri-apps/api/window` and titlebar dragging.
 - **Integrated MenuBar (`MenuBar.vue`)**: Desktop dropdown menus (`File`, `Edit`, `View`, `Tools`, `Help`) with clean single-language rendering.
 - **Left Navigation (`Sidebar.vue`)**: Collapsible navigation bar managing library views, recursive folder trees, color tags, and smart albums.
-- **Center Canvas (`VirtualGrid.vue` & `FileList.vue`)**: Virtualized grid rendering tens of thousands of items with dynamic column resizing, smooth thumbnail zoom slider, and list view toggle.
+- **Center Canvas (`VirtualGrid.vue` & `FileList.vue`)**: Virtualized fixed-width Grid and Waterfall layouts. Viewport resizing changes column count without stretching cards; per-column binary search limits scroll-time visibility work to the active window.
 - **Right Property Inspector (`InspectorPane.vue`)**: Tokenized positive/negative prompt chips with one-click copy, model specs table, and collapsible raw JSON viewer.
 - **Quick Look Lightbox (`LightboxModal.vue`)**: Immersive fullscreen viewer with pan, zoom, and keyboard navigation.
 
 ### 2. State & Localization
 - **Reactive i18n (`src/i18n/`)**: Lightweight reactive internationalization supporting 7 locales (`en`, `zh-CN`, `zh-TW`, `ja`, `de`, `fr`, `es`) and automatic OS language detection (`auto`).
 - **Updater (`src/utils/updater.ts` & `UpdateModal.vue`)**: SemVer comparison against GitHub Releases API with automated asset matching and release notes rendering.
+
+### 3. Startup and Thumbnail Scheduling
+
+- The shell loads the indexed SQLite library first so the gallery becomes usable without waiting for filesystem I/O.
+- Optional startup scans are rate-limited per folder. New installations leave startup scanning disabled by default.
+- Visible thumbnails have priority. Look-ahead generation begins only after scrolling settles, is deduplicated, and runs through serialized bounded batches.
+- The disk cache is populated lazily rather than generated in full during import. See [PERFORMANCE.md](PERFORMANCE.md) for tradeoffs and the remaining optimization plan.
 
 ---
 
@@ -104,4 +111,3 @@ To solve the "AI Burst / Roll" gallery clutter problem:
 - **Burst Clustering**: Groups batch generation variants by exact or high-similarity prompts (Jaccard threshold) constrained within a temporal generation window.
 - **Manual Stacking**: Full keyboard-driven grouping via `Ctrl+G` (stack) and `Ctrl+Shift+G` (unstack).
 - **Poker Deck Presentation**: Collapsed stack presentation with item count badges (`📚 N`), inline expansion, hero cover selection (`Alt+S`), and side-by-side comparison (`C`).
-
