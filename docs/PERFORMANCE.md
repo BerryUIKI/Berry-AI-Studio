@@ -31,6 +31,11 @@ Berry AI Studio should remain interactive with large local libraries while keepi
 - Users who enable it receive a per-folder cooldown (six hours by default), preventing a full tree walk on every launch.
 - Manual scans remain available when immediate reconciliation is required.
 
+### Prompt-based organization
+
+- Explicit whole-library organization is allowed to read the complete candidate set.
+- Candidates are sorted once by folder and timestamp; comparisons stop after the configured time window, and empty prompts are discarded before similarity work.
+
 ## Measurement Checklist
 
 Record these values against representative libraries (1k, 10k, and 50k items) before changing performance-sensitive code:
