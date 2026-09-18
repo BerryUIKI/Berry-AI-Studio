@@ -10,4 +10,4 @@
 mod db;
 mod migrations;
 
-pub use db::{Database, DatabaseError};
+pub use db::{Database, DatabaseError, ThumbnailCacheEntry};

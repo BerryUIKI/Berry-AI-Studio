@@ -1,16 +1,21 @@
 //! High-performance thumbnail generation with limited concurrency and disk cache management.
 
+use berry_storage::{Database, ThumbnailCacheEntry};
 use image::ImageReader;
 use rayon::prelude::*;
 use rayon::ThreadPool;
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 
-/// Dedicated background thread pool with strictly limited concurrency (max 2 threads)
+/// Dedicated background thread pool with strictly limited concurrency
 /// to ensure the main UI and WebView are never starved of CPU or disk I/O.
 static THUMB_POOL: OnceLock<ThreadPool> = OnceLock::new();
+static RECENT_TOUCHES: OnceLock<Mutex<HashMap<String, i64>>> = OnceLock::new();
+const ACCESS_PERSIST_INTERVAL_SECONDS: i64 = 3600;
+const MAX_RECENT_TOUCHES: usize = 100_000;
 
 fn get_thumb_pool() -> &'static ThreadPool {
     THUMB_POOL.get_or_init(|| {
@@ -31,6 +36,7 @@ pub struct ThumbnailCacheStats {
     pub total_bytes: u64,
     pub file_count: usize,
     pub cache_dir: String,
+    pub budget_bytes: u64,
 }
 
 /// Thumbnail generation progress event payload.
@@ -52,7 +58,7 @@ pub fn get_thumbnail_path(
     thumb_dir.join(format!("{}_{}_{}.webp", file_id, modified_at, max_edge))
 }
 
-/// Generate a downscaled thumbnail and save to `dst_path` as WebP or JPEG.
+/// Generate a downscaled thumbnail and save to `dst_path` as WebP.
 pub fn generate_thumbnail(src_path: &Path, dst_path: &Path, max_edge: u32) -> Result<(), String> {
     if !src_path.exists() {
         return Err(format!(
@@ -101,10 +107,9 @@ pub fn generate_thumbnail(src_path: &Path, dst_path: &Path, max_edge: u32) -> Re
     // Fast Lanczos3 downscaling
     let thumb = img.thumbnail(target_w, target_h);
 
-    // Save as WebP (or fallback to JPEG if needed)
+    // Save as WebP so the manifest codec always matches the encoded file.
     thumb
         .save_with_format(dst_path, image::ImageFormat::WebP)
-        .or_else(|_| thumb.save_with_format(dst_path, image::ImageFormat::Jpeg))
         .map_err(|e| format!("Failed to encode thumbnail {}: {e}", dst_path.display()))?;
 
     Ok(())
@@ -113,41 +118,54 @@ pub fn generate_thumbnail(src_path: &Path, dst_path: &Path, max_edge: u32) -> Re
 /// Ensure a thumbnail exists on disk for a given file. If not present, generate it.
 pub fn ensure_thumbnail(
     cache_dir: &Path,
+    db_path: &Path,
     file_id: i64,
     file_path: &str,
     modified_at: i64,
     max_edge: u32,
+    budget_bytes: u64,
 ) -> Result<String, String> {
     let dst = get_thumbnail_path(cache_dir, file_id, modified_at, max_edge);
     if dst.exists() {
+        if should_persist_access(&dst) {
+            if let Err(error) = record_thumbnail(db_path, file_id, modified_at, max_edge, &dst) {
+                forget_recent_access(&dst);
+                return Err(error);
+            }
+        }
         return Ok(dst.to_string_lossy().to_string());
     }
 
     let src = Path::new(file_path);
     generate_thumbnail(src, &dst, max_edge)?;
+    record_thumbnail(db_path, file_id, modified_at, max_edge, &dst)?;
+    mark_recent_access(&dst);
+    enforce_thumbnail_cache_budget(db_path, budget_bytes)?;
 
     Ok(dst.to_string_lossy().to_string())
 }
 
-/// Batch generate thumbnails in parallel using limited Rayon worker pool (max 2 threads).
+/// Batch generate thumbnails in parallel using a bounded Rayon worker pool.
 pub fn batch_generate_thumbnails<F>(
     cache_dir: &Path,
+    db_path: &Path,
     items: Vec<(i64, String, i64)>, // (file_id, file_path, modified_at)
     max_edge: u32,
+    budget_bytes: u64,
     progress_callback: Option<F>,
-) -> usize
+) -> Result<usize, String>
 where
     F: Fn(usize, usize) + Send + Sync,
 {
     let total = items.len();
     if total == 0 {
-        return 0;
+        return Ok(0);
     }
 
     let completed_counter = AtomicUsize::new(0);
     let pool = get_thumb_pool();
 
-    let count = pool.install(|| {
+    let generated = pool.install(|| {
         items
             .into_par_iter()
             .filter_map(|(file_id, file_path, modified_at)| {
@@ -164,26 +182,48 @@ where
                     cb(current, total);
                 }
 
-                if generated {
-                    Some(1)
+                if dst.is_file() {
+                    Some((file_id, modified_at, dst, generated))
                 } else {
                     None
                 }
             })
-            .count()
+            .collect::<Vec<_>>()
     });
 
-    count
+    let entries = generated
+        .iter()
+        .filter_map(|(file_id, modified_at, path, _)| {
+            thumbnail_entry(*file_id, *modified_at, max_edge, path).ok()
+        })
+        .collect::<Vec<_>>();
+    let db = Database::connect(db_path).map_err(|error| error.to_string())?;
+    db.upsert_thumbnail_cache_entries(&entries)
+        .map_err(|error| error.to_string())?;
+    for (_, _, path, _) in &generated {
+        mark_recent_access(path);
+    }
+    enforce_thumbnail_cache_budget_with_db(&db, budget_bytes)?;
+    Ok(generated
+        .iter()
+        .filter(|(_, _, _, was_generated)| *was_generated)
+        .count())
 }
 
 /// Get disk statistics for the thumbnail cache.
-pub fn get_thumbnail_cache_stats(cache_dir: &Path) -> Result<ThumbnailCacheStats, String> {
+pub fn get_thumbnail_cache_stats(
+    cache_dir: &Path,
+    db_path: &Path,
+    budget_bytes: u64,
+) -> Result<ThumbnailCacheStats, String> {
+    synchronize_thumbnail_manifest(cache_dir, db_path, budget_bytes)?;
     let thumb_dir = cache_dir.join("thumbnails");
     if !thumb_dir.exists() {
         return Ok(ThumbnailCacheStats {
             total_bytes: 0,
             file_count: 0,
             cache_dir: thumb_dir.to_string_lossy().to_string(),
+            budget_bytes,
         });
     }
 
@@ -205,26 +245,282 @@ pub fn get_thumbnail_cache_stats(cache_dir: &Path) -> Result<ThumbnailCacheStats
         total_bytes,
         file_count,
         cache_dir: thumb_dir.to_string_lossy().to_string(),
+        budget_bytes,
     })
 }
 
 /// Clear all cached thumbnail files from disk.
-pub fn clear_thumbnail_cache(cache_dir: &Path) -> Result<usize, String> {
+pub fn clear_thumbnail_cache(cache_dir: &Path, db_path: &Path) -> Result<usize, String> {
+    if let Some(recent_touches) = RECENT_TOUCHES.get() {
+        if let Ok(mut recent_touches) = recent_touches.lock() {
+            recent_touches.clear();
+        }
+    }
     let thumb_dir = cache_dir.join("thumbnails");
     if !thumb_dir.exists() {
+        Database::connect(db_path)
+            .map_err(|error| error.to_string())?
+            .clear_thumbnail_cache_entries()
+            .map_err(|error| error.to_string())?;
         return Ok(0);
     }
 
     let mut removed = 0;
+    let mut removed_paths = Vec::new();
     if let Ok(entries) = fs::read_dir(&thumb_dir) {
         for entry in entries.flatten() {
             if let Ok(meta) = entry.metadata() {
                 if meta.is_file() && fs::remove_file(entry.path()).is_ok() {
                     removed += 1;
+                    removed_paths.push(entry.path().to_string_lossy().to_string());
                 }
             }
         }
     }
 
+    let db = Database::connect(db_path).map_err(|error| error.to_string())?;
+    let has_remaining_files = fs::read_dir(&thumb_dir)
+        .map(|mut entries| entries.any(|entry| entry.is_ok_and(|entry| entry.path().is_file())))
+        .unwrap_or(false);
+    if has_remaining_files {
+        db.delete_thumbnail_cache_entries(&removed_paths)
+            .map_err(|error| error.to_string())?;
+    } else {
+        db.clear_thumbnail_cache_entries()
+            .map_err(|error| error.to_string())?;
+    }
+
     Ok(removed)
+}
+
+/// Import existing cache files into the manifest and enforce the configured budget.
+pub fn synchronize_thumbnail_manifest(
+    cache_dir: &Path,
+    db_path: &Path,
+    budget_bytes: u64,
+) -> Result<(), String> {
+    let thumb_dir = cache_dir.join("thumbnails");
+    if !thumb_dir.exists() {
+        return Ok(());
+    }
+
+    let db = Database::connect(db_path).map_err(|error| error.to_string())?;
+    let mut pending = Vec::with_capacity(256);
+    for entry in fs::read_dir(&thumb_dir).map_err(|error| error.to_string())? {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(_) => continue,
+        };
+        let Some((file_id, modified_at, max_edge)) = parse_thumbnail_filename(&entry.path()) else {
+            continue;
+        };
+        let accessed_at = entry
+            .metadata()
+            .ok()
+            .and_then(|metadata| metadata.modified().ok())
+            .and_then(|modified| modified.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|duration| duration.as_secs() as i64)
+            .unwrap_or_else(current_timestamp);
+        let Ok(manifest_entry) =
+            thumbnail_entry_at(file_id, modified_at, max_edge, &entry.path(), accessed_at)
+        else {
+            continue;
+        };
+        pending.push(manifest_entry);
+        if pending.len() == 256 {
+            db.upsert_thumbnail_cache_entries(&pending)
+                .map_err(|error| error.to_string())?;
+            pending.clear();
+        }
+    }
+    db.upsert_thumbnail_cache_entries(&pending)
+        .map_err(|error| error.to_string())?;
+    enforce_thumbnail_cache_budget_with_db(&db, budget_bytes)
+}
+
+fn record_thumbnail(
+    db_path: &Path,
+    file_id: i64,
+    modified_at: i64,
+    max_edge: u32,
+    path: &Path,
+) -> Result<(), String> {
+    let entry = thumbnail_entry(file_id, modified_at, max_edge, path)?;
+    Database::connect(db_path)
+        .map_err(|error| error.to_string())?
+        .upsert_thumbnail_cache_entries(&[entry])
+        .map_err(|error| error.to_string())
+}
+
+fn should_persist_access(path: &Path) -> bool {
+    let now = current_timestamp();
+    let key = path.to_string_lossy().to_string();
+    let recent_touches = RECENT_TOUCHES.get_or_init(|| Mutex::new(HashMap::new()));
+    let Ok(mut recent_touches) = recent_touches.lock() else {
+        return true;
+    };
+    if recent_touches
+        .get(&key)
+        .is_some_and(|last_access| now - last_access < ACCESS_PERSIST_INTERVAL_SECONDS)
+    {
+        return false;
+    }
+    if recent_touches.len() >= MAX_RECENT_TOUCHES {
+        recent_touches
+            .retain(|_, last_access| now - *last_access < ACCESS_PERSIST_INTERVAL_SECONDS);
+    }
+    recent_touches.insert(key, now);
+    true
+}
+
+fn mark_recent_access(path: &Path) {
+    let recent_touches = RECENT_TOUCHES.get_or_init(|| Mutex::new(HashMap::new()));
+    if let Ok(mut recent_touches) = recent_touches.lock() {
+        recent_touches.insert(path.to_string_lossy().to_string(), current_timestamp());
+    }
+}
+
+fn forget_recent_access(path: &Path) {
+    let Some(recent_touches) = RECENT_TOUCHES.get() else {
+        return;
+    };
+    if let Ok(mut recent_touches) = recent_touches.lock() {
+        recent_touches.remove(path.to_string_lossy().as_ref());
+    }
+}
+
+fn thumbnail_entry(
+    file_id: i64,
+    modified_at: i64,
+    max_edge: u32,
+    path: &Path,
+) -> Result<ThumbnailCacheEntry, String> {
+    thumbnail_entry_at(file_id, modified_at, max_edge, path, current_timestamp())
+}
+
+fn thumbnail_entry_at(
+    file_id: i64,
+    modified_at: i64,
+    max_edge: u32,
+    path: &Path,
+    last_accessed_at: i64,
+) -> Result<ThumbnailCacheEntry, String> {
+    let metadata = path.metadata().map_err(|error| error.to_string())?;
+    Ok(ThumbnailCacheEntry {
+        file_id,
+        modified_at,
+        max_edge,
+        codec: "webp".to_string(),
+        path: path.to_string_lossy().to_string(),
+        size_bytes: metadata.len(),
+        last_accessed_at,
+    })
+}
+
+fn current_timestamp() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64
+}
+
+fn parse_thumbnail_filename(path: &Path) -> Option<(i64, i64, u32)> {
+    if !path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("webp"))
+    {
+        return None;
+    }
+    let stem = path.file_stem()?.to_str()?;
+    let mut parts = stem.rsplitn(3, '_');
+    let max_edge = parts.next()?.parse().ok()?;
+    let modified_at = parts.next()?.parse().ok()?;
+    let file_id = parts.next()?.parse().ok()?;
+    Some((file_id, modified_at, max_edge))
+}
+
+fn enforce_thumbnail_cache_budget(db_path: &Path, budget_bytes: u64) -> Result<(), String> {
+    let db = Database::connect(db_path).map_err(|error| error.to_string())?;
+    enforce_thumbnail_cache_budget_with_db(&db, budget_bytes)
+}
+
+fn enforce_thumbnail_cache_budget_with_db(db: &Database, budget_bytes: u64) -> Result<(), String> {
+    let (mut total_bytes, _) = db
+        .thumbnail_cache_usage()
+        .map_err(|error| error.to_string())?;
+    while total_bytes > budget_bytes {
+        let candidates = db
+            .list_thumbnail_cache_entries_lru(256)
+            .map_err(|error| error.to_string())?;
+        if candidates.is_empty() {
+            break;
+        }
+
+        let mut deleted_paths = Vec::new();
+        for candidate in candidates {
+            if total_bytes <= budget_bytes {
+                break;
+            }
+            let path = Path::new(&candidate.path);
+            if !path.exists() || fs::remove_file(path).is_ok() {
+                total_bytes = total_bytes.saturating_sub(candidate.size_bytes);
+                deleted_paths.push(candidate.path);
+            }
+        }
+        if deleted_paths.is_empty() {
+            break;
+        }
+        db.delete_thumbnail_cache_entries(&deleted_paths)
+            .map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_dir(name: &str) -> PathBuf {
+        let path =
+            std::env::temp_dir().join(format!("berry-thumbnail-{name}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&path);
+        fs::create_dir_all(path.join("thumbnails")).unwrap();
+        path
+    }
+
+    #[test]
+    fn parses_canonical_thumbnail_filenames() {
+        assert_eq!(
+            parse_thumbnail_filename(Path::new("12_1700000000_384.webp")),
+            Some((12, 1_700_000_000, 384))
+        );
+        assert_eq!(parse_thumbnail_filename(Path::new("invalid.webp")), None);
+        assert_eq!(parse_thumbnail_filename(Path::new("12_10_384.jpg")), None);
+    }
+
+    #[test]
+    fn synchronization_imports_entries_and_evicts_oldest_files() {
+        let dir = test_dir("manifest");
+        let db_path = dir.join("berry.db");
+        Database::connect(&db_path).unwrap();
+        let first = get_thumbnail_path(&dir, 1, 10, 256);
+        let second = get_thumbnail_path(&dir, 2, 20, 256);
+        fs::write(&first, vec![1; 80]).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        fs::write(&second, vec![2; 80]).unwrap();
+
+        synchronize_thumbnail_manifest(&dir, &db_path, 100).unwrap();
+
+        assert!(!first.exists());
+        assert!(second.exists());
+        assert_eq!(
+            Database::connect(&db_path)
+                .unwrap()
+                .thumbnail_cache_usage()
+                .unwrap(),
+            (80, 1)
+        );
+        fs::remove_dir_all(dir).unwrap();
+    }
 }
