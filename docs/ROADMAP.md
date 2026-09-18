@@ -111,3 +111,5 @@ This roadmap documents completed milestones and future engineering goals for **B
 - [x] Coalesce filesystem scan progress events by file count and elapsed time.
 - [x] Stream full-scan directory entries without retaining the complete tree.
 - [ ] Benchmark directory fingerprint strategies on local and network filesystems.
+- [x] Lazy-load infrequent modals and drawers through async component boundaries.
+- [ ] Replace full gallery records with lightweight list DTOs and fetch details on selection.

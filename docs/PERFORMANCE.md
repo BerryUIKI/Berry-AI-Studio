@@ -16,6 +16,11 @@ Berry AI Studio should remain interactive with large local libraries while keepi
 - Library and structured-search results arrive in 400-item pages. Grid, Waterfall, and Table request another page near the loaded boundary while retaining an exact filtered total.
 - Stale page responses are discarded when the user changes folder, search, or sort context.
 
+### Initial UI bundle
+
+- Eighteen infrequent modals and drawers are loaded through async Vue component boundaries only when opened.
+- The production entry bundle decreased from approximately 465 KB to 362 KB uncompressed JavaScript and from 136 KB to 49 KB uncompressed CSS. Gzip sizes decreased from 140.5 KB to 114.9 KB for JavaScript and from 22.1 KB to 9.2 KB for CSS.
+
 ### Thumbnail pipeline
 
 - Visible thumbnails use the single-item path for the shortest latency.
@@ -85,7 +90,7 @@ Progress-event coalescing and streaming full-folder traversal are complete. Foll
 
 ### P2: Component and payload reduction
 
-- Split large modal bundles with dynamic imports.
+- [Completed] Split infrequent modal bundles with dynamic imports.
 - Return lightweight gallery DTOs and fetch full metadata only for the selected item.
 - Move expensive filter aggregation to indexed SQL and cache stable facet counts.
 - Audit object URL and decoded-image lifetime after long browsing sessions.
