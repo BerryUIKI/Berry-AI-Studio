@@ -408,6 +408,8 @@ export const zhTW: typeof en = {
     thumbHd: "448px (高畫質 / 64×7 - 寬幅清晰)",
     thumbUltra: "512px (超高畫質 / 64×8 - 適合大螢幕)",
     cacheManagement: "磁碟縮圖快取管理",
+    thumbnailCacheBudget: "Thumbnail Cache Budget",
+    thumbnailCacheBudgetDesc: "Remove the least recently used thumbnail tiers when the disk cache exceeds this limit",
     currentUsage: "目前占用:",
     calculating: "計算中...",
     thumbnailsCount: "張縮圖",
