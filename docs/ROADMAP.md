@@ -78,6 +78,7 @@ This roadmap documents completed milestones and future engineering goals for **B
   - Manual grouping (`Ctrl+G`), unstacking (`Ctrl+Shift+G`), and hero cover selection (`Alt+S`).
   - Poker deck visual cards with badge counts, inline expand/collapse, and side-by-side compare mode (`C`).
   - Flat stack merge safety with warning confirmation dialog and suppressible settings.
+  - Filter-aware stack counts, heroes, and expansion across navigation, structured, text, and semantic result contexts.
   - Virtualized Waterfall gallery layout mode alongside standard grid.
 
 ---
@@ -113,4 +114,5 @@ This roadmap documents completed milestones and future engineering goals for **B
 - [ ] Benchmark directory fingerprint strategies on local and network filesystems.
 - [x] Lazy-load infrequent modals and drawers through async component boundaries.
 - [x] Remove raw metadata blobs from paginated gallery IPC and fetch full details on selection.
+- [x] Keep navigation filters and stack grouping aligned across paginated text and semantic searches.
 - [ ] Benchmark a dedicated gallery DTO for the remaining structured metadata fields.
