@@ -12,6 +12,7 @@ import {
 import {
   beginThumbnailRequestCycle,
   cancelThumbnailRequests,
+  getThumbnailTier,
   getThumbnailUrl,
   getThumbnailUrlSync,
 } from "../utils/thumbnail";
@@ -36,6 +37,7 @@ const emit = defineEmits<{
 
 const ROW_HEIGHT = 46;
 const OVERSCAN = 6;
+const ROW_THUMBNAIL_EDGE = 36;
 
 const containerRef = ref<HTMLElement | null>(null);
 const scrollTop = ref(0);
@@ -98,7 +100,7 @@ const thumbnailRevision = ref(0);
 // Fast sync or async lookup for row image
 function getRowImageSrc(file: ImageFile): string | null {
   void thumbnailRevision.value;
-  const syncCached = getThumbnailUrlSync(file);
+  const syncCached = getThumbnailUrlSync(file, getThumbnailTier(ROW_THUMBNAIL_EDGE));
   if (syncCached) return syncCached;
   return file.id ? null : assetUrl(file.path);
 }
@@ -112,9 +114,9 @@ watch(
     for (const file of batch) {
       if (
         file.container !== "mp4" && file.container !== "txt" &&
-        !getThumbnailUrlSync(file)
+        !getThumbnailUrlSync(file, getThumbnailTier(ROW_THUMBNAIL_EDGE))
       ) {
-        void getThumbnailUrl(file, undefined, generation)
+        void getThumbnailUrl(file, getThumbnailTier(ROW_THUMBNAIL_EDGE), generation)
           .then(() => {
             thumbnailRevision.value += 1;
           })

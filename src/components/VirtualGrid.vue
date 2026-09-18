@@ -11,6 +11,7 @@ import {
 import {
   beginThumbnailRequestCycle,
   cancelThumbnailRequests,
+  getThumbnailTier,
   getThumbnailUrl,
   getThumbnailUrlSync,
   requestBatchThumbnails,
@@ -286,16 +287,17 @@ const translateY = computed(() => startRow.value * rowHeight.value);
 // unbounded URL map beside the shared LRU thumbnail cache.
 const thumbnailRevision = ref(0);
 
-function getCardImageSrc(file: ImageFile): string | null {
+function getCardImageSrc(file: ImageFile, displayEdge: number): string | null {
   void thumbnailRevision.value;
   if (!file.id) return assetUrl(file.path);
-  return getThumbnailUrlSync(file);
+  return getThumbnailUrlSync(file, getThumbnailTier(displayEdge));
 }
 
-async function loadThumbnailFor(file: ImageFile, generation: number) {
-  if (!file.id || getThumbnailUrlSync(file)) return;
+async function loadThumbnailFor(file: ImageFile, displayEdge: number, generation: number) {
+  const thumbnailTier = getThumbnailTier(displayEdge);
+  if (!file.id || getThumbnailUrlSync(file, thumbnailTier)) return;
   try {
-    await getThumbnailUrl(file, undefined, generation);
+    await getThumbnailUrl(file, thumbnailTier, generation);
     thumbnailRevision.value += 1;
   } catch {
     // The viewport moved before this queued request began decoding.
@@ -314,9 +316,10 @@ watch(
 
     // Resolve visible thumbnails immediately. Do not also submit them to the
     // batch worker: that used to decode the same image twice during fast scroll.
-    for (const f of files) {
-      if (f.id && !getThumbnailUrlSync(f)) {
-        void loadThumbnailFor(f, generation);
+    for (const item of items) {
+      const thumbnailTier = getThumbnailTier(Math.max(item.width || itemWidth.value, item.imageHeight));
+      if (item.file.id && !getThumbnailUrlSync(item.file, thumbnailTier)) {
+        void loadThumbnailFor(item.file, Math.max(item.width || itemWidth.value, item.imageHeight), generation);
       }
     }
     // Prefetch only after scrolling settles. This avoids building an I/O queue
@@ -328,7 +331,7 @@ watch(
       const aheadEnd = Math.min(props.files.length, lastVisibleIndex + 101);
       if (aheadStart < aheadEnd) {
         const aheadSlice = props.files.slice(aheadStart, aheadEnd);
-        void requestBatchThumbnails(aheadSlice, undefined, {
+        void requestBatchThumbnails(aheadSlice, getThumbnailTier(itemWidth.value), {
           generation,
           priority: THUMBNAIL_PRIORITY.NEAR_LOOKAHEAD,
         });
@@ -336,7 +339,7 @@ watch(
       const behindStart = Math.max(0, firstVisibleIndex - 40);
       if (behindStart < firstVisibleIndex) {
         const behindSlice = props.files.slice(behindStart, firstVisibleIndex);
-        void requestBatchThumbnails(behindSlice, undefined, {
+        void requestBatchThumbnails(behindSlice, getThumbnailTier(itemWidth.value), {
           generation,
           priority: THUMBNAIL_PRIORITY.FAR_LOOKAHEAD,
         });
@@ -590,9 +593,9 @@ function onDragStart(e: DragEvent, file: ImageFile) {
                   file.container !== 'mp4' &&
                   file.container !== 'txt' &&
                   !failedImages.has(file.path) &&
-                  getCardImageSrc(file)
+                  getCardImageSrc(file, Math.max(width || itemWidth, imageHeight))
                 "
-                :src="getCardImageSrc(file) || undefined"
+                :src="getCardImageSrc(file, Math.max(width || itemWidth, imageHeight)) || undefined"
                 :alt="getFileName(file.path)"
                 class="thumbnail-img"
                 :class="{ 'nsfw-blurred': blurNsfw && file.is_nsfw && !revealedNsfw.has(file.path) }"
