@@ -408,6 +408,8 @@ export const es: typeof en = {
     thumbHd: "448px (HD / 64×7 - Amplio y nítido)",
     thumbUltra: "512px (Ultra / 64×8 - Pantallas grandes)",
     cacheManagement: "Administración de caché de miniaturas en disco",
+    thumbnailCacheBudget: "Thumbnail Cache Budget",
+    thumbnailCacheBudgetDesc: "Remove the least recently used thumbnail tiers when the disk cache exceeds this limit",
     currentUsage: "Uso actual:",
     calculating: "Calculando...",
     thumbnailsCount: "miniaturas",

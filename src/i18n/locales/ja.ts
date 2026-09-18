@@ -408,6 +408,8 @@ export const ja: typeof en = {
     thumbHd: "448px (高解像度 / 64×7 - ワイド)",
     thumbUltra: "512px (超高解像度 / 64×8 - 大画面向け)",
     cacheManagement: "ディスクサムネイルキャッシュ管理",
+    thumbnailCacheBudget: "Thumbnail Cache Budget",
+    thumbnailCacheBudgetDesc: "Remove the least recently used thumbnail tiers when the disk cache exceeds this limit",
     currentUsage: "現在の使用容量:",
     calculating: "計算中...",
     thumbnailsCount: "枚のサムネイル",

@@ -406,6 +406,8 @@ export const en = {
     thumbHd: "448px (HD / 64×7 - Wide & Sharp)",
     thumbUltra: "512px (Ultra / 64×8 - Big Screen)",
     cacheManagement: "Disk Thumbnail Cache Management",
+    thumbnailCacheBudget: "Thumbnail Cache Budget",
+    thumbnailCacheBudgetDesc: "Remove the least recently used thumbnail tiers when the disk cache exceeds this limit",
     currentUsage: "Current Usage:",
     calculating: "Calculating...",
     thumbnailsCount: "thumbnails",
