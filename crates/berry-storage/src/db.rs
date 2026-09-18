@@ -473,6 +473,25 @@ impl Database {
         Ok(affected as u64)
     }
 
+    /// Delete a bounded set of file paths belonging to one folder.
+    pub fn delete_files_by_paths(
+        &self,
+        folder_id: i64,
+        paths: &[String],
+    ) -> Result<u64, DatabaseError> {
+        if paths.is_empty() {
+            return Ok(0);
+        }
+        let paths_json = serde_json::to_string(paths)?;
+        let affected = self.conn.execute(
+            "DELETE FROM files
+             WHERE folder_id = ?1
+               AND path IN (SELECT value FROM json_each(?2))",
+            params![folder_id, paths_json],
+        )?;
+        Ok(affected as u64)
+    }
+
     /// Helper to deserialize an image file row.
     fn map_row(row: &rusqlite::Row<'_>) -> Result<ImageFile, DatabaseError> {
         let id: i64 = row.get(0)?;
@@ -2814,6 +2833,27 @@ mod tests {
         let files = db.list_files(folder.id).unwrap();
         assert_eq!(files.len(), 1);
         assert_eq!(files[0].path, "/img/a.png");
+    }
+
+    #[test]
+    fn delete_files_by_paths_is_scoped_to_folder() {
+        let db = Database::connect_in_memory().unwrap();
+        let first = db.add_folder("/first").unwrap();
+        let second = db.add_folder("/second").unwrap();
+        db.upsert_file(&image(first.id, "/first/a.png")).unwrap();
+        db.upsert_file(&image(first.id, "/first/b.png")).unwrap();
+        db.upsert_file(&image(second.id, "/second/a.png")).unwrap();
+
+        let removed = db
+            .delete_files_by_paths(
+                first.id,
+                &["/first/a.png".to_string(), "/second/a.png".to_string()],
+            )
+            .unwrap();
+
+        assert_eq!(removed, 1);
+        assert_eq!(db.list_files(first.id).unwrap().len(), 1);
+        assert_eq!(db.list_files(second.id).unwrap().len(), 1);
     }
 
     #[test]

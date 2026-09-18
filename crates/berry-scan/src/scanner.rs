@@ -50,8 +50,10 @@ pub struct ScanProgress {
     pub folder_id: i64,
     /// Media files processed so far (including skipped unchanged ones).
     pub scanned: u64,
-    /// Total media files found by the walk (the progress bar's denominator).
+    /// Media files found so far, or the exact total once discovery finishes.
     pub found: u64,
+    /// Whether the full directory walk may still discover more files.
+    pub discovering: bool,
     /// The file currently being processed, for display.
     pub current: Option<String>,
 }
@@ -84,7 +86,6 @@ impl ProgressCadence {
 
 struct ProgressReporter<F> {
     folder_id: i64,
-    found: u64,
     cadence: ProgressCadence,
     callback: F,
 }
@@ -93,24 +94,32 @@ impl<F> ProgressReporter<F>
 where
     F: FnMut(ScanProgress),
 {
-    fn new(folder_id: i64, found: u64, callback: F) -> Self {
+    fn new(folder_id: i64, callback: F) -> Self {
         Self {
             folder_id,
-            found,
             cadence: ProgressCadence::new(Instant::now()),
             callback,
         }
     }
 
-    fn report(&mut self, scanned: u64, current: Option<String>, force: bool) {
-        if self
-            .cadence
-            .should_emit(scanned, Instant::now(), force || scanned == self.found)
-        {
+    fn report(
+        &mut self,
+        scanned: u64,
+        found: u64,
+        current: Option<String>,
+        discovering: bool,
+        force: bool,
+    ) {
+        if self.cadence.should_emit(
+            scanned,
+            Instant::now(),
+            force || (!discovering && scanned == found),
+        ) {
             (self.callback)(ScanProgress {
                 folder_id: self.folder_id,
                 scanned,
-                found: self.found,
+                found,
+                discovering,
                 current,
             });
         }
@@ -229,12 +238,9 @@ impl Scanner {
         }
 
         let started = Instant::now();
-        let files = collect_media_files(root);
-        let found = files.len() as u64;
-
         let mut stats = ScanStats {
             folder_id,
-            found,
+            found: 0,
             added: 0,
             updated: 0,
             unchanged: 0,
@@ -242,26 +248,24 @@ impl Scanner {
             failed: 0,
             duration_ms: 0,
         };
-        let mut progress = ProgressReporter::new(folder_id, found, on_progress);
+        let mut progress = ProgressReporter::new(folder_id, on_progress);
+        progress.report(0, 0, None, true, true);
 
         // Cache what the database already knows so unchanged files are skipped
         // without reopening them.
         let db = Database::connect(&self.db_path)?;
-        let existing: HashMap<String, (u64, i64, bool)> = db
+        let mut existing: HashMap<String, (u64, i64, bool)> = db
             .list_file_fingerprints(folder_id)?
             .into_iter()
             .map(|(path, size, mtime, has_meta)| (path, (size, mtime, has_meta)))
             .collect();
 
-        // Paths seen this run; rows indexed before but not seen are removed at
-        // the end (orphan cleanup). Failed files are kept in the list so a
-        // temporarily unreadable file does not lose its row.
-        let mut seen: Vec<String> = Vec::with_capacity(files.len());
         // Files awaiting upsert, flushed in batches of BATCH_SIZE.
         let mut pending: Vec<ImageFile> = Vec::with_capacity(BATCH_SIZE);
 
         let mut scanned = 0u64;
-        for file in files {
+        for file in walk_media_files(root) {
+            stats.found += 1;
             scanned += 1;
             let path_str = file.path.to_string_lossy().to_string();
             let current = Some(path_str.clone());
@@ -269,17 +273,16 @@ impl Scanner {
             // Skip unchanged files that already have everything this scan
             // would produce (incremental scan). A forced rebuild bypasses the
             // cache so every file is re-extracted.
-            let cache = existing.get(&path_str);
+            let cache = existing.remove(&path_str);
             let unchanged = !self.force_extract
-                && cache.is_some_and(|(size, mtime, has_metadata)| {
+                && cache.as_ref().is_some_and(|(size, mtime, has_metadata)| {
                     *size == file.size_bytes
                         && *mtime == file.modified_at
                         && (*has_metadata || !self.extracts)
                 });
             if unchanged {
                 stats.unchanged += 1;
-                seen.push(path_str);
-                progress.report(scanned, current, false);
+                progress.report(scanned, stats.found, current, true, false);
                 continue;
             }
 
@@ -289,8 +292,7 @@ impl Scanner {
                 Ok(Some(container)) => container,
                 Ok(None) | Err(_) => {
                     stats.failed += 1;
-                    seen.push(path_str);
-                    progress.report(scanned, current, false);
+                    progress.report(scanned, stats.found, current, true, false);
                     continue;
                 }
             };
@@ -323,19 +325,21 @@ impl Scanner {
                 pending.clear();
             }
 
-            seen.push(path_str);
-            progress.report(scanned, current, false);
+            progress.report(scanned, stats.found, current, true, false);
         }
 
         if !pending.is_empty() {
             db.upsert_files(&pending)?;
         }
 
-        // Drop rows for files that were indexed before but are gone now.
-        stats.removed = db.delete_files_not_in(folder_id, &seen)?;
+        // Entries remaining in the fingerprint map were not observed during
+        // the streaming walk and can be removed without retaining a second
+        // full list of paths seen on disk.
+        let missing_paths = existing.into_keys().collect::<Vec<_>>();
+        stats.removed = db.delete_files_by_paths(folder_id, &missing_paths)?;
 
         stats.duration_ms = started.elapsed().as_millis() as u64;
-        progress.report(scanned, None, true);
+        progress.report(scanned, stats.found, None, false, true);
         Ok(stats)
     }
 
@@ -380,7 +384,7 @@ impl Scanner {
             failed: 0,
             duration_ms: 0,
         };
-        let mut progress = ProgressReporter::new(folder_id, found, on_progress);
+        let mut progress = ProgressReporter::new(folder_id, on_progress);
         let db = Database::connect(&self.db_path)?;
 
         for (index, path) in candidates.into_iter().enumerate() {
@@ -426,11 +430,11 @@ impl Scanner {
                 stats.unchanged += 1;
             }
 
-            progress.report(index as u64 + 1, Some(path_str), false);
+            progress.report(index as u64 + 1, found, Some(path_str), false, false);
         }
 
         stats.duration_ms = started.elapsed().as_millis() as u64;
-        progress.report(found, None, true);
+        progress.report(found, found, None, false, true);
         Ok(stats)
     }
 }
@@ -470,35 +474,32 @@ fn sidecar_image_candidates(path: &Path) -> Vec<PathBuf> {
 /// Recursively collect supported media files under `root`, skipping hidden
 /// directories. Unreadable entries are skipped without failing the scan.
 fn collect_media_files(root: &Path) -> Vec<MediaFile> {
-    let mut files = Vec::new();
-    for entry in WalkDir::new(root)
+    walk_media_files(root).collect()
+}
+
+/// Stream supported media files under `root` without retaining the tree.
+fn walk_media_files(root: &Path) -> impl Iterator<Item = MediaFile> + '_ {
+    WalkDir::new(root)
         .into_iter()
         .filter_entry(|entry| !is_hidden(entry))
-    {
-        let entry = match entry {
-            Ok(entry) => entry,
-            Err(_) => continue,
-        };
-        if !entry.file_type().is_file() || !is_media(entry.path()) {
-            continue;
-        }
-        let meta = match entry.metadata() {
-            Ok(meta) => meta,
-            Err(_) => continue,
-        };
-        let modified_at = meta
-            .modified()
-            .ok()
-            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-            .map(|d| d.as_secs() as i64)
-            .unwrap_or(0);
-        files.push(MediaFile {
-            path: entry.path().to_path_buf(),
-            size_bytes: meta.len(),
-            modified_at,
-        });
-    }
-    files
+        .filter_map(|entry| {
+            let entry = entry.ok()?;
+            if !entry.file_type().is_file() || !is_media(entry.path()) {
+                return None;
+            }
+            let meta = entry.metadata().ok()?;
+            let modified_at = meta
+                .modified()
+                .ok()
+                .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|duration| duration.as_secs() as i64)
+                .unwrap_or(0);
+            Some(MediaFile {
+                path: entry.path().to_path_buf(),
+                size_bytes: meta.len(),
+                modified_at,
+            })
+        })
 }
 
 /// Whether the walker should descend into `entry` (hidden directories are
@@ -852,23 +853,32 @@ mod tests {
     #[test]
     fn progress_reaches_found_count() {
         let env = setup("progress");
-        write(&env.images.join("a.png"), &png(b"one"));
-        write(&env.images.join("b.jpg"), &jpg(b"two"));
-        write(&env.images.join("sub/c.webp"), &webp());
+        for index in 0..70 {
+            write(
+                &env.images.join(format!("set/{index}.png")),
+                &png(b"content"),
+            );
+        }
 
         let db = Database::connect(&env.db).unwrap();
         let folder = db.add_folder(env.images.to_str().unwrap()).unwrap();
 
         let mut last_seen = 0u64;
         let mut max_scanned = 0u64;
+        let mut saw_discovery = false;
+        let mut completed_discovery = false;
         Scanner::new(env.db.clone())
             .scan_folder(folder.id, &env.images, |p| {
                 last_seen = p.scanned;
                 max_scanned = max_scanned.max(p.scanned);
+                saw_discovery |= p.discovering;
+                completed_discovery = !p.discovering && p.current.is_none();
             })
             .unwrap();
-        assert_eq!(max_scanned, 3);
-        assert_eq!(last_seen, 3);
+        assert_eq!(max_scanned, 70);
+        assert_eq!(last_seen, 70);
+        assert!(saw_discovery);
+        assert!(completed_discovery);
 
         drop(db);
         std::fs::remove_dir_all(&env.dir).unwrap();

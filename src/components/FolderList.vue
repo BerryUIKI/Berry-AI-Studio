@@ -84,7 +84,7 @@ function isTargetActive(target: NavTarget): boolean {
 }
 
 const progressPercent = computed(() => {
-  if (!props.progress || props.progress.found === 0) return 0;
+  if (!props.progress || props.progress.discovering || props.progress.found === 0) return 0;
   return Math.round((props.progress.scanned / props.progress.found) * 100);
 });
 
@@ -229,10 +229,18 @@ function onDropOnTag(e: DragEvent, tag: Tag) {
             <button class="ghost remove" title="Remove folder from library" @click.stop="remove(folder)">×</button>
           </div>
 
-          <div v-if="isBusy(folder.id) && props.progress && props.progress.found > 0" class="bar">
-            <div class="fill" :style="{ width: progressPercent + '%' }"></div>
+          <div
+            v-if="isBusy(folder.id) && props.progress && (props.progress.discovering || props.progress.found > 0)"
+            class="bar"
+          >
+            <div
+              class="fill"
+              :class="{ indeterminate: props.progress.discovering }"
+              :style="props.progress.discovering ? undefined : { width: progressPercent + '%' }"
+            ></div>
             <span class="bar-label">
-              {{ props.progress.scanned }} / {{ props.progress.found }}
+              {{ props.progress.scanned }}
+              <template v-if="!props.progress.discovering"> / {{ props.progress.found }}</template>
               <template v-if="props.progress.current"> · {{ props.progress.current }}</template>
             </span>
           </div>
@@ -517,6 +525,23 @@ button.rebuild {
   height: 100%;
   background: #2f6fed;
   transition: width 0.15s ease-out;
+}
+
+.fill.indeterminate {
+  width: 35%;
+  animation: scan-discovery 1.1s ease-in-out infinite;
+}
+
+@keyframes scan-discovery {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(300%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fill.indeterminate {
+    width: 45%;
+    animation: none;
+  }
 }
 
 .bar-label {
