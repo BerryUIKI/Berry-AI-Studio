@@ -27,6 +27,8 @@ Berry AI Studio should remain interactive with large local libraries while keepi
 ### Startup scanning
 
 - Indexed SQLite data is loaded before filesystem scanning begins.
+- Registered roots use a long-lived native watcher. Events are coalesced by path in a durable SQLite journal and reconciled after a 750 ms quiet period.
+- Ordinary file changes re-index only the reported path. Directory changes are limited to the reported subtree, and deleted subtrees are removed with a prefix-bounded query.
 - Startup scanning is disabled for new installations by default.
 - Users who enable it receive a per-folder cooldown (six hours by default), preventing a full tree walk on every launch.
 - Manual scans remain available when immediate reconciliation is required.
@@ -57,9 +59,9 @@ Use browser performance traces for WebView work, Rust timing spans for commands,
 
 The gallery now fetches bounded pages and extends them near the viewport boundary. SQLite returns the exact filtered total with the page through a window count, avoiding a second filter query and full IPC materialization. Offset paging remains intentionally isolated behind the page API; replace it with sort-aware keyset cursors after representative deep-page benchmarks show that SQLite offset traversal is material.
 
-### P0: Filesystem change journal or watcher
+### P0: Filesystem change journal or watcher — Phase 1 complete
 
-The cooldown reduces redundant startup work but does not remove the cost of a due full walk. Add a long-lived watcher for registered roots, persist a small change journal, and reconcile only affected paths. A periodic low-priority verification scan should remain as a recovery mechanism for missed watcher events or offline changes.
+Registered roots now use the platform watcher, a durable coalesced journal, and path-level reconciliation. Optional cooldown scans remain as recovery for offline or missed events. Follow-up work should expose watcher health, add a polling fallback for unreliable network filesystems, and benchmark event storms on large batch imports.
 
 ### P1: Persistent thumbnail manifest and cache budget
 

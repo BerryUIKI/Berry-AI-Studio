@@ -25,7 +25,7 @@
 │        `berry-scan`         ││       `berry-metadata`       │
 │ - Multi-threaded directory  ││ - PNGInfo parameters parser  │
 │   scanner (walkdir)         ││ - ComfyUI workflow JSON tree │
-│ - Incremental mtime cache   ││ - NovelAI comment signatures │
+│ - Targeted watcher reconcile││ - NovelAI comment signatures │
 │ - Batch SQLite transactions ││ - Fooocus & InvokeAI formats │
 │ - Progress event streaming  ││ - EXIF extraction & Sidecars │
 └──────────────┬──────────────┘└──────────────┬───────────────┘
@@ -56,7 +56,7 @@ The Rust backend is structured as a modular Cargo workspace rooted at `/Cargo.to
 | **`src-tauri/`** | Thin application shell. Manages window state, frameless window decorations, app lifecycle, and exposes IPC endpoints to the frontend. | `tauri`, `tauri-plugin-dialog`, `trash`, internal crates |
 | **`crates/berry-domain/`** | Pure domain models, value objects, metadata formats (`MetadataFormat`), sort criteria, and error types. Zero I/O dependencies. | `serde`, `serde_json` |
 | **`crates/berry-metadata/`** | Container sniffers (`detect_container`) and metadata extractors for WebUI (A1111/SD.Next), ComfyUI, NovelAI, Fooocus, InvokeAI, EasyDiffusion, and `.txt` sidecars. | `berry-domain`, `kamadak-exif`, `serde_json` |
-| **`crates/berry-scan/`** | Fast recursive filesystem scanner (`Scanner`). Uses incremental fingerprinting `(size_bytes, modified_at)` to skip unchanged files, batches database upserts, and emits progress events. | `berry-domain`, `berry-metadata`, `berry-storage`, `walkdir` |
+| **`crates/berry-scan/`** | Recursive recovery scanner plus path-targeted reconciliation. Uses incremental fingerprinting `(size_bytes, modified_at)`, batches database upserts, and emits progress events. | `berry-domain`, `berry-metadata`, `berry-storage`, `walkdir` |
 | **`crates/berry-storage/`** | SQLite persistence layer. Owns schema migrations (`MIGRATIONS`), structured metadata indexing, multi-term query builder, model hash reverse cache, and live database backup/restore. | `berry-domain`, `rusqlite` |
 
 ---
@@ -91,6 +91,7 @@ The frontend is built with **Vue 3 Composition API** + **TypeScript** + **Vite**
 
 - The shell loads the indexed SQLite library first so the gallery becomes usable without waiting for filesystem I/O.
 - Optional startup scans are rate-limited per folder. New installations leave startup scanning disabled by default.
+- A cross-platform `notify` watcher records coalesced events in the v10 SQLite journal. After a short quiet period, `berry-scan` reconciles only the affected files or subtrees and the frontend refreshes from SQLite.
 - Visible thumbnails have priority. Look-ahead generation begins only after scrolling settles, is deduplicated, and runs through serialized bounded batches.
 - The disk cache is populated lazily rather than generated in full during import. See [PERFORMANCE.md](PERFORMANCE.md) for tradeoffs and the remaining optimization plan.
 - Standard library and structured-search queries return `FilePage` batches with an exact filtered total. All three gallery modes request subsequent pages near their loaded boundary and reject stale responses after context changes.
