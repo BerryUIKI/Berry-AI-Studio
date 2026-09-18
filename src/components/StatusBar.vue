@@ -14,7 +14,7 @@ const props = defineProps<{
 }>();
 
 const progressPercent = computed(() => {
-  if (!props.progress || props.progress.found === 0) return 0;
+  if (!props.progress || props.progress.discovering || props.progress.found === 0) return 0;
   return Math.min(100, Math.round((props.progress.scanned / props.progress.found) * 100));
 });
 
@@ -63,12 +63,20 @@ const thumbPercent = computed(() => {
       </div>
 
       <!-- Scan Progress -->
-      <div v-else-if="progress && progress.found > 0 && progress.scanned < progress.found" class="scan-status">
+      <div
+        v-else-if="progress && (progress.discovering || (progress.found > 0 && progress.scanned < progress.found))"
+        class="scan-status"
+      >
         <span class="scan-label">
-          {{ t.statusbar.scanning }} {{ progress.scanned }} / {{ progress.found }} ({{ progressPercent }}%)
+          {{ t.statusbar.scanning }} {{ progress.scanned }}
+          <template v-if="!progress.discovering"> / {{ progress.found }} ({{ progressPercent }}%)</template>
         </span>
         <div class="mini-progress-track">
-          <div class="mini-progress-fill" :style="{ width: `${progressPercent}%` }"></div>
+          <div
+            class="mini-progress-fill"
+            :class="{ indeterminate: progress.discovering }"
+            :style="progress.discovering ? undefined : { width: `${progressPercent}%` }"
+          ></div>
         </div>
       </div>
       <span v-else class="ready-badge">{{ t.statusbar.ready }}</span>
@@ -165,6 +173,23 @@ const thumbPercent = computed(() => {
 
 .mini-progress-fill.cyan {
   background: linear-gradient(90deg, #12b5cb, #fab82b);
+}
+
+.mini-progress-fill.indeterminate {
+  width: 35%;
+  animation: scan-discovery 1.1s ease-in-out infinite;
+}
+
+@keyframes scan-discovery {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(300%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mini-progress-fill.indeterminate {
+    width: 45%;
+    animation: none;
+  }
 }
 
 .ready-badge {
