@@ -166,6 +166,37 @@ where
         return Ok(dst.to_string_lossy().to_string());
     }
 
+    let db = Database::connect(db_path).map_err(|error| error.to_string())?;
+    while let Some(entry) = db
+        .find_sufficient_thumbnail_cache_entry(
+            request.file_id,
+            request.modified_at,
+            request.max_edge,
+        )
+        .map_err(|error| error.to_string())?
+    {
+        let reusable_path = PathBuf::from(&entry.path);
+        if reusable_path.is_file() {
+            if should_persist_access(&reusable_path) {
+                let accessed_at = current_timestamp();
+                if let Err(error) = db.touch_thumbnail_cache_entry(
+                    entry.file_id,
+                    entry.modified_at,
+                    entry.max_edge,
+                    &entry.codec,
+                    accessed_at,
+                    accessed_at - ACCESS_PERSIST_INTERVAL_SECONDS,
+                ) {
+                    forget_recent_access(&reusable_path);
+                    return Err(error.to_string());
+                }
+            }
+            return Ok(entry.path);
+        }
+        db.delete_thumbnail_cache_entries(&[entry.path])
+            .map_err(|error| error.to_string())?;
+    }
+
     let src = Path::new(request.file_path);
     get_thumb_pool().install(|| {
         if !should_continue() {
@@ -601,6 +632,49 @@ mod tests {
         assert_eq!(result.generated, 0);
         assert_eq!(result.canceled, 1);
         assert!(!get_thumbnail_path(&dir, 1, 10, 256).exists());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn visible_request_reuses_a_sufficient_cached_tier() {
+        let dir = test_dir("tier-reuse");
+        let db_path = dir.join("berry.db");
+        let db = Database::connect(&db_path).unwrap();
+        let cached_path = get_thumbnail_path(&dir, 1, 10, 384);
+        fs::write(&cached_path, vec![1; 80]).unwrap();
+        let missing_path = get_thumbnail_path(&dir, 1, 10, 320);
+        db.upsert_thumbnail_cache_entries(&[
+            ThumbnailCacheEntry {
+                file_id: 1,
+                modified_at: 10,
+                max_edge: 320,
+                codec: "webp".to_string(),
+                path: missing_path.to_string_lossy().to_string(),
+                size_bytes: 80,
+                last_accessed_at: 1,
+            },
+            thumbnail_entry(1, 10, 384, &cached_path).unwrap(),
+        ])
+        .unwrap();
+
+        let resolved = ensure_thumbnail(
+            &dir,
+            &db_path,
+            ThumbnailRequest {
+                file_id: 1,
+                file_path: dir.join("missing.png").to_string_lossy().as_ref(),
+                modified_at: 10,
+                max_edge: 256,
+            },
+            1024,
+            || true,
+        )
+        .unwrap();
+
+        assert_eq!(Path::new(&resolved), cached_path);
+        assert!(!get_thumbnail_path(&dir, 1, 10, 256).exists());
+        assert_eq!(db.thumbnail_cache_usage().unwrap(), (80, 1));
+        drop(db);
         fs::remove_dir_all(dir).unwrap();
     }
 }

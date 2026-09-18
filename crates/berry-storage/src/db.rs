@@ -1801,6 +1801,35 @@ impl Database {
         Ok(affected > 0)
     }
 
+    /// Return the smallest cached WebP tier that satisfies a requested edge.
+    pub fn find_sufficient_thumbnail_cache_entry(
+        &self,
+        file_id: i64,
+        modified_at: i64,
+        minimum_edge: u32,
+    ) -> Result<Option<ThumbnailCacheEntry>, DatabaseError> {
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT file_id, modified_at, max_edge, codec, path, size_bytes, last_accessed_at
+             FROM thumbnail_cache_entries
+             WHERE file_id = ?1 AND modified_at = ?2 AND max_edge >= ?3 AND codec = 'webp'
+             ORDER BY max_edge ASC
+             LIMIT 1",
+        )?;
+        let mut rows = stmt.query(params![file_id, modified_at, minimum_edge])?;
+        let Some(row) = rows.next()? else {
+            return Ok(None);
+        };
+        Ok(Some(ThumbnailCacheEntry {
+            file_id: row.get(0)?,
+            modified_at: row.get(1)?,
+            max_edge: row.get::<_, i64>(2)?.max(0) as u32,
+            codec: row.get(3)?,
+            path: row.get(4)?,
+            size_bytes: row.get::<_, i64>(5)?.max(0) as u64,
+            last_accessed_at: row.get(6)?,
+        }))
+    }
+
     /// Return total tracked bytes and entry count.
     pub fn thumbnail_cache_usage(&self) -> Result<(u64, usize), DatabaseError> {
         let (bytes, count): (i64, i64) = self.conn.query_row(
@@ -3496,6 +3525,51 @@ mod tests {
         assert_eq!(db.thumbnail_cache_usage().unwrap(), (250, 1));
         db.clear_thumbnail_cache_entries().unwrap();
         assert_eq!(db.thumbnail_cache_usage().unwrap(), (0, 0));
+    }
+
+    #[test]
+    fn thumbnail_manifest_finds_smallest_sufficient_tier() {
+        let db = Database::connect_in_memory().unwrap();
+        let entries = [
+            ThumbnailCacheEntry {
+                file_id: 1,
+                modified_at: 10,
+                max_edge: 256,
+                codec: "webp".to_string(),
+                path: "/cache/256.webp".to_string(),
+                size_bytes: 100,
+                last_accessed_at: 20,
+            },
+            ThumbnailCacheEntry {
+                file_id: 1,
+                modified_at: 10,
+                max_edge: 384,
+                codec: "webp".to_string(),
+                path: "/cache/384.webp".to_string(),
+                size_bytes: 150,
+                last_accessed_at: 20,
+            },
+            ThumbnailCacheEntry {
+                file_id: 1,
+                modified_at: 9,
+                max_edge: 512,
+                codec: "webp".to_string(),
+                path: "/cache/stale.webp".to_string(),
+                size_bytes: 200,
+                last_accessed_at: 20,
+            },
+        ];
+        db.upsert_thumbnail_cache_entries(&entries).unwrap();
+
+        let match_entry = db
+            .find_sufficient_thumbnail_cache_entry(1, 10, 300)
+            .unwrap()
+            .unwrap();
+        assert_eq!(match_entry.max_edge, 384);
+        assert!(db
+            .find_sufficient_thumbnail_cache_entry(1, 10, 448)
+            .unwrap()
+            .is_none());
     }
 
     #[test]
