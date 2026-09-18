@@ -9,7 +9,7 @@ use std::collections::{BTreeSet, HashMap};
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use berry_domain::{Container, ExtractedMetadata, ImageFile};
 use berry_storage::{Database, DatabaseError};
@@ -21,6 +21,12 @@ const MEDIA_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "webp", "mp4"];
 
 /// How many file upserts happen per transaction.
 const BATCH_SIZE: usize = 256;
+
+/// Maximum number of processed files between progress updates.
+const PROGRESS_FILE_INTERVAL: u64 = 64;
+
+/// Maximum time between progress updates while processing slow files.
+const PROGRESS_TIME_INTERVAL: Duration = Duration::from_millis(100);
 
 /// Errors produced by a scan.
 #[derive(Debug, thiserror::Error)]
@@ -48,6 +54,67 @@ pub struct ScanProgress {
     pub found: u64,
     /// The file currently being processed, for display.
     pub current: Option<String>,
+}
+
+struct ProgressCadence {
+    last_scanned: u64,
+    last_emitted_at: Instant,
+}
+
+impl ProgressCadence {
+    fn new(now: Instant) -> Self {
+        Self {
+            last_scanned: 0,
+            last_emitted_at: now,
+        }
+    }
+
+    fn should_emit(&mut self, scanned: u64, now: Instant, force: bool) -> bool {
+        if !force
+            && scanned.saturating_sub(self.last_scanned) < PROGRESS_FILE_INTERVAL
+            && now.duration_since(self.last_emitted_at) < PROGRESS_TIME_INTERVAL
+        {
+            return false;
+        }
+        self.last_scanned = scanned;
+        self.last_emitted_at = now;
+        true
+    }
+}
+
+struct ProgressReporter<F> {
+    folder_id: i64,
+    found: u64,
+    cadence: ProgressCadence,
+    callback: F,
+}
+
+impl<F> ProgressReporter<F>
+where
+    F: FnMut(ScanProgress),
+{
+    fn new(folder_id: i64, found: u64, callback: F) -> Self {
+        Self {
+            folder_id,
+            found,
+            cadence: ProgressCadence::new(Instant::now()),
+            callback,
+        }
+    }
+
+    fn report(&mut self, scanned: u64, current: Option<String>, force: bool) {
+        if self
+            .cadence
+            .should_emit(scanned, Instant::now(), force || scanned == self.found)
+        {
+            (self.callback)(ScanProgress {
+                folder_id: self.folder_id,
+                scanned,
+                found: self.found,
+                current,
+            });
+        }
+    }
 }
 
 /// Aggregate outcome of a completed scan.
@@ -149,13 +216,13 @@ impl Scanner {
 
     /// Scan `root`, indexing every supported media file under `folder_id`.
     ///
-    /// `on_progress` is called after each media file is processed (and once
-    /// more with `current: None` when the scan finishes).
+    /// `on_progress` is rate-limited by file count and elapsed time, then
+    /// called once more with `current: None` when the scan finishes.
     pub fn scan_folder(
         &self,
         folder_id: i64,
         root: &Path,
-        mut on_progress: impl FnMut(ScanProgress),
+        on_progress: impl FnMut(ScanProgress),
     ) -> Result<ScanStats, ScanError> {
         if !root.is_dir() {
             return Err(ScanError::NotADirectory(root.to_path_buf()));
@@ -175,6 +242,7 @@ impl Scanner {
             failed: 0,
             duration_ms: 0,
         };
+        let mut progress = ProgressReporter::new(folder_id, found, on_progress);
 
         // Cache what the database already knows so unchanged files are skipped
         // without reopening them.
@@ -211,12 +279,7 @@ impl Scanner {
             if unchanged {
                 stats.unchanged += 1;
                 seen.push(path_str);
-                on_progress(ScanProgress {
-                    folder_id,
-                    scanned,
-                    found,
-                    current,
-                });
+                progress.report(scanned, current, false);
                 continue;
             }
 
@@ -227,12 +290,7 @@ impl Scanner {
                 Ok(None) | Err(_) => {
                     stats.failed += 1;
                     seen.push(path_str);
-                    on_progress(ScanProgress {
-                        folder_id,
-                        scanned,
-                        found,
-                        current,
-                    });
+                    progress.report(scanned, current, false);
                     continue;
                 }
             };
@@ -266,12 +324,7 @@ impl Scanner {
             }
 
             seen.push(path_str);
-            on_progress(ScanProgress {
-                folder_id,
-                scanned,
-                found,
-                current,
-            });
+            progress.report(scanned, current, false);
         }
 
         if !pending.is_empty() {
@@ -282,12 +335,7 @@ impl Scanner {
         stats.removed = db.delete_files_not_in(folder_id, &seen)?;
 
         stats.duration_ms = started.elapsed().as_millis() as u64;
-        on_progress(ScanProgress {
-            folder_id,
-            scanned,
-            found,
-            current: None,
-        });
+        progress.report(scanned, None, true);
         Ok(stats)
     }
 
@@ -303,7 +351,7 @@ impl Scanner {
         folder_id: i64,
         root: &Path,
         changed_paths: &[PathBuf],
-        mut on_progress: impl FnMut(ScanProgress),
+        on_progress: impl FnMut(ScanProgress),
     ) -> Result<ScanStats, ScanError> {
         if !root.is_dir() {
             return Err(ScanError::NotADirectory(root.to_path_buf()));
@@ -332,6 +380,7 @@ impl Scanner {
             failed: 0,
             duration_ms: 0,
         };
+        let mut progress = ProgressReporter::new(folder_id, found, on_progress);
         let db = Database::connect(&self.db_path)?;
 
         for (index, path) in candidates.into_iter().enumerate() {
@@ -377,21 +426,11 @@ impl Scanner {
                 stats.unchanged += 1;
             }
 
-            on_progress(ScanProgress {
-                folder_id,
-                scanned: index as u64 + 1,
-                found,
-                current: Some(path_str),
-            });
+            progress.report(index as u64 + 1, Some(path_str), false);
         }
 
         stats.duration_ms = started.elapsed().as_millis() as u64;
-        on_progress(ScanProgress {
-            folder_id,
-            scanned: found,
-            found,
-            current: None,
-        });
+        progress.report(found, None, true);
         Ok(stats)
     }
 }
@@ -833,6 +872,19 @@ mod tests {
 
         drop(db);
         std::fs::remove_dir_all(&env.dir).unwrap();
+    }
+
+    #[test]
+    fn progress_cadence_limits_fast_updates_and_preserves_slow_updates() {
+        let started = Instant::now();
+        let mut cadence = ProgressCadence::new(started);
+
+        assert!(!cadence.should_emit(1, started, false));
+        assert!(!cadence.should_emit(63, started, false));
+        assert!(cadence.should_emit(64, started, false));
+        assert!(!cadence.should_emit(65, started, false));
+        assert!(cadence.should_emit(65, started + PROGRESS_TIME_INTERVAL, false));
+        assert!(cadence.should_emit(66, started + PROGRESS_TIME_INTERVAL, true));
     }
 
     #[test]
