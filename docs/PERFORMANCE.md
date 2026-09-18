@@ -39,6 +39,7 @@ Berry AI Studio should remain interactive with large local libraries while keepi
 - Users who enable it receive a per-folder cooldown (six hours by default), preventing a full tree walk on every launch.
 - Manual scans remain available when immediate reconciliation is required.
 - Scan progress is coalesced to at most one update per 64 processed files or 100 ms, with an unconditional completion update. Large scans therefore avoid one Tauri event and reactive UI update per file.
+- Full scans stream media entries from the directory walker into bounded database batches. They do not retain a complete `MediaFile` tree or a duplicate list of seen paths; unmatched database fingerprints identify removals after traversal.
 
 ### Prompt-based organization
 
@@ -78,9 +79,9 @@ The cache now has a persistent size-tiered manifest, rate-limited access trackin
 
 IPC now carries monotonic viewport generations, the backend skips stale work inside the bounded decode pool, and the frontend orders near look-ahead before backward look-ahead. Visible requests begin before the debounced speculative queue. Follow-up work should expose per-job diagnostics and measure cancellation latency with unusually slow network-backed image decoders.
 
-### P1: Faster scan reconciliation
+### P1: Faster scan reconciliation — Phase 1 complete
 
-Progress-event coalescing is complete. Follow-up work should stream directory entries instead of collecting the full tree before indexing and compare directory-level fingerprints where the platform provides reliable metadata. Benchmark network drives separately because traversal latency dominates there.
+Progress-event coalescing and streaming full-folder traversal are complete. Follow-up work should compare directory-level fingerprints where the platform provides reliable metadata. Benchmark network drives separately because traversal latency dominates there.
 
 ### P2: Component and payload reduction
 
