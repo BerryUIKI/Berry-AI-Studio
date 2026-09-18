@@ -5,7 +5,7 @@
 //! batches, and removes rows for files that no longer exist on disk. Metadata
 //! extraction is plugged in from `berry-metadata` via [`Scanner::with_extractor`].
 
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap};
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -290,6 +290,142 @@ impl Scanner {
         });
         Ok(stats)
     }
+
+    /// Reconcile only paths reported by the filesystem watcher.
+    ///
+    /// Existing directories are expanded recursively, deleted paths remove the
+    /// matching row or subtree, and sidecar text changes re-index a sibling
+    /// image when one exists. Unlike [`scan_folder`](Self::scan_folder), this
+    /// method never walks the complete registered root for an ordinary file
+    /// event and never performs whole-folder orphan cleanup.
+    pub fn reconcile_paths(
+        &self,
+        folder_id: i64,
+        root: &Path,
+        changed_paths: &[PathBuf],
+        mut on_progress: impl FnMut(ScanProgress),
+    ) -> Result<ScanStats, ScanError> {
+        if !root.is_dir() {
+            return Err(ScanError::NotADirectory(root.to_path_buf()));
+        }
+
+        let started = Instant::now();
+        let mut candidates = BTreeSet::new();
+        for path in changed_paths.iter().filter(|path| path.starts_with(root)) {
+            if path.is_dir() {
+                candidates.extend(collect_media_files(path).into_iter().map(|file| file.path));
+            } else if is_sidecar(path) {
+                candidates.extend(sidecar_image_candidates(path));
+            } else {
+                candidates.insert(path.clone());
+            }
+        }
+
+        let found = candidates.len() as u64;
+        let mut stats = ScanStats {
+            folder_id,
+            found,
+            added: 0,
+            updated: 0,
+            unchanged: 0,
+            removed: 0,
+            failed: 0,
+            duration_ms: 0,
+        };
+        let db = Database::connect(&self.db_path)?;
+
+        for (index, path) in candidates.into_iter().enumerate() {
+            let path_str = path.to_string_lossy().to_string();
+            if path.is_file() && is_media(&path) {
+                match media_file_from_path(&path).and_then(|file| {
+                    detect_container(&file.path).map(|container| (file, container))
+                }) {
+                    Ok((file, Some(container))) => {
+                        let existing = db.get_file_by_path(&path_str)?;
+                        let metadata = (self.extractor)(container, &file.path);
+                        db.upsert_file(&ImageFile {
+                            id: None,
+                            folder_id,
+                            path: path_str.clone(),
+                            size_bytes: file.size_bytes,
+                            modified_at: file.modified_at,
+                            container,
+                            metadata,
+                            rating: None,
+                            aesthetic_score: None,
+                            is_favorite: false,
+                            is_nsfw: false,
+                            stack_id: None,
+                            stack_order: 0,
+                        })?;
+                        if existing.is_some() {
+                            stats.updated += 1;
+                        } else {
+                            stats.added += 1;
+                        }
+                    }
+                    Ok((_, None)) | Err(_) => stats.failed += 1,
+                }
+            } else if !path.exists() {
+                if db.get_file_by_path(&path_str)?.is_some() {
+                    db.delete_file_by_path(&path_str)?;
+                    stats.removed += 1;
+                }
+                stats.removed +=
+                    db.delete_files_under_path(folder_id, &path_str, std::path::MAIN_SEPARATOR)?;
+            } else {
+                stats.unchanged += 1;
+            }
+
+            on_progress(ScanProgress {
+                folder_id,
+                scanned: index as u64 + 1,
+                found,
+                current: Some(path_str),
+            });
+        }
+
+        stats.duration_ms = started.elapsed().as_millis() as u64;
+        on_progress(ScanProgress {
+            folder_id,
+            scanned: found,
+            found,
+            current: None,
+        });
+        Ok(stats)
+    }
+}
+
+fn media_file_from_path(path: &Path) -> Result<MediaFile, ScanError> {
+    let meta = path.metadata().map_err(|source| ScanError::Read {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    let modified_at = meta
+        .modified()
+        .ok()
+        .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|duration| duration.as_secs() as i64)
+        .unwrap_or(0);
+    Ok(MediaFile {
+        path: path.to_path_buf(),
+        size_bytes: meta.len(),
+        modified_at,
+    })
+}
+
+fn is_sidecar(path: &Path) -> bool {
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("txt"))
+}
+
+fn sidecar_image_candidates(path: &Path) -> Vec<PathBuf> {
+    ["png", "jpg", "jpeg", "webp"]
+        .into_iter()
+        .map(|extension| path.with_extension(extension))
+        .filter(|candidate| candidate.is_file())
+        .collect()
 }
 
 /// Recursively collect supported media files under `root`, skipping hidden
@@ -589,6 +725,71 @@ mod tests {
         let files = db.list_files(folder.id).unwrap();
         assert_eq!(files.len(), 1);
         assert_eq!(files[0].path, paths(&env, "a.png"));
+
+        drop(db);
+        std::fs::remove_dir_all(&env.dir).unwrap();
+    }
+
+    #[test]
+    fn reconcile_paths_updates_only_reported_files_and_directories() {
+        let env = setup("reconcile");
+        write(&env.images.join("a.png"), &png(b"one"));
+        write(&env.images.join("b.jpg"), &jpg(b"two"));
+        write(&env.images.join("untouched.webp"), &webp());
+
+        let db = Database::connect(&env.db).unwrap();
+        let folder = db.add_folder(env.images.to_str().unwrap()).unwrap();
+        scan(&env, folder.id);
+
+        write(&env.images.join("a.png"), &png(b"one changed and longer"));
+        std::fs::remove_file(env.images.join("b.jpg")).unwrap();
+        write(&env.images.join("new/c.png"), &png(b"three"));
+        let stats = Scanner::new(env.db.clone())
+            .reconcile_paths(
+                folder.id,
+                &env.images,
+                &[
+                    env.images.join("a.png"),
+                    env.images.join("b.jpg"),
+                    env.images.join("new"),
+                ],
+                |_| {},
+            )
+            .unwrap();
+
+        assert_eq!(stats.added, 1);
+        assert_eq!(stats.updated, 1);
+        assert_eq!(stats.removed, 1);
+        let files = db.list_files(folder.id).unwrap();
+        assert_eq!(files.len(), 3);
+        assert!(files
+            .iter()
+            .any(|file| file.path == paths(&env, "untouched.webp")));
+        assert!(files
+            .iter()
+            .any(|file| file.path == paths(&env, "new/c.png")));
+
+        drop(db);
+        std::fs::remove_dir_all(&env.dir).unwrap();
+    }
+
+    #[test]
+    fn reconcile_paths_removes_deleted_directory_rows() {
+        let env = setup("reconcile-dir-delete");
+        write(&env.images.join("set/a.png"), &png(b"one"));
+        write(&env.images.join("set/nested/b.png"), &png(b"two"));
+
+        let db = Database::connect(&env.db).unwrap();
+        let folder = db.add_folder(env.images.to_str().unwrap()).unwrap();
+        scan(&env, folder.id);
+        let removed_dir = env.images.join("set");
+        std::fs::remove_dir_all(&removed_dir).unwrap();
+
+        let stats = Scanner::new(env.db.clone())
+            .reconcile_paths(folder.id, &env.images, &[removed_dir], |_| {})
+            .unwrap();
+        assert_eq!(stats.removed, 2);
+        assert!(db.list_files(folder.id).unwrap().is_empty());
 
         drop(db);
         std::fs::remove_dir_all(&env.dir).unwrap();

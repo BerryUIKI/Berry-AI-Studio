@@ -5,8 +5,8 @@ use std::path::{Path, PathBuf};
 
 use berry_domain::{
     Album, CheckpointModelStat, CleanupQueueItem, Container, DatabaseStats, ExtractedMetadata,
-    FilePage, FileSortField, Folder, ImageFile, LoraModel, ModelCacheEntry, PromptStat,
-    SearchCriteria, SimilarityMatch, SortDirection, StackSummary, Tag,
+    FilePage, FileSortField, FilesystemChange, Folder, ImageFile, LoraModel, ModelCacheEntry,
+    PromptStat, SearchCriteria, SimilarityMatch, SortDirection, StackSummary, Tag,
 };
 use rusqlite::{params, Connection, OpenFlags};
 use uuid::Uuid;
@@ -564,6 +564,23 @@ impl Database {
         self.conn
             .execute("DELETE FROM files WHERE path = ?1", [path])?;
         Ok(())
+    }
+
+    /// Delete file rows at or below a directory path without relying on SQL
+    /// wildcard escaping. The caller supplies the native path separator.
+    pub fn delete_files_under_path(
+        &self,
+        folder_id: i64,
+        directory: &str,
+        separator: char,
+    ) -> Result<u64, DatabaseError> {
+        let prefix = format!("{}{}", directory.trim_end_matches(['/', '\\']), separator);
+        let affected = self.conn.execute(
+            "DELETE FROM files
+             WHERE folder_id = ?1 AND (path = ?2 OR substr(path, 1, length(?3)) = ?3)",
+            params![folder_id, directory, prefix],
+        )?;
+        Ok(affected as u64)
     }
 
     /// Delete a file record by id.
@@ -1628,6 +1645,83 @@ impl Database {
         Ok(rows)
     }
 
+    // --- Filesystem change journal ---
+
+    /// Persist watcher events, coalescing repeated changes to the same path.
+    pub fn record_filesystem_changes(
+        &self,
+        changes: &[FilesystemChange],
+    ) -> Result<(), DatabaseError> {
+        if changes.is_empty() {
+            return Ok(());
+        }
+        let tx = self.conn.unchecked_transaction()?;
+        {
+            let mut stmt = tx.prepare_cached(
+                "INSERT INTO filesystem_change_journal (folder_id, path, event_kind, observed_at)
+                 VALUES (?1, ?2, ?3, ?4)
+                 ON CONFLICT(folder_id, path) DO UPDATE SET
+                     event_kind = excluded.event_kind,
+                     observed_at = excluded.observed_at",
+            )?;
+            for change in changes {
+                stmt.execute(params![
+                    change.folder_id,
+                    change.path,
+                    change.event_kind,
+                    change.observed_at
+                ])?;
+            }
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Return the oldest coalesced watcher events without removing them.
+    pub fn list_filesystem_changes(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<FilesystemChange>, DatabaseError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT folder_id, path, event_kind, observed_at
+             FROM filesystem_change_journal
+             ORDER BY observed_at ASC, folder_id ASC, path ASC
+             LIMIT ?1",
+        )?;
+        let rows = stmt
+            .query_map([limit as i64], |row| {
+                Ok(FilesystemChange {
+                    folder_id: row.get(0)?,
+                    path: row.get(1)?,
+                    event_kind: row.get(2)?,
+                    observed_at: row.get(3)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    /// Acknowledge journal entries only after targeted reconciliation succeeds.
+    pub fn delete_filesystem_changes(
+        &self,
+        changes: &[FilesystemChange],
+    ) -> Result<(), DatabaseError> {
+        if changes.is_empty() {
+            return Ok(());
+        }
+        let tx = self.conn.unchecked_transaction()?;
+        {
+            let mut stmt = tx.prepare_cached(
+                "DELETE FROM filesystem_change_journal WHERE folder_id = ?1 AND path = ?2",
+            )?;
+            for change in changes {
+                stmt.execute(params![change.folder_id, change.path])?;
+            }
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
     // --- File Embeddings and Similarity Search ---
 
     /// Insert or update an embedding vector for a file and model.
@@ -2448,6 +2542,55 @@ mod tests {
     }
 
     #[test]
+    fn filesystem_change_journal_coalesces_and_acknowledges_paths() {
+        let db = Database::connect_in_memory().unwrap();
+        let folder = db.add_folder("/img").unwrap();
+        db.record_filesystem_changes(&[
+            FilesystemChange {
+                folder_id: folder.id,
+                path: "/img/a.png".to_string(),
+                event_kind: "create".to_string(),
+                observed_at: 10,
+            },
+            FilesystemChange {
+                folder_id: folder.id,
+                path: "/img/a.png".to_string(),
+                event_kind: "modify".to_string(),
+                observed_at: 20,
+            },
+        ])
+        .unwrap();
+
+        let changes = db.list_filesystem_changes(10).unwrap();
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0].event_kind, "modify");
+        assert_eq!(changes[0].observed_at, 20);
+        db.delete_filesystem_changes(&changes).unwrap();
+        assert!(db.list_filesystem_changes(10).unwrap().is_empty());
+    }
+
+    #[test]
+    fn delete_files_under_path_preserves_sibling_prefixes() {
+        let db = Database::connect_in_memory().unwrap();
+        let folder = db.add_folder("/img").unwrap();
+        db.upsert_files(&[
+            image(folder.id, "/img/set/a.png"),
+            image(folder.id, "/img/set/nested/b.png"),
+            image(folder.id, "/img/set-other/c.png"),
+        ])
+        .unwrap();
+
+        assert_eq!(
+            db.delete_files_under_path(folder.id, "/img/set", '/')
+                .unwrap(),
+            2
+        );
+        let files = db.list_files(folder.id).unwrap();
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].path, "/img/set-other/c.png");
+    }
+
+    #[test]
     fn metadata_roundtrips_through_json_column() {
         use berry_domain::MetadataFormat;
 
@@ -3164,10 +3307,10 @@ mod tests {
     // --- File Embeddings and Similarity Search Tests ---
 
     #[test]
-    fn migration_reaches_schema_version_9() {
+    fn migration_reaches_schema_version_10() {
         let db = Database::connect_in_memory().unwrap();
-        assert_eq!(db.user_version().unwrap(), 9);
-        assert_eq!(LATEST_VERSION, 9);
+        assert_eq!(db.user_version().unwrap(), 10);
+        assert_eq!(LATEST_VERSION, 10);
     }
 
     #[test]

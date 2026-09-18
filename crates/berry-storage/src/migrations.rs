@@ -155,6 +155,19 @@ pub const MIGRATIONS: &[&str] = &[
 
     CREATE INDEX idx_cleanup_schedule ON pipeline_cleanup_queue(scheduled_delete_at, status);
     "#,
+    // v10: durable coalesced filesystem events for targeted reconciliation.
+    r#"
+    CREATE TABLE filesystem_change_journal (
+        folder_id   INTEGER NOT NULL REFERENCES folders(id) ON DELETE CASCADE,
+        path        TEXT NOT NULL,
+        event_kind  TEXT NOT NULL,
+        observed_at INTEGER NOT NULL,
+        PRIMARY KEY (folder_id, path)
+    ) STRICT;
+
+    CREATE INDEX idx_filesystem_change_observed
+        ON filesystem_change_journal(observed_at);
+    "#,
 ];
 
 /// The schema version the current code migrates databases to.
