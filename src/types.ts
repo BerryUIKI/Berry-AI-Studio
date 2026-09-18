@@ -138,6 +138,7 @@ export interface ScanProgress {
   folder_id: number;
   scanned: number;
   found: number;
+  discovering: boolean;
   current: string | null;
 }
 
