@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
-    "test:stack": "node --experimental-strip-types --test tests/stack-collapse.test.mjs",
+    "test:stack": "node --experimental-strip-types --test tests/stack-collapse.test.mjs tests/thumbnail-tier.test.mjs",
     "preview": "vite preview",
     "tauri": "tauri"
   },
