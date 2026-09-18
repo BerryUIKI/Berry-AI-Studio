@@ -103,6 +103,7 @@ The frontend is built with **Vue 3 Composition API** + **TypeScript** + **Vite**
 - Cache statistics, manifest synchronization, clearing, decoding, and eviction run outside the WebView thread. See [PERFORMANCE.md](PERFORMANCE.md) for tradeoffs and the remaining optimization plan.
 - Standard library and structured-search queries return `FilePage` batches with an exact filtered total. All three gallery modes request subsequent pages near their loaded boundary and reject stale responses after context changes.
 - Page filters execute against complete stored metadata, then the gallery projection removes only raw parameter/workflow fields. Prompt/model display fields and stack identity/order remain in each row, so filtering and grouping semantics are unchanged. Selection and Lightbox navigation hydrate the full record through a revision-aware bounded detail cache.
+- Text-query criteria are merged with the active navigation scope before paging. Filtered stack summaries reuse the same SQLite predicate, choose a hero from matching members, and omit single-match groups; expansion requests remain inside that context. Bounded semantic results compute the equivalent summary locally in one pass.
 
 ---
 
@@ -122,3 +123,4 @@ To solve the "AI Burst / Roll" gallery clutter problem:
 - **Discoverable Organization Flow**: `Tools > Organize Library by Prompt` can rescan either the current folder or every registered folder before applying the saved similarity and time-window preferences.
 - **Manual Stacking**: Full keyboard-driven grouping via `Ctrl+G` (stack) and `Ctrl+Shift+G` (unstack).
 - **Poker Deck Presentation**: Collapsed stack presentation with item count badges (`📚 N`), inline expansion, hero cover selection (`Alt+S`), and side-by-side comparison (`C`).
+- **Filter-Aware Grouping**: Folder, album, tag, favorite, sensitivity, structured metadata, and text filters constrain both stack counts and expanded members. A stack becomes a standalone result when only one member matches.

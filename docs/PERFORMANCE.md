@@ -26,6 +26,8 @@ Berry AI Studio should remain interactive with large local libraries while keepi
 - Paginated gallery queries apply every text, structured metadata, album, tag, favorite, NSFW, folder, sort, and range filter against the complete SQLite row before projecting the response.
 - Gallery responses preserve structured metadata required by Grid, Waterfall, Table, prompt copying, and grouping, along with stack identity and order. Large raw parameter strings and workflow graphs are omitted from page IPC.
 - Selecting or previewing a file fetches its complete record by ID. The frontend deduplicates concurrent requests and retains a 64-entry revision-aware LRU, so Inspector raw metadata remains available without repeating detail IPC.
+- Free-form queries retain the active folder, album, tag, favorite, or sensitivity scope instead of widening back to the full library. Stack summaries use the same SQL filter predicate as the page, and filtered expansion loads only matching members.
+- Semantic-search grouping is derived in one pass over its bounded result set, so stack counts and heroes never include images outside the semantic result.
 
 ### Thumbnail pipeline
 
