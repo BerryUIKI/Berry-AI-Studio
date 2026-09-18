@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, shallowRef } from "vue";
+import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, shallowRef, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { open as openFolderDialog } from "@tauri-apps/plugin-dialog";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -153,6 +153,66 @@ const activeFilterCount = computed(() => countActiveFilters(activeCriteria.value
 const selectedFile = ref<ImageFile | null>(null);
 const selectedFilePaths = ref<Set<string>>(new Set());
 const selectionAnchorPath = ref<string | null>(null);
+const fileDetailsCache = new Map<string, ImageFile>();
+const fileDetailsInFlight = new Map<string, Promise<ImageFile>>();
+const MAX_FILE_DETAILS_CACHE = 64;
+
+function fileDetailsKey(file: ImageFile): string | null {
+  return file.id == null ? null : `${file.id}:${file.modified_at}`;
+}
+
+function cacheFileDetails(key: string, file: ImageFile) {
+  fileDetailsCache.delete(key);
+  fileDetailsCache.set(key, file);
+  while (fileDetailsCache.size > MAX_FILE_DETAILS_CACHE) {
+    const oldestKey = fileDetailsCache.keys().next().value;
+    if (oldestKey === undefined) break;
+    fileDetailsCache.delete(oldestKey);
+  }
+}
+
+async function hydrateFileDetails(file: ImageFile) {
+  const key = fileDetailsKey(file);
+  if (!key || file.id == null) return;
+  let details = fileDetailsCache.get(key);
+  if (!details) {
+    let request = fileDetailsInFlight.get(key);
+    if (!request) {
+      request = invoke<ImageFile>("get_file_details", { fileId: file.id });
+      fileDetailsInFlight.set(key, request);
+    }
+    try {
+      details = await request;
+      cacheFileDetails(key, details);
+    } catch (detailError) {
+      console.warn("Failed to load full file details:", detailError);
+      return;
+    } finally {
+      if (fileDetailsInFlight.get(key) === request) fileDetailsInFlight.delete(key);
+    }
+  }
+
+  if (selectedFile.value && fileDetailsKey(selectedFile.value) === key) {
+    selectedFile.value = details;
+  }
+  if (lightboxFile.value && fileDetailsKey(lightboxFile.value) === key) {
+    lightboxFile.value = details;
+  }
+}
+
+watch(
+  () => selectedFile.value?.id,
+  () => {
+    if (selectedFile.value) void hydrateFileDetails(selectedFile.value);
+  },
+);
+
+watch(
+  () => lightboxFile.value?.id,
+  () => {
+    if (lightboxFile.value) void hydrateFileDetails(lightboxFile.value);
+  },
+);
 
 // Fast lookup map computed once per files change (O(1) lookups on selection)
 const filePathMap = computed(() => {
