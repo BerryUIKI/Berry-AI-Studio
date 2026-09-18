@@ -152,6 +152,11 @@ export interface ScanStats {
   duration_ms: number;
 }
 
+export interface LibraryFilesChanged {
+  folder_id: number;
+  stats: ScanStats;
+}
+
 export interface SearchCriteria {
   text?: string | null;
   prompt?: string | null;
@@ -301,4 +306,3 @@ export interface DetectedLora {
   weight: number;
   model?: LoraModel | null;
 }
-

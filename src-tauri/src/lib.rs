@@ -1,4 +1,5 @@
 mod commands;
+mod watcher;
 
 use std::sync::Mutex;
 
@@ -13,6 +14,9 @@ pub struct AppState {
     pub tagger: Mutex<Option<berry_tagger::Wd14Tagger>>,
     /// Optional active CLIP / SigLIP text & image embedding engine.
     pub clip: Mutex<Option<berry_clip::ClipEngine>>,
+    /// Optional cross-platform watcher. Failure to initialize it must not
+    /// prevent the SQLite-backed library from opening.
+    pub watcher: Mutex<Option<watcher::LibraryWatcher>>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -27,11 +31,29 @@ pub fn run() {
             let _ = std::fs::create_dir_all(data_dir.join("updates"));
             let _ = std::fs::create_dir_all(data_dir.join("thumbnails"));
             let _ = std::fs::create_dir_all(data_dir.join("models"));
-            let db = Database::connect(&data_dir.join("berry.db"))?;
+            let database_path = data_dir.join("berry.db");
+            let db = Database::connect(&database_path)?;
+            let folders = db.list_folders()?;
+            let mut filesystem_watcher =
+                match watcher::LibraryWatcher::new(app.handle().clone(), database_path) {
+                    Ok(watcher) => Some(watcher),
+                    Err(error) => {
+                        eprintln!("filesystem watcher is unavailable: {error}");
+                        None
+                    }
+                };
+            if let Some(watcher) = filesystem_watcher.as_mut() {
+                for folder in &folders {
+                    if let Err(error) = watcher.watch_folder(folder) {
+                        eprintln!("could not watch folder {}: {error}", folder.path);
+                    }
+                }
+            }
             app.manage(AppState {
                 db: Mutex::new(db),
                 tagger: Mutex::new(None),
                 clip: Mutex::new(None),
+                watcher: Mutex::new(filesystem_watcher),
             });
             Ok(())
         })

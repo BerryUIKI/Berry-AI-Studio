@@ -11,6 +11,7 @@ import type {
   FilePage,
   Folder,
   ImageFile,
+  LibraryFilesChanged,
   LibraryCounts,
   NavTarget,
   ScanProgress,
@@ -225,6 +226,18 @@ const organizeLibraryNotice = ref("");
 let organizeLibraryNoticeTimer: ReturnType<typeof setTimeout> | null = null;
 
 let unlisten: UnlistenFn | null = null;
+let unlistenLibraryChanges: UnlistenFn | null = null;
+let libraryRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleLibraryRefresh(_event: LibraryFilesChanged) {
+  if (libraryRefreshTimer) clearTimeout(libraryRefreshTimer);
+  libraryRefreshTimer = setTimeout(() => {
+    libraryRefreshTimer = null;
+    void Promise.all([refreshCounts(), reloadFiltersMeta(), loadAlbumsAndTags()]).then(() =>
+      loadFiles(),
+    );
+  }, 500);
+}
 
 function handleWindowKeyDown(e: KeyboardEvent) {
   const tag = (document.activeElement?.tagName ?? "").toLowerCase();
@@ -491,6 +504,10 @@ onMounted(async () => {
   unlisten = await listen<ScanProgress>("scan-progress", (event) => {
     progress.value = event.payload;
   });
+  unlistenLibraryChanges = await listen<LibraryFilesChanged>(
+    "library-files-changed",
+    (event) => scheduleLibraryRefresh(event.payload),
+  );
 
   unlistenThumb = await listen<{ current: number; total: number; done: boolean }>(
     "thumbnail-progress",
@@ -514,7 +531,9 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener("keydown", handleWindowKeyDown);
   if (organizeLibraryNoticeTimer) clearTimeout(organizeLibraryNoticeTimer);
+  if (libraryRefreshTimer) clearTimeout(libraryRefreshTimer);
   unlisten?.();
+  unlistenLibraryChanges?.();
   unlistenThumb?.();
 });
 
