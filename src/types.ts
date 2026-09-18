@@ -178,6 +178,7 @@ export interface SearchCriteria {
   album_id?: number | null;
   tag_id?: number | null;
   folder_id?: number | null;
+  stack_id?: string | null;
   sort?: FileSortField | null;
   direction?: SortDirection | null;
   limit?: number | null;
