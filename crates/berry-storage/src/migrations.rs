@@ -168,6 +168,22 @@ pub const MIGRATIONS: &[&str] = &[
     CREATE INDEX idx_filesystem_change_observed
         ON filesystem_change_journal(observed_at);
     "#,
+    // v11: persistent thumbnail cache manifest for size tiers and LRU cleanup.
+    r#"
+    CREATE TABLE thumbnail_cache_entries (
+        file_id          INTEGER NOT NULL,
+        modified_at      INTEGER NOT NULL,
+        max_edge         INTEGER NOT NULL,
+        codec            TEXT NOT NULL,
+        path             TEXT NOT NULL UNIQUE,
+        size_bytes       INTEGER NOT NULL,
+        last_accessed_at INTEGER NOT NULL,
+        PRIMARY KEY (file_id, modified_at, max_edge, codec)
+    ) STRICT;
+
+    CREATE INDEX idx_thumbnail_cache_lru
+        ON thumbnail_cache_entries(last_accessed_at, path);
+    "#,
 ];
 
 /// The schema version the current code migrates databases to.

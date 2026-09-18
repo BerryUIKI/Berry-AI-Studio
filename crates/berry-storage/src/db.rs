@@ -13,6 +13,18 @@ use uuid::Uuid;
 
 use crate::migrations::{LATEST_VERSION, MIGRATIONS};
 
+/// One persistent thumbnail cache entry keyed by source revision and size tier.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ThumbnailCacheEntry {
+    pub file_id: i64,
+    pub modified_at: i64,
+    pub max_edge: u32,
+    pub codec: String,
+    pub path: String,
+    pub size_bytes: u64,
+    pub last_accessed_at: i64,
+}
+
 /// Errors produced by the storage layer.
 #[derive(Debug, thiserror::Error)]
 pub enum DatabaseError {
@@ -1722,6 +1734,134 @@ impl Database {
         Ok(())
     }
 
+    // --- Thumbnail cache manifest ---
+
+    /// Insert or refresh persistent thumbnail cache metadata.
+    pub fn upsert_thumbnail_cache_entries(
+        &self,
+        entries: &[ThumbnailCacheEntry],
+    ) -> Result<(), DatabaseError> {
+        if entries.is_empty() {
+            return Ok(());
+        }
+        let tx = self.conn.unchecked_transaction()?;
+        {
+            let mut stmt = tx.prepare_cached(
+                "INSERT INTO thumbnail_cache_entries
+                    (file_id, modified_at, max_edge, codec, path, size_bytes, last_accessed_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+                 ON CONFLICT(file_id, modified_at, max_edge, codec) DO UPDATE SET
+                    path = excluded.path,
+                    size_bytes = excluded.size_bytes,
+                    last_accessed_at = excluded.last_accessed_at
+                 WHERE thumbnail_cache_entries.path <> excluded.path
+                    OR thumbnail_cache_entries.size_bytes <> excluded.size_bytes
+                    OR thumbnail_cache_entries.last_accessed_at < excluded.last_accessed_at - 3600",
+            )?;
+            for entry in entries {
+                stmt.execute(params![
+                    entry.file_id,
+                    entry.modified_at,
+                    entry.max_edge,
+                    entry.codec,
+                    entry.path,
+                    entry.size_bytes.min(i64::MAX as u64) as i64,
+                    entry.last_accessed_at,
+                ])?;
+            }
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Refresh access time at most once per caller-selected persistence interval.
+    pub fn touch_thumbnail_cache_entry(
+        &self,
+        file_id: i64,
+        modified_at: i64,
+        max_edge: u32,
+        codec: &str,
+        accessed_at: i64,
+        minimum_previous_access: i64,
+    ) -> Result<bool, DatabaseError> {
+        let affected = self.conn.execute(
+            "UPDATE thumbnail_cache_entries
+             SET last_accessed_at = ?5
+             WHERE file_id = ?1 AND modified_at = ?2 AND max_edge = ?3 AND codec = ?4
+               AND last_accessed_at < ?6",
+            params![
+                file_id,
+                modified_at,
+                max_edge,
+                codec,
+                accessed_at,
+                minimum_previous_access,
+            ],
+        )?;
+        Ok(affected > 0)
+    }
+
+    /// Return total tracked bytes and entry count.
+    pub fn thumbnail_cache_usage(&self) -> Result<(u64, usize), DatabaseError> {
+        let (bytes, count): (i64, i64) = self.conn.query_row(
+            "SELECT coalesce(sum(size_bytes), 0), count(*) FROM thumbnail_cache_entries",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+        Ok((bytes.max(0) as u64, count.max(0) as usize))
+    }
+
+    /// Return the least-recently accessed cache entries first.
+    pub fn list_thumbnail_cache_entries_lru(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<ThumbnailCacheEntry>, DatabaseError> {
+        let mut stmt = self.conn.prepare_cached(
+            "SELECT file_id, modified_at, max_edge, codec, path, size_bytes, last_accessed_at
+             FROM thumbnail_cache_entries
+             ORDER BY last_accessed_at ASC, path ASC
+             LIMIT ?1",
+        )?;
+        let rows = stmt
+            .query_map([limit as i64], |row| {
+                Ok(ThumbnailCacheEntry {
+                    file_id: row.get(0)?,
+                    modified_at: row.get(1)?,
+                    max_edge: row.get::<_, i64>(2)?.max(0) as u32,
+                    codec: row.get(3)?,
+                    path: row.get(4)?,
+                    size_bytes: row.get::<_, i64>(5)?.max(0) as u64,
+                    last_accessed_at: row.get(6)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    /// Remove manifest rows after their disk files have been removed.
+    pub fn delete_thumbnail_cache_entries(&self, paths: &[String]) -> Result<(), DatabaseError> {
+        if paths.is_empty() {
+            return Ok(());
+        }
+        let tx = self.conn.unchecked_transaction()?;
+        {
+            let mut stmt =
+                tx.prepare_cached("DELETE FROM thumbnail_cache_entries WHERE path = ?1")?;
+            for path in paths {
+                stmt.execute([path])?;
+            }
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
+    /// Reset the manifest after an explicit cache clear.
+    pub fn clear_thumbnail_cache_entries(&self) -> Result<(), DatabaseError> {
+        self.conn
+            .execute("DELETE FROM thumbnail_cache_entries", [])?;
+        Ok(())
+    }
+
     // --- File Embeddings and Similarity Search ---
 
     /// Insert or update an embedding vector for a file and model.
@@ -3307,10 +3447,55 @@ mod tests {
     // --- File Embeddings and Similarity Search Tests ---
 
     #[test]
-    fn migration_reaches_schema_version_10() {
+    fn migration_reaches_schema_version_11() {
         let db = Database::connect_in_memory().unwrap();
-        assert_eq!(db.user_version().unwrap(), 10);
-        assert_eq!(LATEST_VERSION, 10);
+        assert_eq!(db.user_version().unwrap(), 11);
+        assert_eq!(LATEST_VERSION, 11);
+    }
+
+    #[test]
+    fn thumbnail_manifest_tracks_usage_lru_and_deletion() {
+        let db = Database::connect_in_memory().unwrap();
+        let entries = vec![
+            ThumbnailCacheEntry {
+                file_id: 1,
+                modified_at: 10,
+                max_edge: 256,
+                codec: "webp".to_string(),
+                path: "/cache/1.webp".to_string(),
+                size_bytes: 100,
+                last_accessed_at: 20,
+            },
+            ThumbnailCacheEntry {
+                file_id: 2,
+                modified_at: 11,
+                max_edge: 512,
+                codec: "webp".to_string(),
+                path: "/cache/2.webp".to_string(),
+                size_bytes: 250,
+                last_accessed_at: 10,
+            },
+        ];
+        db.upsert_thumbnail_cache_entries(&entries).unwrap();
+        assert_eq!(db.thumbnail_cache_usage().unwrap(), (350, 2));
+        assert_eq!(
+            db.list_thumbnail_cache_entries_lru(1).unwrap()[0].path,
+            "/cache/2.webp"
+        );
+
+        assert!(db
+            .touch_thumbnail_cache_entry(2, 11, 512, "webp", 30, 15)
+            .unwrap());
+        assert_eq!(
+            db.list_thumbnail_cache_entries_lru(1).unwrap()[0].path,
+            "/cache/1.webp"
+        );
+
+        db.delete_thumbnail_cache_entries(&["/cache/1.webp".to_string()])
+            .unwrap();
+        assert_eq!(db.thumbnail_cache_usage().unwrap(), (250, 1));
+        db.clear_thumbnail_cache_entries().unwrap();
+        assert_eq!(db.thumbnail_cache_usage().unwrap(), (0, 0));
     }
 
     #[test]
