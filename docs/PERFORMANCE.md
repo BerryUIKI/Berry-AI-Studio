@@ -38,6 +38,7 @@ Berry AI Studio should remain interactive with large local libraries while keepi
 - Startup scanning is disabled for new installations by default.
 - Users who enable it receive a per-folder cooldown (six hours by default), preventing a full tree walk on every launch.
 - Manual scans remain available when immediate reconciliation is required.
+- Scan progress is coalesced to at most one update per 64 processed files or 100 ms, with an unconditional completion update. Large scans therefore avoid one Tauri event and reactive UI update per file.
 
 ### Prompt-based organization
 
@@ -79,7 +80,7 @@ IPC now carries monotonic viewport generations, the backend skips stale work ins
 
 ### P1: Faster scan reconciliation
 
-Stream directory entries instead of collecting the full tree before indexing, reduce progress-event frequency, and compare directory-level fingerprints where the platform provides reliable metadata. Benchmark network drives separately because traversal latency dominates there.
+Progress-event coalescing is complete. Follow-up work should stream directory entries instead of collecting the full tree before indexing and compare directory-level fingerprints where the platform provides reliable metadata. Benchmark network drives separately because traversal latency dominates there.
 
 ### P2: Component and payload reduction
 
