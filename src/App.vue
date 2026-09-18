@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, shallowRef } from "vue";
+import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, shallowRef } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { open as openFolderDialog } from "@tauri-apps/plugin-dialog";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -31,26 +31,8 @@ import { collapseStackMembers, resolveStackHeroPaths } from "./utils/stack";
 import SortBar from "./components/SortBar.vue";
 import SearchBar from "./components/SearchBar.vue";
 import InspectorPane from "./components/InspectorPane.vue";
-import LightboxModal from "./components/LightboxModal.vue";
 import StatusBar from "./components/StatusBar.vue";
-import FilterDrawer from "./components/FilterDrawer.vue";
 import BatchActionBar from "./components/BatchActionBar.vue";
-import AlbumModal from "./components/AlbumModal.vue";
-import TagModal from "./components/TagModal.vue";
-import PromptStatsModal from "./components/PromptStatsModal.vue";
-import ModelManagerModal from "./components/ModelManagerModal.vue";
-import FileOperationModal from "./components/FileOperationModal.vue";
-import DatabaseManagerModal from "./components/DatabaseManagerModal.vue";
-import ShortcutsHelpModal from "./components/ShortcutsHelpModal.vue";
-import SettingsModal from "./components/SettingsModal.vue";
-import UpdateModal from "./components/UpdateModal.vue";
-import AutoTagModal from "./components/AutoTagModal.vue";
-import ClipManagerModal from "./components/ClipManagerModal.vue";
-import LoraManagerModal from "./components/LoraManagerModal.vue";
-import AddFolderModal from "./components/AddFolderModal.vue";
-import OnboardingModal from "./components/OnboardingModal.vue";
-import CompareModal from "./components/CompareModal.vue";
-import StackMergeWarningModal from "./components/StackMergeWarningModal.vue";
 import { t } from "./i18n";
 import { countActiveFilters, criteriaToQuery } from "./utils/search";
 import {
@@ -62,6 +44,27 @@ import {
 } from "./utils/config";
 import { checkForUpdates } from "./utils/updater";
 import { applyTheme, normalizeTheme, type AppTheme } from "./utils/theme";
+
+const LightboxModal = defineAsyncComponent(() => import("./components/LightboxModal.vue"));
+const FilterDrawer = defineAsyncComponent(() => import("./components/FilterDrawer.vue"));
+const AlbumModal = defineAsyncComponent(() => import("./components/AlbumModal.vue"));
+const TagModal = defineAsyncComponent(() => import("./components/TagModal.vue"));
+const PromptStatsModal = defineAsyncComponent(() => import("./components/PromptStatsModal.vue"));
+const ModelManagerModal = defineAsyncComponent(() => import("./components/ModelManagerModal.vue"));
+const FileOperationModal = defineAsyncComponent(() => import("./components/FileOperationModal.vue"));
+const DatabaseManagerModal = defineAsyncComponent(() => import("./components/DatabaseManagerModal.vue"));
+const ShortcutsHelpModal = defineAsyncComponent(() => import("./components/ShortcutsHelpModal.vue"));
+const SettingsModal = defineAsyncComponent(() => import("./components/SettingsModal.vue"));
+const UpdateModal = defineAsyncComponent(() => import("./components/UpdateModal.vue"));
+const AutoTagModal = defineAsyncComponent(() => import("./components/AutoTagModal.vue"));
+const ClipManagerModal = defineAsyncComponent(() => import("./components/ClipManagerModal.vue"));
+const LoraManagerModal = defineAsyncComponent(() => import("./components/LoraManagerModal.vue"));
+const AddFolderModal = defineAsyncComponent(() => import("./components/AddFolderModal.vue"));
+const OnboardingModal = defineAsyncComponent(() => import("./components/OnboardingModal.vue"));
+const CompareModal = defineAsyncComponent(() => import("./components/CompareModal.vue"));
+const StackMergeWarningModal = defineAsyncComponent(
+  () => import("./components/StackMergeWarningModal.vue"),
+);
 
 const info = ref<AppInfo | null>(null);
 const folders = ref<Folder[]>([]);
@@ -1953,6 +1956,7 @@ function onResetZoom() {
 
     <!-- Modals & Drawers -->
     <FilterDrawer
+      v-if="filterDrawerOpen"
       :open="filterDrawerOpen"
       :models="distinctModels"
       :samplers="distinctSamplers"
@@ -1963,12 +1967,14 @@ function onResetZoom() {
     />
 
     <PromptStatsModal
+      v-if="promptStatsModalOpen"
       :open="promptStatsModalOpen"
       @close="promptStatsModalOpen = false"
       @apply-search="onApplyStatsSearch"
     />
 
     <ModelManagerModal
+      v-if="modelManagerModalOpen"
       :show="modelManagerModalOpen"
       @close="modelManagerModalOpen = false"
       @filter-model="onFilterByModel"
@@ -1976,17 +1982,20 @@ function onResetZoom() {
     />
 
     <DatabaseManagerModal
+      v-if="dbManagerModalOpen"
       :show="dbManagerModalOpen"
       @close="dbManagerModalOpen = false"
       @database-changed="onDatabaseChanged"
     />
 
     <ShortcutsHelpModal
+      v-if="shortcutsHelpModalOpen"
       :show="shortcutsHelpModalOpen"
       @close="shortcutsHelpModalOpen = false"
     />
 
     <FileOperationModal
+      v-if="fileOpModalOpen"
       :open="fileOpModalOpen"
       :mode="fileOpMode"
       :files="fileOpTargetFiles"
@@ -1996,6 +2005,7 @@ function onResetZoom() {
     />
 
     <AlbumModal
+      v-if="albumModalOpen"
       :open="albumModalOpen"
       :file-ids="albumTargetFileIds"
       @close="albumModalOpen = false"
@@ -2006,6 +2016,7 @@ function onResetZoom() {
     />
 
     <TagModal
+      v-if="tagModalOpen"
       :open="tagModalOpen"
       :file-ids="tagTargetFileIds"
       @close="tagModalOpen = false"
@@ -2017,6 +2028,7 @@ function onResetZoom() {
 
     <!-- WD14 AI Auto-Tagger Modal -->
     <AutoTagModal
+      v-if="autoTagModalOpen"
       :show="autoTagModalOpen"
       :selected-file="autoTagTargetFile"
       :selected-file-count="selectedFilesList.length"
@@ -2027,6 +2039,7 @@ function onResetZoom() {
 
     <!-- CLIP / SigLIP AI Semantic Search Manager Modal -->
     <ClipManagerModal
+      v-if="clipModalOpen"
       :show="clipModalOpen"
       @close="clipModalOpen = false"
       @indexed="loadFiles"
@@ -2034,6 +2047,7 @@ function onResetZoom() {
 
     <!-- LoRA Trigger Words Manager Modal -->
     <LoraManagerModal
+      v-if="loraModalOpen"
       :show="loraModalOpen"
       @close="loraModalOpen = false"
       @inject-prompt="onInjectPrompt"
@@ -2041,6 +2055,7 @@ function onResetZoom() {
 
     <!-- Settings Modal -->
     <SettingsModal
+      v-if="settingsModalOpen"
       :show="settingsModalOpen"
       :info="info"
       @close="settingsModalOpen = false"
@@ -2049,6 +2064,7 @@ function onResetZoom() {
 
     <!-- Update Modal -->
     <UpdateModal
+      v-if="updateModalOpen"
       :show="updateModalOpen"
       :current-version="info?.app_version || '0.1.1'"
       @close="updateModalOpen = false"
@@ -2076,6 +2092,7 @@ function onResetZoom() {
     />
 
     <StackMergeWarningModal
+      v-if="stackMergeWarningOpen"
       :show="stackMergeWarningOpen"
       :stack-count="(pendingStackMerge?.sourceStackIds.length ?? 0) + 1"
       :image-count="pendingStackMerge?.standaloneFileIds.length ?? 0"
