@@ -21,6 +21,12 @@ Berry AI Studio should remain interactive with large local libraries while keepi
 - Eighteen infrequent modals and drawers are loaded through async Vue component boundaries only when opened.
 - The production entry bundle decreased from approximately 465 KB to 362 KB uncompressed JavaScript and from 136 KB to 49 KB uncompressed CSS. Gzip sizes decreased from 140.5 KB to 114.9 KB for JavaScript and from 22.1 KB to 9.2 KB for CSS.
 
+### Gallery payloads
+
+- Paginated gallery queries apply every text, structured metadata, album, tag, favorite, NSFW, folder, sort, and range filter against the complete SQLite row before projecting the response.
+- Gallery responses preserve structured metadata required by Grid, Waterfall, Table, prompt copying, and grouping, along with stack identity and order. Large raw parameter strings and workflow graphs are omitted from page IPC.
+- Selecting or previewing a file fetches its complete record by ID. The frontend deduplicates concurrent requests and retains a 64-entry revision-aware LRU, so Inspector raw metadata remains available without repeating detail IPC.
+
 ### Thumbnail pipeline
 
 - Visible thumbnails use the single-item path for the shortest latency.
@@ -91,7 +97,8 @@ Progress-event coalescing and streaming full-folder traversal are complete. Foll
 ### P2: Component and payload reduction
 
 - [Completed] Split infrequent modal bundles with dynamic imports.
-- Return lightweight gallery DTOs and fetch full metadata only for the selected item.
+- [Phase 1 complete] Exclude raw workflow payloads from gallery pages and fetch complete metadata on selection.
+- Introduce a dedicated gallery DTO after measuring whether the remaining structured fields materially affect 400-item pages.
 - Move expensive filter aggregation to indexed SQL and cache stable facet counts.
 - Audit object URL and decoded-image lifetime after long browsing sessions.
 
