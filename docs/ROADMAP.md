@@ -105,4 +105,5 @@ This roadmap documents completed milestones and future engineering goals for **B
 - [x] Persistent filesystem watcher journal with targeted path reconciliation and optional recovery scans.
 - [x] Persistent size-tiered thumbnail manifest with configurable LRU disk budget.
 - [x] Cancelable viewport generations with visible-first and directional look-ahead priority.
-- [ ] Zoom-aware thumbnail tier selection and per-job queue diagnostics.
+- [x] Zoom-aware thumbnail tier selection for Gallery and Table surfaces.
+- [ ] Per-job thumbnail queue diagnostics and cached-tier fallback.
