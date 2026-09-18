@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { assetUrl } from "./image";
 import type { ImageFile } from "../types";
+import { selectThumbnailTier } from "./thumbnail-tier";
 
 export interface ThumbnailCacheStats {
   total_bytes: number;
@@ -29,6 +30,7 @@ const THUMBNAIL_BUDGET_SETTING_KEY = "berry_thumbnail_cache_budget_mb";
 const DEFAULT_MAX_EDGE = 384; // 64 * 6, perfect balanced resolution for 130px~360px grid zoom
 const DEFAULT_CACHE_BUDGET_MB = 2048;
 const MAX_MEMORY_CACHE_ENTRIES = 3000;
+let configuredThumbnailMaxEdge: number | null = null;
 
 class LruThumbnailCache {
   private cache = new Map<string, string>();
@@ -140,22 +142,34 @@ export function cancelThumbnailRequests(): void {
  * Get the user-configured max edge resolution from localStorage.
  */
 export function getThumbnailMaxEdge(): number {
+  if (configuredThumbnailMaxEdge !== null) return configuredThumbnailMaxEdge;
   try {
     const val = localStorage.getItem(THUMBNAIL_SETTING_KEY);
     if (val) {
       const parsed = parseInt(val, 10);
-      if (parsed >= 128 && parsed <= 1024) return parsed;
+      if (parsed >= 128 && parsed <= 1024) {
+        configuredThumbnailMaxEdge = parsed;
+        return parsed;
+      }
     }
   } catch {
     // Ignore localStorage access errors
   }
-  return DEFAULT_MAX_EDGE;
+  configuredThumbnailMaxEdge = DEFAULT_MAX_EDGE;
+  return configuredThumbnailMaxEdge;
+}
+
+/** Select a cache tier for a rendered thumbnail without exceeding user settings. */
+export function getThumbnailTier(displayEdge: number): number {
+  const deviceScale = typeof window === "undefined" ? 1 : window.devicePixelRatio;
+  return selectThumbnailTier(displayEdge, getThumbnailMaxEdge(), deviceScale);
 }
 
 /**
  * Save user-configured thumbnail resolution.
  */
 export function setThumbnailMaxEdge(maxEdge: number): void {
+  configuredThumbnailMaxEdge = maxEdge;
   try {
     localStorage.setItem(THUMBNAIL_SETTING_KEY, String(maxEdge));
     // Clear in-memory cache so images request new resolution
@@ -201,10 +215,13 @@ export function getThumbnailCacheKey(
 /**
  * Check if thumbnail URL is already available in memory cache synchronously.
  */
-export function getThumbnailUrlSync(file: ImageFile): string | null {
+export function getThumbnailUrlSync(
+  file: ImageFile,
+  maxEdge: number = getThumbnailMaxEdge(),
+): string | null {
   const fileId = file.id ?? 0;
   if (!fileId) return null;
-  return memoryCache.get(getThumbnailCacheKey(file)) ?? null;
+  return memoryCache.get(getThumbnailCacheKey(file, maxEdge)) ?? null;
 }
 
 /**
