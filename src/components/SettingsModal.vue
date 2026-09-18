@@ -3,9 +3,11 @@ import { onMounted, ref, watch } from "vue";
 import type { AppInfo } from "../types";
 import {
   clearThumbnailCache,
+  getThumbnailCacheBudgetMb,
   getThumbnailCacheStats,
   getThumbnailMaxEdge,
   setThumbnailMaxEdge,
+  setThumbnailCacheBudgetMb,
   type ThumbnailCacheStats,
 } from "../utils/thumbnail";
 import { formatBytes } from "../utils/image";
@@ -42,6 +44,7 @@ const emit = defineEmits<{
     showCardBadges: boolean;
     defaultView: "grid" | "masonry" | "table";
     thumbnailMaxEdge: number;
+    thumbnailCacheBudgetMb: number;
     autoCheckUpdate: boolean;
     allowMultipleStacksOpen: boolean;
   }): void;
@@ -59,6 +62,7 @@ const blurNsfwDefault = ref(true);
 const showCardBadges = ref(true);
 const defaultView = ref<"grid" | "masonry" | "table">("grid");
 const thumbnailMaxEdge = ref(getThumbnailMaxEdge());
+const thumbnailCacheBudgetMb = ref(getThumbnailCacheBudgetMb());
 const autoStack = ref(false);
 const stackSimilarityThreshold = ref(0.85);
 const stackTimeWindowMinutes = ref(180);
@@ -95,6 +99,8 @@ async function loadSettingsAndPaths() {
     showCardBadges.value = config.show_card_badges;
     defaultView.value = config.default_view || "grid";
     thumbnailMaxEdge.value = config.thumbnail_max_edge || getThumbnailMaxEdge();
+    thumbnailCacheBudgetMb.value =
+      config.thumbnail_cache_budget_mb || getThumbnailCacheBudgetMb();
     autoStack.value = config.auto_stack ?? false;
     stackSimilarityThreshold.value = config.stack_similarity_threshold ?? 0.85;
     stackTimeWindowMinutes.value = config.stack_time_window_minutes ?? 180;
@@ -162,6 +168,7 @@ onMounted(() => {
 async function saveSettings() {
   setLocale(selectedLocale.value);
   setThumbnailMaxEdge(thumbnailMaxEdge.value);
+  setThumbnailCacheBudgetMb(thumbnailCacheBudgetMb.value);
   applyTheme(selectedTheme.value);
 
   // Write to persistent config.json
@@ -177,6 +184,7 @@ async function saveSettings() {
       show_card_badges: showCardBadges.value,
       default_view: defaultView.value,
       thumbnail_max_edge: thumbnailMaxEdge.value,
+      thumbnail_cache_budget_mb: thumbnailCacheBudgetMb.value,
       similarity_limit: Number(localStorage.getItem("berry_similarity_limit")) || 50,
       auto_check_update: autoCheckUpdate.value,
       silent_install: localStorage.getItem("berry_silent_install") === "true",
@@ -188,6 +196,7 @@ async function saveSettings() {
   } catch (e) {
     console.error("Failed to save config.json:", e);
   }
+  void loadCacheStats();
 
   emit("save", {
     locale: selectedLocale.value,
@@ -198,6 +207,7 @@ async function saveSettings() {
     showCardBadges: showCardBadges.value,
     defaultView: defaultView.value,
     thumbnailMaxEdge: thumbnailMaxEdge.value,
+    thumbnailCacheBudgetMb: thumbnailCacheBudgetMb.value,
     autoCheckUpdate: autoCheckUpdate.value,
     allowMultipleStacksOpen: allowMultipleStacksOpen.value,
   });
@@ -407,13 +417,28 @@ async function saveSettings() {
               </select>
             </div>
 
+            <div class="setting-row">
+              <div class="row-info">
+                <span class="row-label">{{ t.settings.thumbnailCacheBudget }}</span>
+                <span class="row-desc">{{ t.settings.thumbnailCacheBudgetDesc }}</span>
+              </div>
+              <select v-model.number="thumbnailCacheBudgetMb" class="select-input">
+                <option :value="512">512 MB</option>
+                <option :value="1024">1 GB</option>
+                <option :value="2048">2 GB</option>
+                <option :value="4096">4 GB</option>
+                <option :value="8192">8 GB</option>
+                <option :value="16384">16 GB</option>
+              </select>
+            </div>
+
             <div class="setting-row immediate-action-row">
               <div class="row-info">
                 <span class="row-label">{{ t.settings.cacheManagement }}</span>
                 <span class="row-desc">
                   {{ t.settings.currentUsage }}
                   <strong style="color:#12b5cb;">
-                    {{ cacheStats ? `${formatBytes(cacheStats.total_bytes)} (${cacheStats.file_count} ${t.settings.thumbnailsCount})` : t.settings.calculating }}
+                    {{ cacheStats ? `${formatBytes(cacheStats.total_bytes)} / ${formatBytes(cacheStats.budget_bytes)} (${cacheStats.file_count} ${t.settings.thumbnailsCount})` : t.settings.calculating }}
                   </strong>
                   <span v-if="cacheMessage" style="margin-left: 8px; color: #4ade80;">{{ cacheMessage }}</span>
                 </span>

@@ -10,6 +10,7 @@ export interface AppConfig {
   show_card_badges: boolean;
   default_view: "grid" | "masonry" | "table";
   thumbnail_max_edge: number;
+  thumbnail_cache_budget_mb: number;
   similarity_limit: number;
   auto_check_update: boolean;
   silent_install: boolean;
@@ -41,6 +42,7 @@ const DEFAULT_CONFIG: AppConfig = {
   show_card_badges: true,
   default_view: "grid",
   thumbnail_max_edge: 384,
+  thumbnail_cache_budget_mb: 2048,
   similarity_limit: 50,
   auto_check_update: true,
   silent_install: false,
@@ -101,6 +103,14 @@ export async function loadAppConfig(): Promise<AppConfig> {
       const parsed = parseInt(legacyThumb, 10);
       if (!isNaN(parsed) && parsed > 0) {
         config.thumbnail_max_edge = parsed;
+      }
+    }
+
+    const legacyThumbnailBudget = localStorage.getItem("berry_thumbnail_cache_budget_mb");
+    if (legacyThumbnailBudget) {
+      const parsed = parseInt(legacyThumbnailBudget, 10);
+      if (!isNaN(parsed) && parsed >= 256) {
+        config.thumbnail_cache_budget_mb = parsed;
       }
     }
 
@@ -174,6 +184,10 @@ function syncConfigToLocalStorage(config: AppConfig): void {
     localStorage.setItem("berry_card_badges", String(config.show_card_badges));
     localStorage.setItem("berry_default_view", config.default_view);
     localStorage.setItem("berry_thumbnail_max_edge", String(config.thumbnail_max_edge));
+    localStorage.setItem(
+      "berry_thumbnail_cache_budget_mb",
+      String(config.thumbnail_cache_budget_mb),
+    );
     localStorage.setItem("berry_similarity_limit", String(config.similarity_limit));
     localStorage.setItem("berry_auto_check_update", String(config.auto_check_update));
     localStorage.setItem("berry_silent_install", String(config.silent_install));

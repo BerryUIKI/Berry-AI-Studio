@@ -6,10 +6,13 @@ export interface ThumbnailCacheStats {
   total_bytes: number;
   file_count: number;
   cache_dir: string;
+  budget_bytes: number;
 }
 
 const THUMBNAIL_SETTING_KEY = "berry_thumbnail_max_edge";
+const THUMBNAIL_BUDGET_SETTING_KEY = "berry_thumbnail_cache_budget_mb";
 const DEFAULT_MAX_EDGE = 384; // 64 * 6, perfect balanced resolution for 130px~360px grid zoom
+const DEFAULT_CACHE_BUDGET_MB = 2048;
 const MAX_MEMORY_CACHE_ENTRIES = 3000;
 
 class LruThumbnailCache {
@@ -99,6 +102,29 @@ export function setThumbnailMaxEdge(maxEdge: number): void {
   }
 }
 
+/** Read the configured persistent thumbnail disk budget. */
+export function getThumbnailCacheBudgetMb(): number {
+  try {
+    const value = localStorage.getItem(THUMBNAIL_BUDGET_SETTING_KEY);
+    if (value) {
+      const parsed = parseInt(value, 10);
+      if (parsed >= 256 && parsed <= 65_536) return parsed;
+    }
+  } catch {
+    // Ignore localStorage access errors.
+  }
+  return DEFAULT_CACHE_BUDGET_MB;
+}
+
+/** Save the thumbnail disk budget for synchronous request scheduling. */
+export function setThumbnailCacheBudgetMb(budgetMb: number): void {
+  try {
+    localStorage.setItem(THUMBNAIL_BUDGET_SETTING_KEY, String(budgetMb));
+  } catch {
+    // Ignore localStorage access errors.
+  }
+}
+
 /** Stable cache identity for a particular file revision and thumbnail tier. */
 export function getThumbnailCacheKey(
   file: ImageFile,
@@ -143,6 +169,7 @@ export async function getThumbnailUrl(
         filePath: file.path,
         modifiedAt: file.modified_at,
         maxEdge,
+        cacheBudgetMb: getThumbnailCacheBudgetMb(),
       });
       const url = assetUrl(diskPath);
       memoryCache.set(cacheKey, url);
@@ -203,6 +230,7 @@ export async function requestBatchThumbnails(
         generated += await invoke<number>("batch_generate_thumbnails", {
           items: items.map(({ file_id, file_path, modified_at }) => ({ file_id, file_path, modified_at })),
           maxEdge: nextEdge,
+          cacheBudgetMb: getThumbnailCacheBudgetMb(),
         });
         for (const item of items) batchReadyKeys.add(item.cache_key);
       } catch {
@@ -221,7 +249,9 @@ export async function requestBatchThumbnails(
  * Fetch thumbnail cache statistics from disk.
  */
 export async function getThumbnailCacheStats(): Promise<ThumbnailCacheStats> {
-  return await invoke<ThumbnailCacheStats>("get_thumbnail_cache_stats");
+  return await invoke<ThumbnailCacheStats>("get_thumbnail_cache_stats", {
+    cacheBudgetMb: getThumbnailCacheBudgetMb(),
+  });
 }
 
 /**

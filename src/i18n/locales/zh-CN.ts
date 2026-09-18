@@ -408,6 +408,8 @@ export const zhCN: typeof en = {
     thumbHd: "448px (高清 / 64×7 - 宽幅清晰)",
     thumbUltra: "512px (超清 / 64×8 - 适合大屏)",
     cacheManagement: "磁盘缩略图缓存管理",
+    thumbnailCacheBudget: "Thumbnail Cache Budget",
+    thumbnailCacheBudgetDesc: "Remove the least recently used thumbnail tiers when the disk cache exceeds this limit",
     currentUsage: "当前占用:",
     calculating: "计算中...",
     thumbnailsCount: "张缩略图",
