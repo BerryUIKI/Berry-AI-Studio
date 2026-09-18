@@ -112,4 +112,5 @@ This roadmap documents completed milestones and future engineering goals for **B
 - [x] Stream full-scan directory entries without retaining the complete tree.
 - [ ] Benchmark directory fingerprint strategies on local and network filesystems.
 - [x] Lazy-load infrequent modals and drawers through async component boundaries.
-- [ ] Replace full gallery records with lightweight list DTOs and fetch details on selection.
+- [x] Remove raw metadata blobs from paginated gallery IPC and fetch full details on selection.
+- [ ] Benchmark a dedicated gallery DTO for the remaining structured metadata fields.

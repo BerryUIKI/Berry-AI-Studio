@@ -102,6 +102,7 @@ The frontend is built with **Vue 3 Composition API** + **TypeScript** + **Vite**
 - The disk cache is populated lazily rather than generated in full during import. The v11 SQLite manifest records each file revision, size tier, codec, byte count, and rate-limited access time. A background startup worker imports legacy cache files without delaying first paint, and bounded LRU cleanup enforces the configured disk budget.
 - Cache statistics, manifest synchronization, clearing, decoding, and eviction run outside the WebView thread. See [PERFORMANCE.md](PERFORMANCE.md) for tradeoffs and the remaining optimization plan.
 - Standard library and structured-search queries return `FilePage` batches with an exact filtered total. All three gallery modes request subsequent pages near their loaded boundary and reject stale responses after context changes.
+- Page filters execute against complete stored metadata, then the gallery projection removes only raw parameter/workflow fields. Prompt/model display fields and stack identity/order remain in each row, so filtering and grouping semantics are unchanged. Selection and Lightbox navigation hydrate the full record through a revision-aware bounded detail cache.
 
 ---
 
