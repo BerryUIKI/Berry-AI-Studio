@@ -629,6 +629,27 @@ impl Database {
     /// the same SQLite query. `COUNT(*) OVER()` avoids a second filter pass and
     /// does not materialize the complete result set.
     pub fn search_files_page(&self, criteria: &SearchCriteria) -> Result<FilePage, DatabaseError> {
+        self.search_files_page_with_metadata(criteria, "metadata")
+    }
+
+    /// Search a gallery page while excluding raw metadata payloads that the
+    /// list UI never renders. Filtering still evaluates the complete stored
+    /// metadata before this result projection is applied.
+    pub fn search_gallery_files_page(
+        &self,
+        criteria: &SearchCriteria,
+    ) -> Result<FilePage, DatabaseError> {
+        self.search_files_page_with_metadata(
+            criteria,
+            "CASE WHEN metadata IS NULL THEN NULL ELSE json_set(metadata, '$.parameters', NULL, '$.raw', NULL) END",
+        )
+    }
+
+    fn search_files_page_with_metadata(
+        &self,
+        criteria: &SearchCriteria,
+        metadata_projection: &str,
+    ) -> Result<FilePage, DatabaseError> {
         let mut conditions = Vec::new();
         let mut params: Vec<rusqlite::types::Value> = Vec::new();
 
@@ -784,7 +805,7 @@ impl Database {
         };
 
         let sql = format!(
-            "SELECT id, folder_id, path, container, size_bytes, modified_at, metadata, rating, aesthetic_score, is_favorite, is_nsfw, stack_id, stack_order, COUNT(*) OVER() AS total_count
+            "SELECT id, folder_id, path, container, size_bytes, modified_at, {metadata_projection} AS metadata, rating, aesthetic_score, is_favorite, is_nsfw, stack_id, stack_order, COUNT(*) OVER() AS total_count
              FROM files{where_clause} ORDER BY {order_clause}{limit_clause}"
         );
 
@@ -3028,6 +3049,12 @@ mod tests {
             7.0,
             "12345",
         ));
+        if let Some(metadata) = &mut file1.metadata {
+            metadata.parameters = Some("large raw parameter block".repeat(100));
+            metadata.raw = Some("large workflow graph".repeat(100));
+        }
+        file1.stack_id = Some("stack-filter-test".to_string());
+        file1.stack_order = 2;
 
         let mut file2 = image(folder.id, "/library/nature_forest.png");
         file2.rating = Some(6);
@@ -3164,6 +3191,36 @@ mod tests {
         assert_eq!(final_page.items.len(), 1);
         assert_eq!(final_page.total, 3);
         assert!(!final_page.has_more);
+
+        // Gallery projection preserves structured fields used for filtering
+        // and grouping while excluding raw payloads fetched on selection.
+        let gallery_page = db
+            .search_gallery_files_page(&SearchCriteria {
+                prompt: Some("cyberpunk".to_string()),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(gallery_page.total, 1);
+        let gallery_file = &gallery_page.items[0];
+        let gallery_metadata = gallery_file.metadata.as_ref().unwrap();
+        assert_eq!(
+            gallery_metadata.prompt.as_deref(),
+            Some("a neon cyberpunk cat, 8k resolution, photorealistic")
+        );
+        assert_eq!(
+            gallery_metadata.negative_prompt.as_deref(),
+            Some("blurry, low quality")
+        );
+        assert!(gallery_metadata.parameters.is_none());
+        assert!(gallery_metadata.raw.is_none());
+        assert_eq!(gallery_file.stack_id.as_deref(), Some("stack-filter-test"));
+        assert_eq!(gallery_file.stack_order, 2);
+
+        let full_file = db
+            .get_file_by_path("/library/cyberpunk_cat.png")
+            .unwrap()
+            .unwrap();
+        assert!(full_file.metadata.unwrap().raw.is_some());
 
         // 9. Distinct models and samplers
         let models = db.list_distinct_models().unwrap();

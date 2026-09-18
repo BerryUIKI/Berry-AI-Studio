@@ -233,8 +233,17 @@ pub async fn search_files_page(
     state: State<'_, AppState>,
 ) -> Result<FilePage, String> {
     db(&state)?
-        .search_files_page(&criteria)
+        .search_gallery_files_page(&criteria)
         .map_err(|e| e.to_string())
+}
+
+/// Fetch one complete file record after a gallery summary is selected.
+#[tauri::command]
+pub fn get_file_details(file_id: i64, state: State<'_, AppState>) -> Result<ImageFile, String> {
+    db(&state)?
+        .get_file_by_id(file_id)
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| format!("no file with id {file_id}"))
 }
 
 /// Search indexed files using a parsed query string.
@@ -279,7 +288,7 @@ pub async fn search_files_by_query_page(
     criteria.limit = Some(limit);
     criteria.offset = Some(offset);
     db(&state)?
-        .search_files_page(&criteria)
+        .search_gallery_files_page(&criteria)
         .map_err(|e| e.to_string())
 }
 

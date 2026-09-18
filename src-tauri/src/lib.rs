@@ -95,6 +95,7 @@ pub fn run() {
             commands::rebuild_metadata,
             commands::search_files,
             commands::search_files_page,
+            commands::get_file_details,
             commands::search_files_by_query,
             commands::search_files_by_query_page,
             commands::list_distinct_models,
