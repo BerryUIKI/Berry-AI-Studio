@@ -47,6 +47,21 @@ pub struct ThumbnailProgress {
     pub done: bool,
 }
 
+/// Outcome of one bounded thumbnail batch.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ThumbnailBatchResult {
+    pub generated: usize,
+    pub canceled: usize,
+}
+
+/// Source identity and requested size tier for one visible thumbnail.
+pub struct ThumbnailRequest<'a> {
+    pub file_id: i64,
+    pub file_path: &'a str,
+    pub modified_at: i64,
+    pub max_edge: u32,
+}
+
 /// Compute canonical destination path for a thumbnail.
 pub fn get_thumbnail_path(
     cache_dir: &Path,
@@ -116,19 +131,34 @@ pub fn generate_thumbnail(src_path: &Path, dst_path: &Path, max_edge: u32) -> Re
 }
 
 /// Ensure a thumbnail exists on disk for a given file. If not present, generate it.
-pub fn ensure_thumbnail(
+pub fn ensure_thumbnail<C>(
     cache_dir: &Path,
     db_path: &Path,
-    file_id: i64,
-    file_path: &str,
-    modified_at: i64,
-    max_edge: u32,
+    request: ThumbnailRequest<'_>,
     budget_bytes: u64,
-) -> Result<String, String> {
-    let dst = get_thumbnail_path(cache_dir, file_id, modified_at, max_edge);
+    should_continue: C,
+) -> Result<String, String>
+where
+    C: Fn() -> bool + Send + Sync,
+{
+    if !should_continue() {
+        return Err("thumbnail request canceled".to_string());
+    }
+    let dst = get_thumbnail_path(
+        cache_dir,
+        request.file_id,
+        request.modified_at,
+        request.max_edge,
+    );
     if dst.exists() {
         if should_persist_access(&dst) {
-            if let Err(error) = record_thumbnail(db_path, file_id, modified_at, max_edge, &dst) {
+            if let Err(error) = record_thumbnail(
+                db_path,
+                request.file_id,
+                request.modified_at,
+                request.max_edge,
+                &dst,
+            ) {
                 forget_recent_access(&dst);
                 return Err(error);
             }
@@ -136,9 +166,20 @@ pub fn ensure_thumbnail(
         return Ok(dst.to_string_lossy().to_string());
     }
 
-    let src = Path::new(file_path);
-    generate_thumbnail(src, &dst, max_edge)?;
-    record_thumbnail(db_path, file_id, modified_at, max_edge, &dst)?;
+    let src = Path::new(request.file_path);
+    get_thumb_pool().install(|| {
+        if !should_continue() {
+            return Err("thumbnail request canceled".to_string());
+        }
+        generate_thumbnail(src, &dst, request.max_edge)
+    })?;
+    record_thumbnail(
+        db_path,
+        request.file_id,
+        request.modified_at,
+        request.max_edge,
+        &dst,
+    )?;
     mark_recent_access(&dst);
     enforce_thumbnail_cache_budget(db_path, budget_bytes)?;
 
@@ -146,29 +187,43 @@ pub fn ensure_thumbnail(
 }
 
 /// Batch generate thumbnails in parallel using a bounded Rayon worker pool.
-pub fn batch_generate_thumbnails<F>(
+pub fn batch_generate_thumbnails<F, C>(
     cache_dir: &Path,
     db_path: &Path,
     items: Vec<(i64, String, i64)>, // (file_id, file_path, modified_at)
     max_edge: u32,
     budget_bytes: u64,
     progress_callback: Option<F>,
-) -> Result<usize, String>
+    should_continue: C,
+) -> Result<ThumbnailBatchResult, String>
 where
     F: Fn(usize, usize) + Send + Sync,
+    C: Fn() -> bool + Send + Sync,
 {
     let total = items.len();
     if total == 0 {
-        return Ok(0);
+        return Ok(ThumbnailBatchResult {
+            generated: 0,
+            canceled: 0,
+        });
     }
 
     let completed_counter = AtomicUsize::new(0);
+    let canceled_counter = AtomicUsize::new(0);
     let pool = get_thumb_pool();
 
     let generated = pool.install(|| {
         items
             .into_par_iter()
             .filter_map(|(file_id, file_path, modified_at)| {
+                if !should_continue() {
+                    canceled_counter.fetch_add(1, Ordering::Relaxed);
+                    let current = completed_counter.fetch_add(1, Ordering::Relaxed) + 1;
+                    if let Some(ref cb) = progress_callback {
+                        cb(current, total);
+                    }
+                    return None;
+                }
                 let dst = get_thumbnail_path(cache_dir, file_id, modified_at, max_edge);
                 let generated = if dst.exists() {
                     false
@@ -204,10 +259,13 @@ where
         mark_recent_access(path);
     }
     enforce_thumbnail_cache_budget_with_db(&db, budget_bytes)?;
-    Ok(generated
-        .iter()
-        .filter(|(_, _, _, was_generated)| *was_generated)
-        .count())
+    Ok(ThumbnailBatchResult {
+        generated: generated
+            .iter()
+            .filter(|(_, _, _, was_generated)| *was_generated)
+            .count(),
+        canceled: canceled_counter.load(Ordering::Relaxed),
+    })
 }
 
 /// Get disk statistics for the thumbnail cache.
@@ -521,6 +579,28 @@ mod tests {
                 .unwrap(),
             (80, 1)
         );
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn canceled_batch_skips_files_before_decode() {
+        let dir = test_dir("canceled-batch");
+        let db_path = dir.join("berry.db");
+        Database::connect(&db_path).unwrap();
+        let result = batch_generate_thumbnails(
+            &dir,
+            &db_path,
+            vec![(1, dir.join("missing.png").to_string_lossy().to_string(), 10)],
+            256,
+            1024,
+            None::<fn(usize, usize)>,
+            || false,
+        )
+        .unwrap();
+
+        assert_eq!(result.generated, 0);
+        assert_eq!(result.canceled, 1);
+        assert!(!get_thumbnail_path(&dir, 1, 10, 256).exists());
         fs::remove_dir_all(dir).unwrap();
     }
 }
