@@ -23,6 +23,7 @@ Berry AI Studio should remain interactive with large local libraries while keepi
 - Batch requests are deduplicated, serialized, and split into bounded chunks.
 - Grid, Waterfall, and Table advance a shared viewport generation when their visible range changes. Rust checks that generation again inside the bounded decode pool, so stale queued files are discarded before decoding begins.
 - Near look-ahead outranks backward look-ahead. Cache misses display lightweight placeholders rather than loading full-resolution originals, and placeholder motion follows `prefers-reduced-motion`.
+- Grid and Waterfall requests select the smallest cache tier that covers the rendered card at the current device scale, capped by the user's resolution setting. Table rows use the compact tier instead of generating gallery-sized previews.
 - The Rust decoder uses a dedicated bounded Rayon pool, and the frontend keeps a bounded in-memory URL LRU.
 - SQLite schema v11 persists a thumbnail manifest keyed by file ID, source modification time, size tier, and codec. Access timestamps are written at most once per thumbnail per hour.
 - A configurable disk budget defaults to 2 GB. Generation and background legacy-cache synchronization remove least-recently used tiers in bounded batches when usage exceeds the budget.
@@ -67,9 +68,9 @@ The gallery now fetches bounded pages and extends them near the viewport boundar
 
 Registered roots now use the platform watcher, a durable coalesced journal, and path-level reconciliation. Optional cooldown scans remain as recovery for offline or missed events. Follow-up work should expose watcher health, add a polling fallback for unreliable network filesystems, and benchmark event storms on large batch imports.
 
-### P1: Persistent thumbnail manifest and cache budget — Phase 1 complete
+### P1: Persistent thumbnail manifest and cache budget — Phase 2 complete
 
-The cache now has a persistent size-tiered manifest, rate-limited access tracking, background adoption of legacy files, configurable usage reporting, and bounded LRU enforcement. Follow-up work should select tiers directly from gallery zoom, reuse smaller tiers when their resolution is sufficient, and benchmark manifest adoption with 50k cached files.
+The cache now has a persistent size-tiered manifest, rate-limited access tracking, background adoption of legacy files, configurable usage reporting, and bounded LRU enforcement. Gallery zoom and table density select the smallest sufficient tier while respecting the configured quality ceiling. Follow-up work should reuse an already-cached larger tier when it avoids redundant generation, and benchmark manifest adoption with 50k cached files.
 
 ### P1: Cancelable thumbnail priority queue — Phase 1 complete
 
