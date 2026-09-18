@@ -35,7 +35,7 @@ pub fn run() {
             let db = Database::connect(&database_path)?;
             let folders = db.list_folders()?;
             let mut filesystem_watcher =
-                match watcher::LibraryWatcher::new(app.handle().clone(), database_path) {
+                match watcher::LibraryWatcher::new(app.handle().clone(), database_path.clone()) {
                     Ok(watcher) => Some(watcher),
                     Err(error) => {
                         eprintln!("filesystem watcher is unavailable: {error}");
@@ -55,6 +55,26 @@ pub fn run() {
                 clip: Mutex::new(None),
                 watcher: Mutex::new(filesystem_watcher),
             });
+            let thumbnail_data_dir = data_dir.clone();
+            let thumbnail_database_path = database_path.clone();
+            let thumbnail_budget_mb = std::fs::read_to_string(data_dir.join("config.json"))
+                .ok()
+                .and_then(|content| serde_json::from_str::<commands::AppConfig>(&content).ok())
+                .map(|config| config.thumbnail_cache_budget_mb);
+            if let Err(error) = std::thread::Builder::new()
+                .name("berry-thumbnail-manifest".to_string())
+                .spawn(move || {
+                    if let Err(error) = berry_scan::synchronize_thumbnail_manifest(
+                        &thumbnail_data_dir,
+                        &thumbnail_database_path,
+                        commands::thumbnail_budget_bytes(thumbnail_budget_mb),
+                    ) {
+                        eprintln!("thumbnail manifest synchronization failed: {error}");
+                    }
+                })
+            {
+                eprintln!("thumbnail manifest worker could not start: {error}");
+            }
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

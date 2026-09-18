@@ -1064,14 +1064,25 @@ pub async fn get_or_create_thumbnail(
     file_path: String,
     modified_at: i64,
     max_edge: Option<u32>,
+    cache_budget_mb: Option<u64>,
 ) -> Result<String, String> {
     let data_dir = app_handle
         .path()
         .app_data_dir()
         .map_err(|e| format!("Failed to get app data dir: {e}"))?;
     let max_edge = max_edge.unwrap_or(384);
+    let db_path = data_dir.join("berry.db");
+    let budget_bytes = thumbnail_budget_bytes(cache_budget_mb);
     tauri::async_runtime::spawn_blocking(move || {
-        berry_scan::ensure_thumbnail(&data_dir, file_id, &file_path, modified_at, max_edge)
+        berry_scan::ensure_thumbnail(
+            &data_dir,
+            &db_path,
+            file_id,
+            &file_path,
+            modified_at,
+            max_edge,
+            budget_bytes,
+        )
     })
     .await
     .map_err(|e| e.to_string())?
@@ -1090,12 +1101,15 @@ pub async fn batch_generate_thumbnails(
     app_handle: AppHandle,
     items: Vec<BatchThumbnailItem>,
     max_edge: Option<u32>,
+    cache_budget_mb: Option<u64>,
 ) -> Result<usize, String> {
     let data_dir = app_handle
         .path()
         .app_data_dir()
         .map_err(|e| format!("Failed to get app data dir: {e}"))?;
     let max_edge = max_edge.unwrap_or(384);
+    let db_path = data_dir.join("berry.db");
+    let budget_bytes = thumbnail_budget_bytes(cache_budget_mb);
     let total = items.len();
     let tuples: Vec<(i64, String, i64)> = items
         .into_iter()
@@ -1106,8 +1120,10 @@ pub async fn batch_generate_thumbnails(
     let count = tauri::async_runtime::spawn_blocking(move || {
         berry_scan::batch_generate_thumbnails(
             &data_dir,
+            &db_path,
             tuples,
             max_edge,
+            budget_bytes,
             Some(move |current: usize, total: usize| {
                 let _ = app_clone.emit(
                     "thumbnail-progress",
@@ -1121,7 +1137,7 @@ pub async fn batch_generate_thumbnails(
         )
     })
     .await
-    .map_err(|e| format!("Thumbnail generation task failed: {e}"))?;
+    .map_err(|e| format!("Thumbnail generation task failed: {e}"))??;
 
     let _ = app_handle.emit(
         "thumbnail-progress",
@@ -1137,24 +1153,43 @@ pub async fn batch_generate_thumbnails(
 
 /// Get stats for thumbnail cache on disk.
 #[tauri::command]
-pub fn get_thumbnail_cache_stats(
+pub async fn get_thumbnail_cache_stats(
     app_handle: AppHandle,
+    cache_budget_mb: Option<u64>,
 ) -> Result<berry_scan::ThumbnailCacheStats, String> {
     let data_dir = app_handle
         .path()
         .app_data_dir()
         .map_err(|e| format!("Failed to get app data dir: {e}"))?;
-    berry_scan::get_thumbnail_cache_stats(&data_dir)
+    let db_path = data_dir.join("berry.db");
+    let budget_bytes = thumbnail_budget_bytes(cache_budget_mb);
+    tauri::async_runtime::spawn_blocking(move || {
+        berry_scan::get_thumbnail_cache_stats(&data_dir, &db_path, budget_bytes)
+    })
+    .await
+    .map_err(|error| format!("Thumbnail cache statistics task failed: {error}"))?
 }
 
 /// Clear thumbnail cache files from disk.
 #[tauri::command]
-pub fn clear_thumbnail_cache(app_handle: AppHandle) -> Result<usize, String> {
+pub async fn clear_thumbnail_cache(app_handle: AppHandle) -> Result<usize, String> {
     let data_dir = app_handle
         .path()
         .app_data_dir()
         .map_err(|e| format!("Failed to get app data dir: {e}"))?;
-    berry_scan::clear_thumbnail_cache(&data_dir)
+    let db_path = data_dir.join("berry.db");
+    tauri::async_runtime::spawn_blocking(move || {
+        berry_scan::clear_thumbnail_cache(&data_dir, &db_path)
+    })
+    .await
+    .map_err(|error| format!("Thumbnail cache clearing task failed: {error}"))?
+}
+
+pub(crate) fn thumbnail_budget_bytes(cache_budget_mb: Option<u64>) -> u64 {
+    cache_budget_mb
+        .unwrap_or_else(default_thumbnail_cache_budget_mb)
+        .clamp(256, 65_536)
+        .saturating_mul(1024 * 1024)
 }
 
 // --- Visual Similarity and Embeddings ---
@@ -1968,6 +2003,8 @@ pub struct AppConfig {
     pub show_card_badges: bool,
     pub default_view: String,
     pub thumbnail_max_edge: u32,
+    #[serde(default = "default_thumbnail_cache_budget_mb")]
+    pub thumbnail_cache_budget_mb: u64,
     pub similarity_limit: u32,
     pub auto_check_update: bool,
     pub silent_install: bool,
@@ -1997,6 +2034,10 @@ fn default_theme() -> String {
     "system".to_string()
 }
 
+fn default_thumbnail_cache_budget_mb() -> u64 {
+    2048
+}
+
 fn default_stack_similarity() -> f64 {
     0.85
 }
@@ -2016,6 +2057,7 @@ impl Default for AppConfig {
             show_card_badges: true,
             default_view: "grid".to_string(),
             thumbnail_max_edge: 384,
+            thumbnail_cache_budget_mb: default_thumbnail_cache_budget_mb(),
             similarity_limit: 50,
             auto_check_update: true,
             silent_install: false,
@@ -2042,11 +2084,16 @@ mod app_config_tests {
             .unwrap()
             .remove("startup_scan_interval_minutes");
         value.as_object_mut().unwrap().remove("theme");
+        value
+            .as_object_mut()
+            .unwrap()
+            .remove("thumbnail_cache_budget_mb");
 
         let config: AppConfig = serde_json::from_value(value).unwrap();
         assert!(config.suppressed_warnings.is_empty());
         assert_eq!(config.startup_scan_interval_minutes, 360);
         assert_eq!(config.theme, "system");
+        assert_eq!(config.thumbnail_cache_budget_mb, 2048);
     }
 }
 
