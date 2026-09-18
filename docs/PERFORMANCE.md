@@ -22,6 +22,8 @@ Berry AI Studio should remain interactive with large local libraries while keepi
 - Look-ahead generation waits until scrolling settles, so dragging the scrollbar does not enqueue work for intermediate positions.
 - Batch requests are deduplicated, serialized, and split into bounded chunks.
 - The Rust decoder uses a dedicated bounded Rayon pool, and the frontend keeps a bounded in-memory URL LRU.
+- SQLite schema v11 persists a thumbnail manifest keyed by file ID, source modification time, size tier, and codec. Access timestamps are written at most once per thumbnail per hour.
+- A configurable disk budget defaults to 2 GB. Generation and background legacy-cache synchronization remove least-recently used tiers in bounded batches when usage exceeds the budget.
 - Thumbnails are generated lazily. Import-time generation of the entire library is intentionally avoided because it delays ingest, creates cache entries that may never be viewed, and causes a CPU and disk spike. A future opt-in idle prewarm mode can be added for users who prefer disk usage over first-view latency.
 
 ### Startup scanning
@@ -63,9 +65,9 @@ The gallery now fetches bounded pages and extends them near the viewport boundar
 
 Registered roots now use the platform watcher, a durable coalesced journal, and path-level reconciliation. Optional cooldown scans remain as recovery for offline or missed events. Follow-up work should expose watcher health, add a polling fallback for unreliable network filesystems, and benchmark event storms on large batch imports.
 
-### P1: Persistent thumbnail manifest and cache budget
+### P1: Persistent thumbnail manifest and cache budget — Phase 1 complete
 
-Add a manifest keyed by file ID, modification time, size tier, and codec. Track last access and enforce a configurable disk budget with LRU cleanup. Generate a larger tier only when the selected gallery zoom requires it; reuse smaller tiers when acceptable.
+The cache now has a persistent size-tiered manifest, rate-limited access tracking, background adoption of legacy files, configurable usage reporting, and bounded LRU enforcement. Follow-up work should select tiers directly from gallery zoom, reuse smaller tiers when their resolution is sufficient, and benchmark manifest adoption with 50k cached files.
 
 ### P1: Cancelable thumbnail priority queue
 
