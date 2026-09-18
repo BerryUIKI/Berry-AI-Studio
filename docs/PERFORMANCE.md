@@ -21,6 +21,8 @@ Berry AI Studio should remain interactive with large local libraries while keepi
 - Visible thumbnails use the single-item path for the shortest latency.
 - Look-ahead generation waits until scrolling settles, so dragging the scrollbar does not enqueue work for intermediate positions.
 - Batch requests are deduplicated, serialized, and split into bounded chunks.
+- Grid, Waterfall, and Table advance a shared viewport generation when their visible range changes. Rust checks that generation again inside the bounded decode pool, so stale queued files are discarded before decoding begins.
+- Near look-ahead outranks backward look-ahead. Cache misses display lightweight placeholders rather than loading full-resolution originals, and placeholder motion follows `prefers-reduced-motion`.
 - The Rust decoder uses a dedicated bounded Rayon pool, and the frontend keeps a bounded in-memory URL LRU.
 - SQLite schema v11 persists a thumbnail manifest keyed by file ID, source modification time, size tier, and codec. Access timestamps are written at most once per thumbnail per hour.
 - A configurable disk budget defaults to 2 GB. Generation and background legacy-cache synchronization remove least-recently used tiers in bounded batches when usage exceeds the budget.
@@ -69,9 +71,9 @@ Registered roots now use the platform watcher, a durable coalesced journal, and 
 
 The cache now has a persistent size-tiered manifest, rate-limited access tracking, background adoption of legacy files, configurable usage reporting, and bounded LRU enforcement. Follow-up work should select tiers directly from gallery zoom, reuse smaller tiers when their resolution is sufficient, and benchmark manifest adoption with 50k cached files.
 
-### P1: Cancelable thumbnail priority queue
+### P1: Cancelable thumbnail priority queue — Phase 1 complete
 
-Expose request priority and cancellation across IPC. Visible cards should outrank look-ahead work, and queued jobs that move far outside the viewport should be discarded before decoding begins.
+IPC now carries monotonic viewport generations, the backend skips stale work inside the bounded decode pool, and the frontend orders near look-ahead before backward look-ahead. Visible requests begin before the debounced speculative queue. Follow-up work should expose per-job diagnostics and measure cancellation latency with unusually slow network-backed image decoders.
 
 ### P1: Faster scan reconciliation
 
