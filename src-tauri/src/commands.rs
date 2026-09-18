@@ -133,15 +133,28 @@ pub fn add_folder_with_options(
         _ => None,
     };
 
-    db.add_folder_with_mode(
-        &canonical,
-        &ftype,
-        src.as_deref(),
-        ingest_action.as_deref(),
-        grace_period_hours,
-        auto_harvest.unwrap_or(true),
-    )
-    .map_err(|e| e.to_string())
+    let folder = db
+        .add_folder_with_mode(
+            &canonical,
+            &ftype,
+            src.as_deref(),
+            ingest_action.as_deref(),
+            grace_period_hours,
+            auto_harvest.unwrap_or(true),
+        )
+        .map_err(|e| e.to_string())?;
+    drop(db);
+    if let Ok(mut watcher) = state.watcher.lock() {
+        if let Some(watcher) = watcher.as_mut() {
+            if let Err(error) = watcher.watch_folder(&folder) {
+                eprintln!(
+                    "could not watch newly added folder {}: {error}",
+                    folder.path
+                );
+            }
+        }
+    }
+    Ok(folder)
 }
 
 /// All registered folders, ordered by id.
@@ -153,9 +166,28 @@ pub fn list_folders(state: State<'_, AppState>) -> Result<Vec<Folder>, String> {
 /// Remove a folder and its indexed files.
 #[tauri::command]
 pub fn remove_folder(folder_id: i64, state: State<'_, AppState>) -> Result<(), String> {
-    db(&state)?
+    let database = db(&state)?;
+    let folder = database
+        .list_folders()
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .find(|folder| folder.id == folder_id)
+        .ok_or_else(|| format!("no folder with id {folder_id}"))?;
+    database
         .remove_folder(folder_id)
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    drop(database);
+    if let Ok(mut watcher) = state.watcher.lock() {
+        if let Some(watcher) = watcher.as_mut() {
+            if let Err(error) = watcher.unwatch_folder(&folder) {
+                eprintln!(
+                    "could not stop watching removed folder {}: {error}",
+                    folder.path
+                );
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Files of a folder, ordered by path.

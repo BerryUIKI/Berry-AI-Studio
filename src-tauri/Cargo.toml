@@ -34,5 +34,6 @@ tauri-plugin-opener = "2"
 trash = "5"
 ureq = { version = "2.10", default-features = false, features = ["tls"] }
 uuid = { version = "1", features = ["v4"] }
+notify = "8.2.0"
 
 
