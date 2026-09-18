@@ -9,6 +9,21 @@ export interface ThumbnailCacheStats {
   budget_bytes: number;
 }
 
+interface ThumbnailBatchResult {
+  generated: number;
+  canceled: number;
+}
+
+export const THUMBNAIL_PRIORITY = {
+  FAR_LOOKAHEAD: 10,
+  NEAR_LOOKAHEAD: 20,
+} as const;
+
+interface ThumbnailBatchOptions {
+  generation?: number;
+  priority?: number;
+}
+
 const THUMBNAIL_SETTING_KEY = "berry_thumbnail_max_edge";
 const THUMBNAIL_BUDGET_SETTING_KEY = "berry_thumbnail_cache_budget_mb";
 const DEFAULT_MAX_EDGE = 384; // 64 * 6, perfect balanced resolution for 130px~360px grid zoom
@@ -56,20 +71,70 @@ class LruThumbnailCache {
 // In-memory runtime LRU map of file revision + size tier -> asset URL.
 const memoryCache = new LruThumbnailCache(3000);
 
-// Active in-flight promises to deduplicate concurrent requests for the same file
-const inFlightRequests = new Map<string, Promise<string>>();
+// Active requests are generation-aware so a new viewport never inherits a
+// canceled promise from the previous scroll position.
+const inFlightRequests = new Map<
+  string,
+  { generation?: number; promise: Promise<string> }
+>();
 interface QueuedThumbnail {
   cache_key: string;
   file_id: number;
   file_path: string;
   modified_at: number;
   max_edge: number;
+  generation: number;
+  priority: number;
+  sequence: number;
 }
 
 const queuedBatchItems = new Map<string, QueuedThumbnail>();
 const batchReadyKeys = new Set<string>();
 let batchDrainPromise: Promise<number> | null = null;
+let activeThumbnailGeneration = 0;
+let thumbnailQueueSequence = 0;
+let pendingCancellationGeneration = 0;
+let sentCancellationGeneration = 0;
+let cancellationPromise: Promise<void> | null = null;
 const BATCH_CHUNK_SIZE = 48;
+const CANCELED_REQUEST_MESSAGE = "thumbnail request canceled";
+
+function scheduleThumbnailCancellation(generation: number): Promise<void> {
+  pendingCancellationGeneration = Math.max(pendingCancellationGeneration, generation);
+  if (cancellationPromise) return cancellationPromise;
+
+  cancellationPromise = (async () => {
+    while (sentCancellationGeneration < pendingCancellationGeneration) {
+      const nextGeneration = pendingCancellationGeneration;
+      try {
+        await invoke("cancel_thumbnail_requests", { generation: nextGeneration });
+      } finally {
+        sentCancellationGeneration = nextGeneration;
+      }
+    }
+  })().finally(() => {
+    cancellationPromise = null;
+    if (sentCancellationGeneration < pendingCancellationGeneration) {
+      void scheduleThumbnailCancellation(pendingCancellationGeneration);
+    }
+  });
+  return cancellationPromise;
+}
+
+/** Start a viewport generation and invalidate stale visible and look-ahead work. */
+export function beginThumbnailRequestCycle(): number {
+  activeThumbnailGeneration += 1;
+  queuedBatchItems.clear();
+  void scheduleThumbnailCancellation(activeThumbnailGeneration).catch(() => {
+    // A later request also advances the backend generation.
+  });
+  return activeThumbnailGeneration;
+}
+
+/** Cancel pending work when a gallery surface is removed. */
+export function cancelThumbnailRequests(): void {
+  beginThumbnailRequestCycle();
+}
 
 /**
  * Get the user-configured max edge resolution from localStorage.
@@ -95,8 +160,8 @@ export function setThumbnailMaxEdge(maxEdge: number): void {
     localStorage.setItem(THUMBNAIL_SETTING_KEY, String(maxEdge));
     // Clear in-memory cache so images request new resolution
     memoryCache.clear();
-    queuedBatchItems.clear();
     batchReadyKeys.clear();
+    beginThumbnailRequestCycle();
   } catch {
     // Ignore errors
   }
@@ -148,6 +213,7 @@ export function getThumbnailUrlSync(file: ImageFile): string | null {
 export async function getThumbnailUrl(
   file: ImageFile,
   maxEdge: number = getThumbnailMaxEdge(),
+  generation?: number,
 ): Promise<string> {
   const fileId = file.id ?? 0;
   if (!fileId) return assetUrl(file.path);
@@ -158,33 +224,46 @@ export async function getThumbnailUrl(
   if (cached) return cached;
 
   // Deduplicate in-flight requests
-  if (inFlightRequests.has(cacheKey)) {
-    return inFlightRequests.get(cacheKey)!;
+  const existingRequest = inFlightRequests.get(cacheKey);
+  if (
+    existingRequest &&
+    (existingRequest.generation === undefined || existingRequest.generation === generation)
+  ) {
+    return existingRequest.promise;
   }
 
-  const promise = (async () => {
+  let promise!: Promise<string>;
+  promise = (async () => {
     try {
       const diskPath = await invoke<string>("get_or_create_thumbnail", {
-        fileId,
-        filePath: file.path,
-        modifiedAt: file.modified_at,
-        maxEdge,
-        cacheBudgetMb: getThumbnailCacheBudgetMb(),
+        request: {
+          fileId,
+          filePath: file.path,
+          modifiedAt: file.modified_at,
+          maxEdge,
+          cacheBudgetMb: getThumbnailCacheBudgetMb(),
+          generation,
+        },
       });
       const url = assetUrl(diskPath);
       memoryCache.set(cacheKey, url);
       return url;
-    } catch {
+    } catch (error) {
+      if (generation !== undefined && String(error).includes(CANCELED_REQUEST_MESSAGE)) {
+        throw error;
+      }
       // Fallback to original image if downsampling fails (e.g. video)
       const fallbackUrl = assetUrl(file.path);
       memoryCache.set(cacheKey, fallbackUrl);
       return fallbackUrl;
     } finally {
-      inFlightRequests.delete(cacheKey);
+      if (inFlightRequests.get(cacheKey)?.promise === promise) {
+        inFlightRequests.delete(cacheKey);
+      }
     }
   })();
 
-  inFlightRequests.set(cacheKey, promise);
+  inFlightRequests.set(cacheKey, { generation, promise });
   return promise;
 }
 
@@ -194,8 +273,11 @@ export async function getThumbnailUrl(
 export async function requestBatchThumbnails(
   files: ImageFile[],
   maxEdge: number = getThumbnailMaxEdge(),
+  options: ThumbnailBatchOptions = {},
 ): Promise<number> {
   if (!files || files.length === 0) return 0;
+  const generation = options.generation ?? activeThumbnailGeneration;
+  const priority = options.priority ?? THUMBNAIL_PRIORITY.FAR_LOOKAHEAD;
 
   for (const file of files) {
     const cacheKey = getThumbnailCacheKey(file, maxEdge);
@@ -205,12 +287,21 @@ export async function requestBatchThumbnails(
       inFlightRequests.has(cacheKey) ||
       memoryCache.get(cacheKey)
     ) continue;
+    const queued = queuedBatchItems.get(cacheKey);
+    if (
+      queued &&
+      (queued.generation > generation ||
+        (queued.generation === generation && queued.priority >= priority))
+    ) continue;
     queuedBatchItems.set(cacheKey, {
       cache_key: cacheKey,
       file_id: file.id,
       file_path: file.path,
       modified_at: file.modified_at,
       max_edge: maxEdge,
+      generation,
+      priority,
+      sequence: thumbnailQueueSequence++,
     });
   }
 
@@ -220,19 +311,35 @@ export async function requestBatchThumbnails(
   batchDrainPromise = (async () => {
     let generated = 0;
     while (queuedBatchItems.size > 0) {
-      const nextEdge = queuedBatchItems.values().next().value?.max_edge;
-      const items = Array.from(queuedBatchItems.values())
-        .filter((item) => item.max_edge === nextEdge && !inFlightRequests.has(item.cache_key))
+      const ordered = Array.from(queuedBatchItems.values()).sort(
+        (left, right) =>
+          right.generation - left.generation ||
+          right.priority - left.priority ||
+          left.sequence - right.sequence,
+      );
+      const next = ordered[0];
+      if (!next) break;
+      const items = ordered
+        .filter(
+          (item) =>
+            item.generation === next.generation &&
+            item.max_edge === next.max_edge &&
+            !inFlightRequests.has(item.cache_key),
+        )
         .slice(0, BATCH_CHUNK_SIZE);
       if (items.length === 0) break;
       for (const item of items) queuedBatchItems.delete(item.cache_key);
       try {
-        generated += await invoke<number>("batch_generate_thumbnails", {
+        const result = await invoke<ThumbnailBatchResult>("batch_generate_thumbnails", {
           items: items.map(({ file_id, file_path, modified_at }) => ({ file_id, file_path, modified_at })),
-          maxEdge: nextEdge,
+          maxEdge: next.max_edge,
           cacheBudgetMb: getThumbnailCacheBudgetMb(),
+          generation: next.generation,
         });
-        for (const item of items) batchReadyKeys.add(item.cache_key);
+        generated += result.generated;
+        if (result.canceled === 0) {
+          for (const item of items) batchReadyKeys.add(item.cache_key);
+        }
       } catch {
         // Visible items can still recover through the single-thumbnail path.
       }
@@ -258,6 +365,8 @@ export async function getThumbnailCacheStats(): Promise<ThumbnailCacheStats> {
  * Clear all thumbnail cache files from disk and memory.
  */
 export async function clearThumbnailCache(): Promise<number> {
+  const generation = beginThumbnailRequestCycle();
+  await scheduleThumbnailCancellation(generation);
   memoryCache.clear();
   inFlightRequests.clear();
   queuedBatchItems.clear();

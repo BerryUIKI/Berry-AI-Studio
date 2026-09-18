@@ -9,9 +9,12 @@ import {
   normalizePath,
 } from "../utils/image";
 import {
+  beginThumbnailRequestCycle,
+  cancelThumbnailRequests,
   getThumbnailUrl,
   getThumbnailUrlSync,
   requestBatchThumbnails,
+  THUMBNAIL_PRIORITY,
 } from "../utils/thumbnail";
 import { t } from "../i18n";
 import { resolveStackHeroPaths } from "../utils/stack";
@@ -113,6 +116,7 @@ onUnmounted(() => {
   stackClickTimers.clear();
   resizeObserver?.disconnect();
   window.removeEventListener("keydown", handleKeyDown);
+  cancelThumbnailRequests();
 });
 
 function onScroll(e: Event) {
@@ -282,17 +286,19 @@ const translateY = computed(() => startRow.value * rowHeight.value);
 // unbounded URL map beside the shared LRU thumbnail cache.
 const thumbnailRevision = ref(0);
 
-function getCardImageSrc(file: ImageFile): string {
+function getCardImageSrc(file: ImageFile): string | null {
   void thumbnailRevision.value;
   if (!file.id) return assetUrl(file.path);
-  return getThumbnailUrlSync(file) || assetUrl(file.path);
+  return getThumbnailUrlSync(file);
 }
 
-async function loadThumbnailFor(file: ImageFile) {
+async function loadThumbnailFor(file: ImageFile, generation: number) {
   if (!file.id || getThumbnailUrlSync(file)) return;
-  await getThumbnailUrl(file);
-  if (file.id) {
+  try {
+    await getThumbnailUrl(file, undefined, generation);
     thumbnailRevision.value += 1;
+  } catch {
+    // The viewport moved before this queued request began decoding.
   }
 }
 
@@ -301,6 +307,8 @@ let prefetchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 watch(
   visibleItems,
   (items) => {
+    if (prefetchDebounceTimer) clearTimeout(prefetchDebounceTimer);
+    const generation = beginThumbnailRequestCycle();
     const files = items.map((item) => item.file);
     if (!files || files.length === 0) return;
 
@@ -308,12 +316,11 @@ watch(
     // batch worker: that used to decode the same image twice during fast scroll.
     for (const f of files) {
       if (f.id && !getThumbnailUrlSync(f)) {
-        void loadThumbnailFor(f);
+        void loadThumbnailFor(f, generation);
       }
     }
     // Prefetch only after scrolling settles. This avoids building an I/O queue
     // for every intermediate position while the scrollbar thumb is dragged.
-    if (prefetchDebounceTimer) clearTimeout(prefetchDebounceTimer);
     prefetchDebounceTimer = setTimeout(() => {
       const firstVisibleIndex = items[0]?.index ?? 0;
       const lastVisibleIndex = items[items.length - 1]?.index ?? 0;
@@ -321,12 +328,18 @@ watch(
       const aheadEnd = Math.min(props.files.length, lastVisibleIndex + 101);
       if (aheadStart < aheadEnd) {
         const aheadSlice = props.files.slice(aheadStart, aheadEnd);
-        void requestBatchThumbnails(aheadSlice);
+        void requestBatchThumbnails(aheadSlice, undefined, {
+          generation,
+          priority: THUMBNAIL_PRIORITY.NEAR_LOOKAHEAD,
+        });
       }
       const behindStart = Math.max(0, firstVisibleIndex - 40);
       if (behindStart < firstVisibleIndex) {
         const behindSlice = props.files.slice(behindStart, firstVisibleIndex);
-        void requestBatchThumbnails(behindSlice);
+        void requestBatchThumbnails(behindSlice, undefined, {
+          generation,
+          priority: THUMBNAIL_PRIORITY.FAR_LOOKAHEAD,
+        });
       }
     }, 220);
   },
@@ -576,15 +589,25 @@ function onDragStart(e: DragEvent, file: ImageFile) {
                 v-if="
                   file.container !== 'mp4' &&
                   file.container !== 'txt' &&
-                  !failedImages.has(file.path)
+                  !failedImages.has(file.path) &&
+                  getCardImageSrc(file)
                 "
-                :src="getCardImageSrc(file)"
+                :src="getCardImageSrc(file) || undefined"
                 :alt="getFileName(file.path)"
                 class="thumbnail-img"
                 :class="{ 'nsfw-blurred': blurNsfw && file.is_nsfw && !revealedNsfw.has(file.path) }"
                 loading="lazy"
                 decoding="async"
                 @error="onImageError(file.path)"
+              />
+              <div
+                v-else-if="
+                  file.container !== 'mp4' &&
+                  file.container !== 'txt' &&
+                  !failedImages.has(file.path)
+                "
+                class="thumbnail-pending"
+                aria-hidden="true"
               />
               <video
                 v-else-if="file.container === 'mp4'"
@@ -967,6 +990,31 @@ function onDragStart(e: DragEvent, file: ImageFile) {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+.thumbnail-pending {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    110deg,
+    transparent 25%,
+    rgba(255, 255, 255, 0.08) 45%,
+    transparent 65%
+  );
+  background-size: 220% 100%;
+  animation: thumbnail-queue-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes thumbnail-queue-pulse {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thumbnail-pending {
+    animation: none;
+    background: rgba(255, 255, 255, 0.04);
+  }
 }
 
 .thumbnail-fallback {

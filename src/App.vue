@@ -53,7 +53,6 @@ import CompareModal from "./components/CompareModal.vue";
 import StackMergeWarningModal from "./components/StackMergeWarningModal.vue";
 import { t } from "./i18n";
 import { countActiveFilters, criteriaToQuery } from "./utils/search";
-import { requestBatchThumbnails } from "./utils/thumbnail";
 import {
   isWarningSuppressed,
   loadAppConfig,
@@ -1261,10 +1260,6 @@ async function loadFiles() {
       console.warn("Failed to load stack metadata:", stackErr);
     }
 
-    // Background async batch generation for initial slice of files
-    if (files.value.length > 0) {
-      void requestBatchThumbnails(files.value.slice(0, 200));
-    }
   } catch (e) {
     if (requestVersion === libraryRequestVersion) error.value = String(e);
   } finally {
@@ -1391,9 +1386,6 @@ async function handleFindSimilar(file: ImageFile) {
       similarity_score: item.score,
     }));
     applySimilarityFilter();
-    if (files.value.length > 0) {
-      void requestBatchThumbnails(files.value.slice(0, 200));
-    }
     if (lightboxFile.value) {
       lightboxFile.value = null;
     }
