@@ -6,6 +6,7 @@
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::Ordering;
 use std::sync::MutexGuard;
 
 use berry_clip::{ClipEngine, ClipModelInfo};
@@ -1057,31 +1058,55 @@ pub fn open_external_url(url: String, app_handle: AppHandle) -> Result<(), Strin
 }
 
 /// Request a single thumbnail (lazy on-demand generation).
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ThumbnailRequestArgs {
+    pub file_id: i64,
+    pub file_path: String,
+    pub modified_at: i64,
+    pub max_edge: Option<u32>,
+    pub cache_budget_mb: Option<u64>,
+    pub generation: Option<u64>,
+}
+
 #[tauri::command]
 pub async fn get_or_create_thumbnail(
     app_handle: AppHandle,
-    file_id: i64,
-    file_path: String,
-    modified_at: i64,
-    max_edge: Option<u32>,
-    cache_budget_mb: Option<u64>,
+    request: ThumbnailRequestArgs,
+    state: State<'_, AppState>,
 ) -> Result<String, String> {
     let data_dir = app_handle
         .path()
         .app_data_dir()
         .map_err(|e| format!("Failed to get app data dir: {e}"))?;
-    let max_edge = max_edge.unwrap_or(384);
+    let max_edge = request.max_edge.unwrap_or(384);
     let db_path = data_dir.join("berry.db");
-    let budget_bytes = thumbnail_budget_bytes(cache_budget_mb);
+    let budget_bytes = thumbnail_budget_bytes(request.cache_budget_mb);
+    let generation = request.generation;
+    let file_id = request.file_id;
+    let file_path = request.file_path;
+    let modified_at = request.modified_at;
+    let generation_tracker = state.thumbnail_generation.clone();
+    if let Some(generation) = generation {
+        generation_tracker.fetch_max(generation, Ordering::AcqRel);
+    }
     tauri::async_runtime::spawn_blocking(move || {
+        let worker_generation_tracker = generation_tracker.clone();
         berry_scan::ensure_thumbnail(
             &data_dir,
             &db_path,
-            file_id,
-            &file_path,
-            modified_at,
-            max_edge,
+            berry_scan::ThumbnailRequest {
+                file_id,
+                file_path: &file_path,
+                modified_at,
+                max_edge,
+            },
             budget_bytes,
+            move || {
+                generation.is_none_or(|generation| {
+                    worker_generation_tracker.load(Ordering::Acquire) == generation
+                })
+            },
         )
     })
     .await
@@ -1102,7 +1127,9 @@ pub async fn batch_generate_thumbnails(
     items: Vec<BatchThumbnailItem>,
     max_edge: Option<u32>,
     cache_budget_mb: Option<u64>,
-) -> Result<usize, String> {
+    generation: Option<u64>,
+    state: State<'_, AppState>,
+) -> Result<berry_scan::ThumbnailBatchResult, String> {
     let data_dir = app_handle
         .path()
         .app_data_dir()
@@ -1110,6 +1137,9 @@ pub async fn batch_generate_thumbnails(
     let max_edge = max_edge.unwrap_or(384);
     let db_path = data_dir.join("berry.db");
     let budget_bytes = thumbnail_budget_bytes(cache_budget_mb);
+    let generation_tracker = state.thumbnail_generation.clone();
+    let generation = generation.unwrap_or_else(|| generation_tracker.load(Ordering::Acquire));
+    generation_tracker.fetch_max(generation, Ordering::AcqRel);
     let total = items.len();
     let tuples: Vec<(i64, String, i64)> = items
         .into_iter()
@@ -1117,6 +1147,7 @@ pub async fn batch_generate_thumbnails(
         .collect();
 
     let app_clone = app_handle.clone();
+    let worker_generation_tracker = generation_tracker.clone();
     let count = tauri::async_runtime::spawn_blocking(move || {
         berry_scan::batch_generate_thumbnails(
             &data_dir,
@@ -1134,6 +1165,7 @@ pub async fn batch_generate_thumbnails(
                     },
                 );
             }),
+            move || worker_generation_tracker.load(Ordering::Acquire) == generation,
         )
     })
     .await
@@ -1149,6 +1181,14 @@ pub async fn batch_generate_thumbnails(
     );
 
     Ok(count)
+}
+
+/// Cancel queued thumbnail work from older viewport generations.
+#[tauri::command]
+pub fn cancel_thumbnail_requests(generation: u64, state: State<'_, AppState>) {
+    state
+        .thumbnail_generation
+        .fetch_max(generation, Ordering::AcqRel);
 }
 
 /// Get stats for thumbnail cache on disk.
