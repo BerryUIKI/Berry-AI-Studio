@@ -1,7 +1,8 @@
 mod commands;
 mod watcher;
 
-use std::sync::Mutex;
+use std::sync::atomic::AtomicU64;
+use std::sync::{Arc, Mutex};
 
 use berry_storage::Database;
 use tauri::Manager;
@@ -17,6 +18,8 @@ pub struct AppState {
     /// Optional cross-platform watcher. Failure to initialize it must not
     /// prevent the SQLite-backed library from opening.
     pub watcher: Mutex<Option<watcher::LibraryWatcher>>,
+    /// Monotonic generation used to cancel stale visible and look-ahead work.
+    pub thumbnail_generation: Arc<AtomicU64>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -54,6 +57,7 @@ pub fn run() {
                 tagger: Mutex::new(None),
                 clip: Mutex::new(None),
                 watcher: Mutex::new(filesystem_watcher),
+                thumbnail_generation: Arc::new(AtomicU64::new(0)),
             });
             let thumbnail_data_dir = data_dir.clone();
             let thumbnail_database_path = database_path.clone();
@@ -135,6 +139,7 @@ pub fn run() {
             commands::open_external_url,
             commands::get_or_create_thumbnail,
             commands::batch_generate_thumbnails,
+            commands::cancel_thumbnail_requests,
             commands::get_thumbnail_cache_stats,
             commands::clear_thumbnail_cache,
             commands::upsert_file_embedding,
