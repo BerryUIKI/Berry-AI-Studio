@@ -10,6 +10,8 @@ import {
   normalizePath,
 } from "../utils/image";
 import {
+  beginThumbnailRequestCycle,
+  cancelThumbnailRequests,
   getThumbnailUrl,
   getThumbnailUrlSync,
 } from "../utils/thumbnail";
@@ -94,26 +96,31 @@ function updateHeight() {
 const thumbnailRevision = ref(0);
 
 // Fast sync or async lookup for row image
-function getRowImageSrc(file: ImageFile): string {
+function getRowImageSrc(file: ImageFile): string | null {
   void thumbnailRevision.value;
   const syncCached = getThumbnailUrlSync(file);
   if (syncCached) return syncCached;
-  return assetUrl(file.path);
+  return file.id ? null : assetUrl(file.path);
 }
 
 // Prefetch thumbnails for visible rows
 watch(
   visibleFiles,
   (batch) => {
+    const generation = beginThumbnailRequestCycle();
     if (!batch || batch.length === 0) return;
     for (const file of batch) {
       if (
         file.container !== "mp4" && file.container !== "txt" &&
         !getThumbnailUrlSync(file)
       ) {
-        void getThumbnailUrl(file).then(() => {
-          thumbnailRevision.value += 1;
-        });
+        void getThumbnailUrl(file, undefined, generation)
+          .then(() => {
+            thumbnailRevision.value += 1;
+          })
+          .catch(() => {
+            // The row left the visible window before decoding began.
+          });
       }
     }
   },
@@ -138,6 +145,7 @@ onUnmounted(() => {
     resizeObserver.disconnect();
     resizeObserver = null;
   }
+  cancelThumbnailRequests();
 });
 
 function snippet(text: string | null | undefined, max = 48): string {
@@ -206,12 +214,21 @@ function size(meta: ImageFile["metadata"]): string {
             </td>
             <td class="preview-cell">
               <img
-                v-if="file.container !== 'mp4' && file.container !== 'txt'"
-                :src="getRowImageSrc(file)"
+                v-if="
+                  file.container !== 'mp4' &&
+                  file.container !== 'txt' &&
+                  getRowImageSrc(file)
+                "
+                :src="getRowImageSrc(file) || undefined"
                 :alt="getFileName(file.path)"
                 class="thumb"
                 loading="lazy"
                 decoding="async"
+              />
+              <div
+                v-else-if="file.container !== 'mp4' && file.container !== 'txt'"
+                class="thumb-placeholder thumb-pending"
+                aria-hidden="true"
               />
               <video
                 v-else-if="file.container === 'mp4'"
@@ -374,6 +391,29 @@ function size(meta: ImageFile["metadata"]): string {
   color: #999;
   background: rgba(0, 0, 0, 0.04);
   border-radius: 4px;
+}
+
+.thumb-pending {
+  background: linear-gradient(
+    110deg,
+    rgba(255, 255, 255, 0.02) 25%,
+    rgba(255, 255, 255, 0.1) 45%,
+    rgba(255, 255, 255, 0.02) 65%
+  );
+  background-size: 220% 100%;
+  animation: table-thumbnail-queue-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes table-thumbnail-queue-pulse {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thumb-pending {
+    animation: none;
+    background: rgba(255, 255, 255, 0.04);
+  }
 }
 
 .name {
