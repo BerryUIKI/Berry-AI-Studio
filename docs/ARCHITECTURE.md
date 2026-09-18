@@ -86,6 +86,7 @@ The frontend is built with **Vue 3 Composition API** + **TypeScript** + **Vite**
 ### 2. State & Localization
 - **Reactive i18n (`src/i18n/`)**: Lightweight reactive internationalization supporting 7 locales (`en`, `zh-CN`, `zh-TW`, `ja`, `de`, `fr`, `es`) and automatic OS language detection (`auto`).
 - **Updater (`src/utils/updater.ts` & `UpdateModal.vue`)**: SemVer comparison against GitHub Releases API with automated asset matching and release notes rendering.
+- **Async Feature Surfaces**: Infrequent modals, drawers, managers, onboarding, and comparison views use dynamic component imports and are mounted only while open, keeping their JavaScript and scoped CSS out of the initial bundle.
 
 ### 3. Startup and Thumbnail Scheduling
 
