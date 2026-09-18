@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { collapseStackMembers, resolveStackHeroPaths } from "../src/utils/stack.ts";
+import {
+  collapseStackMembers,
+  resolveStackHeroPaths,
+  summarizeResultStacks,
+} from "../src/utils/stack.ts";
 
 function image(id, path, stackOrder) {
   return {
@@ -45,4 +49,18 @@ test("targeted collapse leaves other stacks and standalone images unchanged", ()
     collapseStackMembers([first, hidden, other, standalone], stackMap, "stack-a").map((file) => file.path),
     ["first.png", "other.png", "standalone.png"],
   );
+});
+
+test("result summaries count and select heroes only among matching members", () => {
+  const matchingFirst = image(2, "matching-first.png", 1);
+  const matchingSecond = image(3, "matching-second.png", 2);
+  const other = { ...image(4, "other.png", 0), stack_id: "stack-b" };
+
+  const summary = summarizeResultStacks([matchingSecond, matchingFirst, other]);
+  assert.deepEqual(summary, {
+    "stack-a": { count: 2, heroId: 2 },
+  });
+  assert.equal(summary["stack-a"].heroId, matchingFirst.id);
+  assert.equal(summary["stack-a"].count, 2);
+  assert.equal(summary["stack-b"], undefined);
 });

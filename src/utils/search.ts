@@ -21,6 +21,10 @@ export function criteriaToQuery(c: SearchCriteria): string {
     const val = c.model_name.trim();
     parts.push(val.includes(" ") ? `model:"${val}"` : `model:${val}`);
   }
+  if (c.model_hash?.trim()) {
+    const val = c.model_hash.trim();
+    parts.push(val.includes(" ") ? `hash:"${val}"` : `hash:${val}`);
+  }
   if (c.sampler?.trim()) {
     const val = c.sampler.trim();
     parts.push(val.includes(" ") ? `sampler:"${val}"` : `sampler:${val}`);

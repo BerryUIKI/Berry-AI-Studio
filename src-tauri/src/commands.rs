@@ -270,26 +270,102 @@ pub async fn search_files_by_query(
         .map_err(|e| e.to_string())
 }
 
+fn criteria_with_query_context(query: &str, context: SearchCriteria) -> SearchCriteria {
+    let mut criteria = SearchCriteria::from_query(query);
+    if context.folder_id.is_some() {
+        criteria.folder_id = context.folder_id;
+    }
+    if context.album_id.is_some() {
+        criteria.album_id = context.album_id;
+    }
+    if context.tag_id.is_some() {
+        criteria.tag_id = context.tag_id;
+    }
+    if context.stack_id.is_some() {
+        criteria.stack_id = context.stack_id;
+    }
+    if context.is_favorite.is_some() {
+        criteria.is_favorite = context.is_favorite;
+    }
+    if context.is_nsfw.is_some() {
+        criteria.is_nsfw = context.is_nsfw;
+    }
+    criteria.sort = context.sort;
+    criteria.direction = context.direction;
+    criteria.limit = context.limit;
+    criteria.offset = context.offset;
+    criteria
+}
+
+#[cfg(test)]
+mod search_context_tests {
+    use super::*;
+
+    #[test]
+    fn query_context_preserves_navigation_scope_and_paging() {
+        let context = SearchCriteria {
+            album_id: Some(7),
+            is_favorite: Some(true),
+            sort: Some(FileSortField::Rating),
+            direction: Some(SortDirection::Desc),
+            limit: Some(400),
+            offset: Some(800),
+            ..Default::default()
+        };
+        let criteria = criteria_with_query_context("model:dreamshaper fav:false", context);
+
+        assert_eq!(criteria.model_name.as_deref(), Some("dreamshaper"));
+        assert_eq!(criteria.album_id, Some(7));
+        assert_eq!(criteria.is_favorite, Some(true));
+        assert_eq!(criteria.sort, Some(FileSortField::Rating));
+        assert_eq!(criteria.direction, Some(SortDirection::Desc));
+        assert_eq!(criteria.limit, Some(400));
+        assert_eq!(criteria.offset, Some(800));
+    }
+}
+
 /// Parse a free-form query and return one bounded page of matching files.
 #[tauri::command]
 pub async fn search_files_by_query_page(
     query: String,
-    folder_id: Option<i64>,
-    sort: Option<FileSortField>,
-    direction: Option<SortDirection>,
-    limit: usize,
-    offset: usize,
+    context: SearchCriteria,
     state: State<'_, AppState>,
 ) -> Result<FilePage, String> {
-    let mut criteria = SearchCriteria::from_query(&query);
-    criteria.folder_id = folder_id;
-    criteria.sort = sort;
-    criteria.direction = direction;
-    criteria.limit = Some(limit);
-    criteria.offset = Some(offset);
+    let criteria = criteria_with_query_context(&query, context);
     db(&state)?
         .search_gallery_files_page(&criteria)
         .map_err(|e| e.to_string())
+}
+
+/// List stack summaries for the same filtered context as the gallery.
+#[tauri::command]
+pub fn list_filtered_stacks(
+    query: String,
+    context: SearchCriteria,
+    state: State<'_, AppState>,
+) -> Result<Vec<StackSummary>, String> {
+    let criteria = criteria_with_query_context(&query, context);
+    db(&state)?
+        .list_filtered_stacks(&criteria)
+        .map_err(|error| error.to_string())
+}
+
+/// Fetch only stack members that remain inside the current filtered context.
+#[tauri::command]
+pub fn get_filtered_stack_members(
+    stack_id: String,
+    query: String,
+    mut context: SearchCriteria,
+    state: State<'_, AppState>,
+) -> Result<Vec<ImageFile>, String> {
+    context.stack_id = Some(stack_id);
+    context.limit = None;
+    context.offset = None;
+    let criteria = criteria_with_query_context(&query, context);
+    db(&state)?
+        .search_gallery_files_page(&criteria)
+        .map(|page| page.items)
+        .map_err(|error| error.to_string())
 }
 
 /// List distinct model names present in indexed metadata.

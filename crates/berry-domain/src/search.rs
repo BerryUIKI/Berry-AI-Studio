@@ -52,6 +52,8 @@ pub struct SearchCriteria {
     pub tag_id: Option<i64>,
     /// Optional folder constraint. If `None`, searches across all indexed folders.
     pub folder_id: Option<i64>,
+    /// Optional stack constraint used by filtered stack expansion.
+    pub stack_id: Option<String>,
     /// Field to sort results by. Defaults to `ModifiedAt`.
     pub sort: Option<FileSortField>,
     /// Sort direction. Defaults to `Desc`.
@@ -88,6 +90,7 @@ mod tests {
             album_id: Some(10),
             tag_id: Some(5),
             folder_id: Some(42),
+            stack_id: Some("stack-a".to_string()),
             sort: Some(FileSortField::Rating),
             direction: Some(SortDirection::Desc),
             limit: Some(100),

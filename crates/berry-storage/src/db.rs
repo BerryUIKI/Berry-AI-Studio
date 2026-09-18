@@ -645,17 +645,18 @@ impl Database {
         )
     }
 
-    fn search_files_page_with_metadata(
-        &self,
-        criteria: &SearchCriteria,
-        metadata_projection: &str,
-    ) -> Result<FilePage, DatabaseError> {
+    fn build_search_filter(criteria: &SearchCriteria) -> (String, Vec<rusqlite::types::Value>) {
         let mut conditions = Vec::new();
-        let mut params: Vec<rusqlite::types::Value> = Vec::new();
+        let mut params = Vec::new();
 
         if let Some(fid) = criteria.folder_id {
             conditions.push("folder_id = ?".to_string());
             params.push(rusqlite::types::Value::Integer(fid));
+        }
+
+        if let Some(stack_id) = &criteria.stack_id {
+            conditions.push("stack_id = ?".to_string());
+            params.push(rusqlite::types::Value::Text(stack_id.clone()));
         }
 
         if let Some(text) = &criteria.text {
@@ -758,6 +759,21 @@ impl Database {
             params.push(rusqlite::types::Value::Integer(tid));
         }
 
+        let where_clause = if conditions.is_empty() {
+            String::new()
+        } else {
+            format!(" WHERE {}", conditions.join(" AND "))
+        };
+        (where_clause, params)
+    }
+
+    fn search_files_page_with_metadata(
+        &self,
+        criteria: &SearchCriteria,
+        metadata_projection: &str,
+    ) -> Result<FilePage, DatabaseError> {
+        let (where_clause, mut params) = Self::build_search_filter(criteria);
+
         let sort = criteria.sort.unwrap_or(FileSortField::ModifiedAt);
         let direction = criteria.direction.unwrap_or(SortDirection::Desc);
         let order_clause = match (sort, direction) {
@@ -796,12 +812,6 @@ impl Database {
                 " LIMIT -1 OFFSET ?"
             }
             (None, None) => "",
-        };
-
-        let where_clause = if conditions.is_empty() {
-            String::new()
-        } else {
-            format!(" WHERE {}", conditions.join(" AND "))
         };
 
         let sql = format!(
@@ -2503,6 +2513,46 @@ impl Database {
             .map_err(Into::into)
     }
 
+    /// List stack summaries within the current filtered result set.
+    ///
+    /// The summary hero is the first matching member, so a filter never hides a
+    /// matching stack merely because its library-wide hero is outside the result.
+    pub fn list_filtered_stacks(
+        &self,
+        criteria: &SearchCriteria,
+    ) -> Result<Vec<StackSummary>, DatabaseError> {
+        let (where_clause, params) = Self::build_search_filter(criteria);
+        let sql = format!(
+            "WITH filtered AS (
+                SELECT id, stack_id, stack_order
+                FROM files{where_clause}
+             ), ranked AS (
+                SELECT stack_id, id,
+                       COUNT(*) OVER (PARTITION BY stack_id) AS match_count,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY stack_id
+                           ORDER BY stack_order ASC, id ASC
+                       ) AS member_rank
+                FROM filtered
+                WHERE stack_id IS NOT NULL
+             )
+             SELECT stack_id, match_count, id
+             FROM ranked
+             WHERE member_rank = 1 AND match_count > 1
+             ORDER BY match_count DESC, stack_id ASC"
+        );
+        let mut stmt = self.conn.prepare(&sql)?;
+        let rows = stmt.query_map(rusqlite::params_from_iter(&params), |row| {
+            Ok(StackSummary {
+                stack_id: row.get(0)?,
+                count: row.get::<_, i64>(1)? as usize,
+                hero_image_id: row.get(2)?,
+            })
+        })?;
+        rows.collect::<rusqlite::Result<Vec<_>>>()
+            .map_err(Into::into)
+    }
+
     /// Get non-hero images in a stack whose rating is below `min_rating`, for batch culling.
     pub fn get_stack_cull_candidate_ids(
         &self,
@@ -3081,6 +3131,8 @@ mod tests {
             8.0,
             "99999",
         ));
+        file3.stack_id = Some("stack-filter-test".to_string());
+        file3.stack_order = 0;
 
         db.upsert_files(&[file1, file2, file3]).unwrap();
 
@@ -3215,6 +3267,28 @@ mod tests {
         assert!(gallery_metadata.raw.is_none());
         assert_eq!(gallery_file.stack_id.as_deref(), Some("stack-filter-test"));
         assert_eq!(gallery_file.stack_order, 2);
+
+        let filtered_stacks = db
+            .list_filtered_stacks(&SearchCriteria {
+                model_name: Some("dreamshaper_xl".to_string()),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(filtered_stacks.len(), 1);
+        assert_eq!(filtered_stacks[0].count, 2);
+        let filtered_hero = db
+            .get_file_by_path("/library/anime_portrait.png")
+            .unwrap()
+            .unwrap();
+        assert_eq!(filtered_stacks[0].hero_image_id, filtered_hero.id);
+
+        let single_match_stacks = db
+            .list_filtered_stacks(&SearchCriteria {
+                prompt: Some("cyberpunk".to_string()),
+                ..Default::default()
+            })
+            .unwrap();
+        assert!(single_match_stacks.is_empty());
 
         let full_file = db
             .get_file_by_path("/library/cyberpunk_cat.png")
