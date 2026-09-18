@@ -98,6 +98,8 @@ pub fn run() {
             commands::get_file_details,
             commands::search_files_by_query,
             commands::search_files_by_query_page,
+            commands::list_filtered_stacks,
+            commands::get_filtered_stack_members,
             commands::list_distinct_models,
             commands::list_distinct_samplers,
             commands::create_album,

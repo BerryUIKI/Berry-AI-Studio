@@ -27,7 +27,11 @@ import MenuBar from "./components/MenuBar.vue";
 import Sidebar from "./components/Sidebar.vue";
 import FileList from "./components/FileList.vue";
 import VirtualGrid from "./components/VirtualGrid.vue";
-import { collapseStackMembers, resolveStackHeroPaths } from "./utils/stack";
+import {
+  collapseStackMembers,
+  resolveStackHeroPaths,
+  summarizeResultStacks,
+} from "./utils/stack";
 import SortBar from "./components/SortBar.vue";
 import SearchBar from "./components/SearchBar.vue";
 import InspectorPane from "./components/InspectorPane.vue";
@@ -88,6 +92,7 @@ const loraModalOpen = ref(false);
 const gridItemWidth = ref(200);
 const similaritySourceFile = ref<ImageFile | null>(null);
 const rawSimilarityFiles = shallowRef<ImageFile[]>([]);
+const semanticSearchFiles = shallowRef<ImageFile[]>([]);
 const similarityThreshold = ref<number>(0);
 const similarityLimit = ref<number>(
   Number(localStorage.getItem("berry_similarity_limit")) || 50
@@ -1026,7 +1031,14 @@ async function onToggleStackExpand(stackId: string) {
         collapseStackLocally(expandedId);
       }
     }
-    const members = await invoke<ImageFile[]>("get_stack_members", { stackId });
+    const query = searchQuery.value.trim();
+    const members = query && isSemanticSearch.value
+      ? semanticSearchFiles.value.filter((file) => file.stack_id === stackId)
+      : await invoke<ImageFile[]>("get_filtered_stack_members", {
+          stackId,
+          query,
+          context: currentPagedCriteria(0),
+        });
     if (members.length === 0) return;
     const insertionIndex = files.value.findIndex((file) => file.stack_id === stackId);
     const nextFiles = files.value.filter((file) => file.stack_id !== stackId);
@@ -1246,6 +1258,7 @@ async function loadFiles() {
   const requestVersion = ++libraryRequestVersion;
   similaritySourceFile.value = null;
   rawSimilarityFiles.value = [];
+  semanticSearchFiles.value = [];
   filesLoading.value = true;
   filesLoadingMore.value = false;
   expandedStacks.value = new Set();
@@ -1266,10 +1279,11 @@ async function loadFiles() {
             limit: similarityLimit.value || 50,
           });
           if (requestVersion !== libraryRequestVersion) return;
-          files.value = matches.map((m) => ({
+          semanticSearchFiles.value = matches.map((m) => ({
             ...m.file,
             similarity_score: m.score,
           }));
+          files.value = semanticSearchFiles.value;
           galleryTotal.value = files.value.length;
         } catch (clipErr) {
           // If no model loaded, open CLIP modal so user can load one
@@ -1279,14 +1293,9 @@ async function loadFiles() {
           galleryTotal.value = 0;
         }
       } else {
-        const folderId = activeTarget.value.type === "folder" ? activeTarget.value.folder.id : null;
         const page = await invoke<FilePage>("search_files_by_query_page", {
           query: q,
-          folderId,
-          sort: sortField.value,
-          direction: sortDirection.value,
-          limit: GALLERY_PAGE_SIZE,
-          offset: 0,
+          context: currentPagedCriteria(0),
         });
         if (requestVersion !== libraryRequestVersion) return;
         files.value = page.items;
@@ -1304,10 +1313,18 @@ async function loadFiles() {
       nextGalleryOffset.value = page.offset + page.items.length;
     }
 
-    // Refresh stack summaries for active folder or all
+    // Refresh stack summaries for the exact current result context.
     try {
-      const folderId = activeTarget.value.type === "folder" ? activeTarget.value.folder.id : null;
-      const stacks = await invoke<StackSummary[]>("list_stacks", { folderId });
+      const stacks = q && isSemanticSearch.value
+        ? Object.entries(summarizeResultStacks(files.value)).map(([stack_id, summary]) => ({
+            stack_id,
+            count: summary.count,
+            hero_image_id: summary.heroId,
+          }))
+        : await invoke<StackSummary[]>("list_filtered_stacks", {
+            query: q,
+            context: currentPagedCriteria(0),
+          });
       if (requestVersion !== libraryRequestVersion) return;
       const map: Record<string, { count: number; heroId: number | null }> = {};
       for (const s of stacks) {
@@ -1366,11 +1383,7 @@ async function loadMoreFiles() {
     const page = q
       ? await invoke<FilePage>("search_files_by_query_page", {
           query: q,
-          folderId: activeTarget.value.type === "folder" ? activeTarget.value.folder.id : null,
-          sort: sortField.value,
-          direction: sortDirection.value,
-          limit: GALLERY_PAGE_SIZE,
-          offset,
+          context: currentPagedCriteria(offset),
         })
       : await invoke<FilePage>("search_files_page", { criteria: currentPagedCriteria(offset) });
     if (requestVersion !== libraryRequestVersion || offset !== nextGalleryOffset.value) return;
