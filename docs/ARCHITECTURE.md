@@ -93,7 +93,8 @@ The frontend is built with **Vue 3 Composition API** + **TypeScript** + **Vite**
 - Optional startup scans are rate-limited per folder. New installations leave startup scanning disabled by default.
 - A cross-platform `notify` watcher records coalesced events in the v10 SQLite journal. After a short quiet period, `berry-scan` reconciles only the affected files or subtrees and the frontend refreshes from SQLite.
 - Visible thumbnails have priority. Look-ahead generation begins only after scrolling settles, is deduplicated, and runs through serialized bounded batches.
-- The disk cache is populated lazily rather than generated in full during import. See [PERFORMANCE.md](PERFORMANCE.md) for tradeoffs and the remaining optimization plan.
+- The disk cache is populated lazily rather than generated in full during import. The v11 SQLite manifest records each file revision, size tier, codec, byte count, and rate-limited access time. A background startup worker imports legacy cache files without delaying first paint, and bounded LRU cleanup enforces the configured disk budget.
+- Cache statistics, manifest synchronization, clearing, decoding, and eviction run outside the WebView thread. See [PERFORMANCE.md](PERFORMANCE.md) for tradeoffs and the remaining optimization plan.
 - Standard library and structured-search queries return `FilePage` batches with an exact filtered total. All three gallery modes request subsequent pages near their loaded boundary and reject stale responses after context changes.
 
 ---
