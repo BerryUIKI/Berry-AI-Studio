@@ -108,3 +108,5 @@ This roadmap documents completed milestones and future engineering goals for **B
 - [x] Zoom-aware thumbnail tier selection for Gallery and Table surfaces.
 - [x] Reuse sufficient cached tiers and prune broken manifest paths during lookup.
 - [ ] Per-job thumbnail queue diagnostics.
+- [x] Coalesce filesystem scan progress events by file count and elapsed time.
+- [ ] Stream full-scan directory entries without retaining the complete tree.
