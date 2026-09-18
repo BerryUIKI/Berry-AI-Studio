@@ -104,4 +104,5 @@ This roadmap documents completed milestones and future engineering goals for **B
 - [ ] Introduce lightweight gallery DTOs and load full metadata on selection.
 - [x] Persistent filesystem watcher journal with targeted path reconciliation and optional recovery scans.
 - [x] Persistent size-tiered thumbnail manifest with configurable LRU disk budget.
-- [ ] Zoom-aware thumbnail tier selection, request priority, and cancellation.
+- [x] Cancelable viewport generations with visible-first and directional look-ahead priority.
+- [ ] Zoom-aware thumbnail tier selection and per-job queue diagnostics.
