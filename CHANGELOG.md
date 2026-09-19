@@ -5,6 +5,39 @@ All notable changes to the Berry AI Studio project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-09-19
+
+### Large-Library Performance & Gallery Virtualization (Milestone 13)
+
+Version 0.2.1 delivers comprehensive performance optimizations across gallery rendering, thumbnail caching, database queries, filesystem indexing, and application bundles to ensure fluid navigation with tens of thousands of local images:
+
+#### ⚡ Virtual Gallery & Layout Optimization
+- **Responsive Fixed-Width Columns**: Maintained stable card widths during viewport resizing, dynamically adjusting column counts instead of stretching images.
+- **Frame-Coalesced Scrolling**: Coalesced scroll events through `requestAnimationFrame`, limiting reactive updates to at most one per rendered frame.
+- **Per-Column Binary Search**: Replaced full dataset filtering in Waterfall view with per-column binary search for visible items.
+- **Filter-Aware Stack Summaries**: Kept stack counts, heroes, and expanded members aligned with active text, structured, and semantic search filters.
+
+#### 📦 Incremental Data Delivery & Deferred Payloads
+- **Bounded 400-Item Paging**: Replaced full table materialization with bounded 400-item SQLite queries returning exact filtered window counts.
+- **Deferred Raw Metadata**: Omitted heavy prompt strings and ComfyUI workflow JSON from gallery page IPC; loaded detailed records on-demand with a 64-entry LRU cache.
+- **Stale Response Invalidation**: Discarded in-flight page queries when navigation filters, folders, or sort orders change.
+
+#### 🖼️ Smart Multi-Tier Thumbnail Pipeline
+- **Persistent Thumbnail Manifest (Schema v11)**: SQLite-backed manifest tracking image IDs, modification times, size tiers, and codecs with rate-limited access tracking.
+- **Configurable 2 GB Cache Budget**: Automated LRU eviction maintaining disk usage within the configured budget during generation and background migration.
+- **Rendered-Size Tier Selection**: Selected the smallest sufficient thumbnail tier covering rendered card dimensions across Grid, Waterfall, and compact Table rows.
+- **Existing Tier Reuse**: Reused existing larger cached tiers for the same revision to eliminate redundant decoding.
+- **Cancelable Decode Priority**: Prioritized visible thumbnails before speculative look-ahead, using monotonic viewport generations to drop stale decoding jobs.
+
+#### 📂 Streaming Ingestion & Filesystem Watcher
+- **Native Directory Watcher**: Registered long-lived platform watchers with a durable SQLite journal, 750ms quiet-period coalescing, and targeted path reconciliation.
+- **Streaming Folder Scans**: Streamed media entries into bounded database batches without keeping full directory trees in memory.
+- **Throttled Scan Progress**: Coalesced scan progress IPC events to at most one per 64 files or 100 ms.
+- **Startup Scan Cooldown**: Added a six-hour default cooldown preventing repetitive full-tree walks on app launch.
+
+#### 🚀 Bundle & Resource Reduction
+- **Async Modal Bundle Splitting**: Dynamically imported 18 infrequent modals and drawers, reducing the entry JavaScript bundle by ~103 KB and CSS by ~87 KB uncompressed (~25 KB gzipped).
+
 ---
 
 ## [0.2.0] - 2026-09-16
