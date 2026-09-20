@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, onUnmounted, ref, watch } from "vue";
 import type { ImageFile } from "../types";
 import {
   assetUrl,
@@ -41,8 +41,9 @@ const ROW_THUMBNAIL_EDGE = 36;
 
 const containerRef = ref<HTMLElement | null>(null);
 const scrollTop = ref(0);
-const containerHeight = ref(600);
+const containerHeight = ref(0);
 let scrollFrame: number | null = null;
+let resizeFrame: number | null = null;
 
 const startRow = computed(() => {
   const raw = Math.floor(scrollTop.value / ROW_HEIGHT);
@@ -88,12 +89,6 @@ watch(
   () => queueMicrotask(maybeRequestMore),
 );
 
-function updateHeight() {
-  if (containerRef.value) {
-    containerHeight.value = containerRef.value.clientHeight || 600;
-  }
-}
-
 // Keep the table reactive without duplicating the shared bounded thumbnail LRU.
 const thumbnailRevision = ref(0);
 
@@ -131,18 +126,40 @@ watch(
 
 let resizeObserver: ResizeObserver | null = null;
 
-onMounted(() => {
-  updateHeight();
-  if (containerRef.value && typeof ResizeObserver !== "undefined") {
-    resizeObserver = new ResizeObserver(() => {
-      updateHeight();
+watch(
+  containerRef,
+  (element) => {
+    resizeObserver?.disconnect();
+    resizeObserver = null;
+    if (resizeFrame !== null) {
+      cancelAnimationFrame(resizeFrame);
+      resizeFrame = null;
+    }
+    if (!element) return;
+
+    const updateHeight = (height: number) => {
+      if (resizeFrame !== null) cancelAnimationFrame(resizeFrame);
+      resizeFrame = requestAnimationFrame(() => {
+        resizeFrame = null;
+        if (containerRef.value === element) {
+          containerHeight.value = Math.max(0, height);
+        }
+      });
+    };
+    updateHeight(element.clientHeight);
+    if (typeof ResizeObserver === "undefined") return;
+    resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries.find((candidate) => candidate.target === element);
+      if (entry) updateHeight(entry.contentRect.height);
     });
-    resizeObserver.observe(containerRef.value);
-  }
-});
+    resizeObserver.observe(element);
+  },
+  { immediate: true, flush: "post" },
+);
 
 onUnmounted(() => {
   if (scrollFrame !== null) cancelAnimationFrame(scrollFrame);
+  if (resizeFrame !== null) cancelAnimationFrame(resizeFrame);
   if (resizeObserver) {
     resizeObserver.disconnect();
     resizeObserver = null;
