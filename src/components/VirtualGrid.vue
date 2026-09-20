@@ -19,6 +19,7 @@ import {
 } from "../utils/thumbnail";
 import { t } from "../i18n";
 import { resolveStackHeroPaths } from "../utils/stack";
+import { calculateGalleryColumns } from "../utils/gallery-layout";
 
 const props = withDefaults(
   defineProps<{
@@ -63,8 +64,8 @@ const emit = defineEmits<{
 
 const containerRef = ref<HTMLElement | null>(null);
 const scrollTop = ref(0);
-const containerWidth = ref(800);
-const containerHeight = ref(600);
+const containerWidth = ref(0);
+const containerHeight = ref(0);
 
 // Image loading error tracker
 const failedImages = ref<Set<string>>(new Set());
@@ -82,35 +83,56 @@ function toggleNsfwReveal(path: string) {
   }
 }
 
-// Update container dimensions
-function updateDimensions() {
-  if (!containerRef.value) return;
-  containerWidth.value = containerRef.value.clientWidth;
-  containerHeight.value = containerRef.value.clientHeight;
-}
-
 let resizeObserver: ResizeObserver | null = null;
-let resizeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let resizeFrame: number | null = null;
+let pendingSize: { element: HTMLElement; width: number; height: number } | null = null;
 let scrollFrame: number | null = null;
 const stackClickTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const STACK_CLICK_DELAY_MS = 240;
 
-onMounted(() => {
-  if (containerRef.value) {
-    updateDimensions();
-    resizeObserver = new ResizeObserver(() => {
-      if (resizeDebounceTimer) clearTimeout(resizeDebounceTimer);
-      resizeDebounceTimer = setTimeout(() => {
-        updateDimensions();
-      }, 50);
+function scheduleDimensionUpdate(element: HTMLElement, width: number, height: number) {
+  pendingSize = { element, width, height };
+  if (resizeFrame !== null) return;
+  resizeFrame = requestAnimationFrame(() => {
+    resizeFrame = null;
+    const size = pendingSize;
+    pendingSize = null;
+    if (!size || containerRef.value !== size.element) return;
+    containerWidth.value = Math.max(0, size.width);
+    containerHeight.value = Math.max(0, size.height);
+  });
+}
+
+watch(
+  containerRef,
+  (element) => {
+    resizeObserver?.disconnect();
+    resizeObserver = null;
+    pendingSize = null;
+    if (resizeFrame !== null) {
+      cancelAnimationFrame(resizeFrame);
+      resizeFrame = null;
+    }
+    if (!element) return;
+
+    scheduleDimensionUpdate(element, element.clientWidth, element.clientHeight);
+    if (typeof ResizeObserver === "undefined") return;
+    resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries.find((candidate) => candidate.target === element);
+      if (!entry) return;
+      scheduleDimensionUpdate(element, entry.contentRect.width, entry.contentRect.height);
     });
-    resizeObserver.observe(containerRef.value);
-  }
+    resizeObserver.observe(element);
+  },
+  { immediate: true, flush: "post" },
+);
+
+onMounted(() => {
   window.addEventListener("keydown", handleKeyDown);
 });
 
 onUnmounted(() => {
-  if (resizeDebounceTimer) clearTimeout(resizeDebounceTimer);
+  if (resizeFrame !== null) cancelAnimationFrame(resizeFrame);
   if (prefetchDebounceTimer) clearTimeout(prefetchDebounceTimer);
   if (scrollFrame !== null) cancelAnimationFrame(scrollFrame);
   for (const timer of stackClickTimers.values()) clearTimeout(timer);
@@ -134,15 +156,13 @@ function onScroll(e: Event) {
 
 // Columns count based on container width
 const cols = computed(() => {
-  const available = containerWidth.value - 2; // small padding offset
-  const minWidth = props.itemMinWidth;
-  const count = Math.floor((available + props.gap) / (minWidth + props.gap));
-  return Math.max(1, count);
+  return calculateGalleryColumns(containerWidth.value, props.itemMinWidth, props.gap);
 });
 
 // Keep the user's chosen card width stable. Resizing the window changes the
 // number of columns, not the image size (matching Eagle's gallery behavior).
 const itemWidth = computed(() => {
+  if (containerWidth.value <= 0) return props.itemMinWidth;
   return Math.max(1, Math.min(props.itemMinWidth, containerWidth.value));
 });
 
