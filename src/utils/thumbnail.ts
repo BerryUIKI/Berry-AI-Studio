@@ -397,6 +397,15 @@ export async function requestBatchThumbnails(
         generated += result.generated;
         if (result.canceled === 0) {
           for (const item of items) batchReadyKeys.add(item.cache_key);
+          if (batchReadyKeys.size > 5000) {
+            const excess = batchReadyKeys.size - 4000;
+            let pruned = 0;
+            for (const key of batchReadyKeys) {
+              batchReadyKeys.delete(key);
+              pruned++;
+              if (pruned >= excess) break;
+            }
+          }
         }
       } catch {
         // Visible items can still recover through the single-thumbnail path.
@@ -447,6 +456,14 @@ export async function getThumbnailDiagnostics(): Promise<ThumbnailDiagnosticsSum
     requestsDispatched: frontendQueueCounters.requestsDispatched,
   };
   return { backend, frontend };
+}
+
+export function getThumbnailMemoryCacheSize(): number {
+  return memoryCache.size;
+}
+
+export function getBatchReadyKeysSize(): number {
+  return batchReadyKeys.size;
 }
 
 /**

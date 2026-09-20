@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { t } from "../i18n";
 import type { PromptKeywordStat, PromptStats } from "../types";
@@ -58,6 +58,10 @@ function handleKeydown(e: KeyboardEvent) {
 
 onMounted(() => {
   window.addEventListener("keydown", handleKeydown);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("keydown", handleKeydown);
 });
 
 const currentItems = computed<PromptKeywordStat[]>(() => {
