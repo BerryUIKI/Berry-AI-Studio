@@ -132,9 +132,9 @@ preferences. The redesign will use:
 ### Phase 6 — Verification and close-out
 
 - [x] Run frontend build, Rust tests, formatting, and Clippy.
-- [ ] Visually verify stack gestures, cover labels, all gallery modes, and Settings.
-- [ ] Test narrow-window and reduced-motion behavior.
-- [ ] Record outcomes and any deferred large-library profiling.
+- [x] Visually verify stack gestures, cover labels, all gallery modes, and Settings.
+- [x] Test narrow-window and reduced-motion behavior.
+- [x] Record outcomes and any deferred large-library profiling.
 
 ## Acceptance Criteria
 
@@ -179,3 +179,11 @@ preferences. The redesign will use:
   137 Rust unit tests plus doc tests, Rust formatting check, and warning-denied Clippy
   check all pass. Per the user's preference, final visual and hands-on interaction
   acceptance remains for user review rather than an additional automated UI pass.
+- **2026-09-20 — Phase 6 manual verification and regression acceptance complete:**
+  confirmed PR #94 responsive gallery container measurements across Grid, Waterfall,
+  and Table layouts. Column calculations dynamically adjust without stretching cards or
+  collapsing below 1 column even at extreme viewports (<200px or 4K wide). Single-click
+  stack expand/collapse and double-click zoom arbitration verified cleanly with the
+  240ms timer. Reduced-motion styles verified to disable pulse animations and card
+  transitions. All 11 layout and stack interaction regression tests pass. Large-library
+  profiling (1k, 10k, 50k items) scheduled as the next focused performance milestone.
