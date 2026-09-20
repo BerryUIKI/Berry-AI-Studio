@@ -154,6 +154,11 @@ impl Database {
         self.path.as_deref()
     }
 
+    /// Access the underlying SQLite connection for diagnostics or benchmarks.
+    pub fn connection(&self) -> &Connection {
+        &self.conn
+    }
+
     /// Apply any pending migrations, advancing `PRAGMA user_version`.
     fn migrate(&mut self) -> Result<(), DatabaseError> {
         let current = self.user_version()?;

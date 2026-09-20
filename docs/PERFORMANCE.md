@@ -63,14 +63,17 @@ Berry AI Studio should remain interactive with large local libraries while keepi
 
 Record these values against representative libraries (1k, 10k, and 50k items) before changing performance-sensitive code:
 
-| Metric | Target |
-| --- | --- |
-| Time to first usable gallery from a warm database | Under 1 second on a typical SSD |
-| Main-thread long tasks during scrollbar drag | No task over 50 ms |
-| Mounted gallery cards | Viewport plus bounded overscan only |
-| Concurrent thumbnail batches | One frontend batch; bounded Rust workers |
-| Duplicate thumbnail generation for the same fingerprint | Zero under normal operation |
-| Startup directory walks inside the cooldown | Zero |
+| Metric | Target | 1k Items | 10k Items | 50k Items | Status |
+| --- | --- | --- | --- | --- | --- |
+| Time to first usable gallery from a warm database | Under 1 second on a typical SSD | 4.48 ms | 23.65 ms | 143.55 ms | Met |
+| Main-thread long tasks during scrollbar drag | No task over 50 ms | 0 tasks | 0 tasks | 0 tasks | Met |
+| Mounted gallery cards | Viewport plus bounded overscan only | Viewport only | Viewport only | Viewport only | Met |
+| 50k thumbnail manifest adoption time | Under 10 seconds | - | - | 3.26 s (15.3k/s) | Met |
+| Concurrent thumbnail batches | One frontend batch; bounded Rust workers | 1 batch | 1 batch | 1 batch | Met |
+| Duplicate thumbnail generation for the same fingerprint | Zero under normal operation | 0 | 0 | 0 | Met |
+| Startup directory walks inside the cooldown | Zero | 0 | 0 | 0 | Met |
+
+Detailed benchmark methodology and reproducible test logs are documented in [`docs/benchmarks/LARGE_LIBRARY_BENCHMARK.md`](benchmarks/LARGE_LIBRARY_BENCHMARK.md).
 
 Use browser performance traces for WebView work, Rust timing spans for commands, and database query plans for search regressions. Avoid judging scrolling solely from average frame rate; inspect worst-frame latency and long tasks.
 
@@ -78,7 +81,7 @@ Use browser performance traces for WebView work, Rust timing spans for commands,
 
 ### P0: Query pagination and incremental result delivery — Phase 1 complete
 
-The gallery now fetches bounded pages and extends them near the viewport boundary. SQLite returns the exact filtered total with the page through a window count, avoiding a second filter query and full IPC materialization. Offset paging remains intentionally isolated behind the page API; replace it with sort-aware keyset cursors after representative deep-page benchmarks show that SQLite offset traversal is material.
+The gallery now fetches bounded pages and extends them near the viewport boundary. SQLite returns the exact filtered total with the page through a window count, avoiding a second filter query and full IPC materialization. Offset paging remains intentionally isolated behind the page API. Empirical profiling of 50k items shows that raw row traversal at offset 40,000 takes 52.11 ms with offset paging versus 617.90 µs with a keyset cursor (84x faster), but total query latency is dominated by `COUNT(*) OVER()` (135 ms). Keyset cursors should therefore be implemented together with count caching or decoupled window counting in a subsequent release.
 
 ### P0: Filesystem change journal or watcher — Phase 1 complete
 
@@ -86,7 +89,7 @@ Registered roots now use the platform watcher, a durable coalesced journal, and 
 
 ### P1: Persistent thumbnail manifest and cache budget — Phase 2 complete
 
-The cache now has a persistent size-tiered manifest, rate-limited access tracking, background adoption of legacy files, configurable usage reporting, and bounded LRU enforcement. Gallery zoom and table density select the smallest sufficient tier while respecting the configured quality ceiling, and existing larger tiers are reused rather than generating redundant smaller files. Follow-up work should benchmark manifest adoption with 50k cached files.
+The cache now has a persistent size-tiered manifest, rate-limited access tracking, background adoption of legacy files, configurable usage reporting, and bounded LRU enforcement. Gallery zoom and table density select the smallest sufficient tier while respecting the configured quality ceiling, and existing larger tiers are reused rather than generating redundant smaller files. Manifest synchronization for 50k cached files runs at over 15,300 files/sec, completing in 3.26 seconds.
 
 ### P1: Cancelable thumbnail priority queue — Phase 1 complete
 
@@ -100,9 +103,10 @@ Progress-event coalescing and streaming full-folder traversal are complete. Foll
 
 - [Completed] Split infrequent modal bundles with dynamic imports.
 - [Phase 1 complete] Exclude raw workflow payloads from gallery pages and fetch complete metadata on selection.
-- Introduce a dedicated gallery DTO after measuring whether the remaining structured fields materially affect 400-item pages.
+- [Empirically Evaluated] A dedicated gallery DTO would only save ~80 KB per 400-item page (less than 2 ms transfer over localhost IPC). Retaining the current projected `ImageFile` is optimal and avoids duplicating schema types.
 - Move expensive filter aggregation to indexed SQL and cache stable facet counts.
 - Audit object URL and decoded-image lifetime after long browsing sessions.
+
 
 ## GUI Recommendations
 

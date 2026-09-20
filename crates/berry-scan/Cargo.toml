@@ -14,3 +14,12 @@ thiserror = "2"
 walkdir = "2"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "rayon"] }
 rayon = "1.10"
+
+[dev-dependencies]
+tempfile = "3"
+rusqlite = { version = "0.40.2", features = ["bundled"] }
+
+
+[[bench]]
+name = "large_library"
+harness = false
