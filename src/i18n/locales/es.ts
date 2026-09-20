@@ -415,6 +415,8 @@ export const es: typeof en = {
     thumbnailsCount: "miniaturas",
     clearCache: "🗑️ Limpiar caché de miniaturas",
     clearing: "Limpiando...",
+    diagnostics: "Diagnóstico",
+
     parsersTitle: "Motores de extracción de metadatos integrados",
     parsersSubtitle: "Berry AI Studio admite la extracción sin pérdidas de parámetros para:",
     enabled: "✓ Habilitado",

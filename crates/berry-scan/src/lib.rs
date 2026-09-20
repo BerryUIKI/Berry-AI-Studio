@@ -12,6 +12,7 @@ pub mod thumbnail;
 pub use scanner::{ScanError, ScanProgress, ScanStats, Scanner};
 pub use thumbnail::{
     batch_generate_thumbnails, clear_thumbnail_cache, ensure_thumbnail, get_thumbnail_cache_stats,
-    get_thumbnail_path, synchronize_thumbnail_manifest, ThumbnailBatchResult, ThumbnailCacheStats,
-    ThumbnailProgress, ThumbnailRequest,
+    get_thumbnail_path, get_thumbnail_queue_diagnostics, reset_thumbnail_queue_diagnostics,
+    synchronize_thumbnail_manifest, ThumbnailBatchResult, ThumbnailCacheStats, ThumbnailProgress,
+    ThumbnailQueueDiagnostics, ThumbnailRequest,
 };

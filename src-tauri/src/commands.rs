@@ -1276,6 +1276,22 @@ pub fn cancel_thumbnail_requests(generation: u64, state: State<'_, AppState>) {
         .fetch_max(generation, Ordering::AcqRel);
 }
 
+/// Get runtime per-job thumbnail queue diagnostics.
+#[tauri::command]
+pub fn get_thumbnail_queue_diagnostics(
+    state: State<'_, AppState>,
+) -> berry_scan::ThumbnailQueueDiagnostics {
+    let mut diag = berry_scan::get_thumbnail_queue_diagnostics();
+    diag.active_generation = state.thumbnail_generation.load(Ordering::Acquire);
+    diag
+}
+
+/// Reset runtime thumbnail queue diagnostics counters.
+#[tauri::command]
+pub fn reset_thumbnail_queue_diagnostics() {
+    berry_scan::reset_thumbnail_queue_diagnostics();
+}
+
 /// Get stats for thumbnail cache on disk.
 #[tauri::command]
 pub async fn get_thumbnail_cache_stats(

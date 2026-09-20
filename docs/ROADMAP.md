@@ -107,11 +107,12 @@ This roadmap documents completed milestones and future engineering goals for **B
 - [x] Cancelable viewport generations with visible-first and directional look-ahead priority.
 - [x] Zoom-aware thumbnail tier selection for Gallery and Table surfaces.
 - [x] Reuse sufficient cached tiers and prune broken manifest paths during lookup.
-- [ ] Per-job thumbnail queue diagnostics.
+- [x] Per-job thumbnail queue diagnostics.
 - [x] Coalesce filesystem scan progress events by file count and elapsed time.
 - [x] Stream full-scan directory entries without retaining the complete tree.
 - [ ] Benchmark directory fingerprint strategies on local and network filesystems.
 - [x] Lazy-load infrequent modals and drawers through async component boundaries.
 - [x] Remove raw metadata blobs from paginated gallery IPC and fetch full details on selection.
 - [x] Keep navigation filters and stack grouping aligned across paginated text and semantic searches.
-- [ ] Benchmark a dedicated gallery DTO for the remaining structured metadata fields.
+- [x] Benchmark a dedicated gallery DTO for the remaining structured metadata fields.
+

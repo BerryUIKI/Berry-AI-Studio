@@ -413,6 +413,8 @@ export const en = {
     thumbnailsCount: "thumbnails",
     clearCache: "🗑️ Clear Thumbnail Cache",
     clearing: "Clearing...",
+    diagnostics: "Diagnostics",
+
     parsersTitle: "Built-in Metadata Extraction Engines",
     parsersSubtitle: "Berry AI Studio supports lossless generation parameter and workflow extraction for:",
     enabled: "✓ Enabled",

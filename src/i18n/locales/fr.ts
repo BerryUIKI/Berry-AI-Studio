@@ -415,6 +415,8 @@ export const fr: typeof en = {
     thumbnailsCount: "miniatures",
     clearCache: "🗑️ Vider le cache des miniatures",
     clearing: "Vidage en cours...",
+    diagnostics: "Diagnostics",
+
     parsersTitle: "Moteurs d'extraction de métadonnées intégrés",
     parsersSubtitle: "Berry AI Studio prend en charge l'extraction sans perte des paramètres pour :",
     enabled: "✓ Activé",

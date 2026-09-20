@@ -91,9 +91,10 @@ Registered roots now use the platform watcher, a durable coalesced journal, and 
 
 The cache now has a persistent size-tiered manifest, rate-limited access tracking, background adoption of legacy files, configurable usage reporting, and bounded LRU enforcement. Gallery zoom and table density select the smallest sufficient tier while respecting the configured quality ceiling, and existing larger tiers are reused rather than generating redundant smaller files. Manifest synchronization for 50k cached files runs at over 15,300 files/sec, completing in 3.26 seconds.
 
-### P1: Cancelable thumbnail priority queue — Phase 1 complete
+### P1: Cancelable thumbnail priority queue — Phase 2 complete
 
-IPC now carries monotonic viewport generations, the backend skips stale work inside the bounded decode pool, and the frontend orders near look-ahead before backward look-ahead. Visible requests begin before the debounced speculative queue. Follow-up work should expose per-job diagnostics and measure cancellation latency with unusually slow network-backed image decoders.
+IPC now carries monotonic viewport generations, the backend skips stale work inside the bounded decode pool, and the frontend orders near look-ahead before backward look-ahead. Visible requests begin before the debounced speculative queue. Per-job runtime queue diagnostics are now fully implemented in both the Rust Rayon worker pool and the frontend LRU cache, tracking real-time queued, running, canceled, completed, failed, and deduplication hit metrics without production console overhead.
+
 
 ### P1: Faster scan reconciliation — Phase 1 complete
 

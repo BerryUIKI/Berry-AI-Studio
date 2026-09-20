@@ -7,8 +7,66 @@ use rayon::ThreadPool;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Mutex, OnceLock};
+
+/// Runtime per-job queue and cache diagnostics.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct ThumbnailQueueDiagnostics {
+    pub queued: u64,
+    pub running: u64,
+    pub completed: u64,
+    pub canceled: u64,
+    pub failed: u64,
+    pub reused_tier_hits: u64,
+    pub manifest_hits: u64,
+    pub active_generation: u64,
+}
+
+struct AtomicQueueCounters {
+    queued: AtomicU64,
+    running: AtomicU64,
+    completed: AtomicU64,
+    canceled: AtomicU64,
+    failed: AtomicU64,
+    reused_tier_hits: AtomicU64,
+    manifest_hits: AtomicU64,
+}
+
+static QUEUE_COUNTERS: AtomicQueueCounters = AtomicQueueCounters {
+    queued: AtomicU64::new(0),
+    running: AtomicU64::new(0),
+    completed: AtomicU64::new(0),
+    canceled: AtomicU64::new(0),
+    failed: AtomicU64::new(0),
+    reused_tier_hits: AtomicU64::new(0),
+    manifest_hits: AtomicU64::new(0),
+};
+
+/// Retrieve snapshot of thumbnail queue diagnostics.
+pub fn get_thumbnail_queue_diagnostics() -> ThumbnailQueueDiagnostics {
+    ThumbnailQueueDiagnostics {
+        queued: QUEUE_COUNTERS.queued.load(Ordering::Relaxed),
+        running: QUEUE_COUNTERS.running.load(Ordering::Relaxed),
+        completed: QUEUE_COUNTERS.completed.load(Ordering::Relaxed),
+        canceled: QUEUE_COUNTERS.canceled.load(Ordering::Relaxed),
+        failed: QUEUE_COUNTERS.failed.load(Ordering::Relaxed),
+        reused_tier_hits: QUEUE_COUNTERS.reused_tier_hits.load(Ordering::Relaxed),
+        manifest_hits: QUEUE_COUNTERS.manifest_hits.load(Ordering::Relaxed),
+        active_generation: 0,
+    }
+}
+
+/// Reset thumbnail queue diagnostics counters.
+pub fn reset_thumbnail_queue_diagnostics() {
+    QUEUE_COUNTERS.queued.store(0, Ordering::Relaxed);
+    QUEUE_COUNTERS.running.store(0, Ordering::Relaxed);
+    QUEUE_COUNTERS.completed.store(0, Ordering::Relaxed);
+    QUEUE_COUNTERS.canceled.store(0, Ordering::Relaxed);
+    QUEUE_COUNTERS.failed.store(0, Ordering::Relaxed);
+    QUEUE_COUNTERS.reused_tier_hits.store(0, Ordering::Relaxed);
+    QUEUE_COUNTERS.manifest_hits.store(0, Ordering::Relaxed);
+}
 
 /// Dedicated background thread pool with strictly limited concurrency
 /// to ensure the main UI and WebView are never starved of CPU or disk I/O.
@@ -141,7 +199,10 @@ pub fn ensure_thumbnail<C>(
 where
     C: Fn() -> bool + Send + Sync,
 {
+    QUEUE_COUNTERS.queued.fetch_add(1, Ordering::Relaxed);
     if !should_continue() {
+        QUEUE_COUNTERS.queued.fetch_sub(1, Ordering::Relaxed);
+        QUEUE_COUNTERS.canceled.fetch_add(1, Ordering::Relaxed);
         return Err("thumbnail request canceled".to_string());
     }
     let dst = get_thumbnail_path(
@@ -151,6 +212,9 @@ where
         request.max_edge,
     );
     if dst.exists() {
+        QUEUE_COUNTERS.queued.fetch_sub(1, Ordering::Relaxed);
+        QUEUE_COUNTERS.manifest_hits.fetch_add(1, Ordering::Relaxed);
+        QUEUE_COUNTERS.completed.fetch_add(1, Ordering::Relaxed);
         if should_persist_access(&dst) {
             if let Err(error) = record_thumbnail(
                 db_path,
@@ -177,6 +241,11 @@ where
     {
         let reusable_path = PathBuf::from(&entry.path);
         if reusable_path.is_file() {
+            QUEUE_COUNTERS.queued.fetch_sub(1, Ordering::Relaxed);
+            QUEUE_COUNTERS
+                .reused_tier_hits
+                .fetch_add(1, Ordering::Relaxed);
+            QUEUE_COUNTERS.completed.fetch_add(1, Ordering::Relaxed);
             if should_persist_access(&reusable_path) {
                 let accessed_at = current_timestamp();
                 if let Err(error) = db.touch_thumbnail_cache_entry(
@@ -198,12 +267,24 @@ where
     }
 
     let src = Path::new(request.file_path);
-    get_thumb_pool().install(|| {
+    QUEUE_COUNTERS.queued.fetch_sub(1, Ordering::Relaxed);
+    QUEUE_COUNTERS.running.fetch_add(1, Ordering::Relaxed);
+    let decode_result = get_thumb_pool().install(|| {
         if !should_continue() {
+            QUEUE_COUNTERS.running.fetch_sub(1, Ordering::Relaxed);
+            QUEUE_COUNTERS.canceled.fetch_add(1, Ordering::Relaxed);
             return Err("thumbnail request canceled".to_string());
         }
-        generate_thumbnail(src, &dst, request.max_edge)
-    })?;
+        let res = generate_thumbnail(src, &dst, request.max_edge);
+        QUEUE_COUNTERS.running.fetch_sub(1, Ordering::Relaxed);
+        if res.is_ok() {
+            QUEUE_COUNTERS.completed.fetch_add(1, Ordering::Relaxed);
+        } else {
+            QUEUE_COUNTERS.failed.fetch_add(1, Ordering::Relaxed);
+        }
+        res
+    });
+    decode_result?;
     record_thumbnail(
         db_path,
         request.file_id,
@@ -239,6 +320,9 @@ where
         });
     }
 
+    QUEUE_COUNTERS
+        .queued
+        .fetch_add(total as u64, Ordering::Relaxed);
     let completed_counter = AtomicUsize::new(0);
     let canceled_counter = AtomicUsize::new(0);
     let pool = get_thumb_pool();
@@ -247,7 +331,9 @@ where
         items
             .into_par_iter()
             .filter_map(|(file_id, file_path, modified_at)| {
+                QUEUE_COUNTERS.queued.fetch_sub(1, Ordering::Relaxed);
                 if !should_continue() {
+                    QUEUE_COUNTERS.canceled.fetch_add(1, Ordering::Relaxed);
                     canceled_counter.fetch_add(1, Ordering::Relaxed);
                     let current = completed_counter.fetch_add(1, Ordering::Relaxed) + 1;
                     if let Some(ref cb) = progress_callback {
@@ -255,12 +341,24 @@ where
                     }
                     return None;
                 }
+                QUEUE_COUNTERS.running.fetch_add(1, Ordering::Relaxed);
                 let dst = get_thumbnail_path(cache_dir, file_id, modified_at, max_edge);
                 let generated = if dst.exists() {
+                    QUEUE_COUNTERS.manifest_hits.fetch_add(1, Ordering::Relaxed);
+                    QUEUE_COUNTERS.running.fetch_sub(1, Ordering::Relaxed);
+                    QUEUE_COUNTERS.completed.fetch_add(1, Ordering::Relaxed);
                     false
                 } else {
                     let src = Path::new(&file_path);
-                    generate_thumbnail(src, &dst, max_edge).is_ok()
+                    let res = generate_thumbnail(src, &dst, max_edge);
+                    QUEUE_COUNTERS.running.fetch_sub(1, Ordering::Relaxed);
+                    if res.is_ok() {
+                        QUEUE_COUNTERS.completed.fetch_add(1, Ordering::Relaxed);
+                        true
+                    } else {
+                        QUEUE_COUNTERS.failed.fetch_add(1, Ordering::Relaxed);
+                        false
+                    }
                 };
 
                 let current = completed_counter.fetch_add(1, Ordering::Relaxed) + 1;
@@ -674,6 +772,57 @@ mod tests {
         assert_eq!(Path::new(&resolved), cached_path);
         assert!(!get_thumbnail_path(&dir, 1, 10, 256).exists());
         assert_eq!(db.thumbnail_cache_usage().unwrap(), (80, 1));
+        drop(db);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn tracks_thumbnail_queue_diagnostics() {
+        let dir = test_dir("diagnostics");
+        let db_path = dir.join("berry.db");
+        let db = Database::connect(&db_path).unwrap();
+
+        // 1. Canceled request increments canceled counter
+        let before_canceled = get_thumbnail_queue_diagnostics().canceled;
+        let err = ensure_thumbnail(
+            &dir,
+            &db_path,
+            ThumbnailRequest {
+                file_id: 1,
+                file_path: dir.join("img.png").to_string_lossy().as_ref(),
+                modified_at: 10,
+                max_edge: 256,
+            },
+            1024,
+            || false,
+        );
+        assert!(err.is_err());
+        let after_canceled = get_thumbnail_queue_diagnostics().canceled;
+        assert!(after_canceled >= before_canceled + 1);
+
+        // 2. Manifest hit increments manifest_hits and completed counters
+        let cached_path = get_thumbnail_path(&dir, 2, 20, 256);
+        fs::write(&cached_path, vec![1; 50]).unwrap();
+        let before_hits = get_thumbnail_queue_diagnostics().manifest_hits;
+        let before_completed = get_thumbnail_queue_diagnostics().completed;
+        let ok = ensure_thumbnail(
+            &dir,
+            &db_path,
+            ThumbnailRequest {
+                file_id: 2,
+                file_path: dir.join("img2.png").to_string_lossy().as_ref(),
+                modified_at: 20,
+                max_edge: 256,
+            },
+            1024,
+            || true,
+        );
+        assert!(ok.is_ok());
+        let after_hits = get_thumbnail_queue_diagnostics().manifest_hits;
+        let after_completed = get_thumbnail_queue_diagnostics().completed;
+        assert!(after_hits >= before_hits + 1);
+        assert!(after_completed >= before_completed + 1);
+
         drop(db);
         fs::remove_dir_all(dir).unwrap();
     }

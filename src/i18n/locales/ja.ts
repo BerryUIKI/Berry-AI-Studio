@@ -415,6 +415,8 @@ export const ja: typeof en = {
     thumbnailsCount: "枚のサムネイル",
     clearCache: "🗑️ サムネイルキャッシュを消去",
     clearing: "消去中...",
+    diagnostics: "診断情報",
+
     parsersTitle: "組み込みメタデータ抽出エンジン",
     parsersSubtitle: "Berry AI Studio は以下の生成ツールのパラメータ抽出に対応しています：",
     enabled: "✓ 有効",

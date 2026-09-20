@@ -415,6 +415,8 @@ export const de: typeof en = {
     thumbnailsCount: "Vorschaubilder",
     clearCache: "🗑️ Cache leeren",
     clearing: "Wird geleert...",
+    diagnostics: "Diagnose",
+
     parsersTitle: "Integrierte Metadaten-Extraktionsmodule",
     parsersSubtitle: "Berry AI Studio unterstützt die verlustfreie Parameter-Extraktion für:",
     enabled: "✓ Aktiviert",

@@ -143,6 +143,8 @@ pub fn run() {
             commands::get_or_create_thumbnail,
             commands::batch_generate_thumbnails,
             commands::cancel_thumbnail_requests,
+            commands::get_thumbnail_queue_diagnostics,
+            commands::reset_thumbnail_queue_diagnostics,
             commands::get_thumbnail_cache_stats,
             commands::clear_thumbnail_cache,
             commands::upsert_file_embedding,

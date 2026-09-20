@@ -415,6 +415,8 @@ export const zhCN: typeof en = {
     thumbnailsCount: "张缩略图",
     clearCache: "🗑️ 清理缩略图缓存",
     clearing: "正在清理...",
+    diagnostics: "诊断信息",
+
     parsersTitle: "内置元数据解析引擎",
     parsersSubtitle: "Berry AI Studio 支持以下生成工具的生成参数与工作流无损解析：",
     enabled: "✓ 已启用",

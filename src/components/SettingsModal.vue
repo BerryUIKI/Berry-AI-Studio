@@ -27,6 +27,9 @@ import {
   type StoragePaths,
 } from "../utils/config";
 import { applyTheme, normalizeTheme, type AppTheme } from "../utils/theme";
+import ThumbnailDiagnosticsModal from "./ThumbnailDiagnosticsModal.vue";
+
+const showDiagnosticsModal = ref(false);
 
 const props = defineProps<{
   show: boolean;
@@ -443,14 +446,24 @@ async function saveSettings() {
                   <span v-if="cacheMessage" style="margin-left: 8px; color: #4ade80;">{{ cacheMessage }}</span>
                 </span>
               </div>
-              <button
-                type="button"
-                class="btn secondary"
-                :disabled="clearingCache"
-                @click="handleClearCache"
-              >
-                {{ clearingCache ? t.settings.clearing : t.settings.clearCache }}
-              </button>
+              <div class="cache-actions" style="display: flex; gap: 8px;">
+                <button
+                  type="button"
+                  class="btn secondary"
+                  :disabled="clearingCache"
+                  @click="handleClearCache"
+                >
+                  {{ clearingCache ? t.settings.clearing : t.settings.clearCache }}
+                </button>
+                <button
+                  type="button"
+                  class="btn secondary"
+                  @click="showDiagnosticsModal = true"
+                >
+                  ⚡ {{ t.settings.diagnostics || 'Diagnostics' }}
+                </button>
+              </div>
+
             </div>
           </div>
 
@@ -614,8 +627,10 @@ async function saveSettings() {
         <button type="button" class="btn primary" @click="saveSettings">{{ t.settings.save }}</button>
       </div>
     </div>
+    <ThumbnailDiagnosticsModal :show="showDiagnosticsModal" @close="showDiagnosticsModal = false" />
   </div>
 </template>
+
 
 <style scoped>
 .modal-overlay {
