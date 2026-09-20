@@ -1292,6 +1292,23 @@ pub fn reset_thumbnail_queue_diagnostics() {
     berry_scan::reset_thumbnail_queue_diagnostics();
 }
 
+/// Get filesystem watcher status and health metrics.
+#[tauri::command]
+pub fn get_watcher_status(state: State<'_, AppState>) -> crate::watcher::WatcherStatus {
+    if let Ok(watcher) = state.watcher.lock() {
+        if let Some(watcher) = watcher.as_ref() {
+            return watcher.get_status();
+        }
+    }
+    crate::watcher::WatcherStatus {
+        is_active: false,
+        watched_roots_count: 0,
+        pending_journal_count: 0,
+        last_reconcile_time: None,
+        last_error: Some("Filesystem watcher is not active".into()),
+    }
+}
+
 /// Get stats for thumbnail cache on disk.
 #[tauri::command]
 pub async fn get_thumbnail_cache_stats(
