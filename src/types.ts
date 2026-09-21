@@ -119,6 +119,13 @@ export interface ChangeLogSyncQuery {
   limit: number;
 }
 
+export interface DatabasePingResult {
+  success: boolean;
+  latency_ms: number;
+  backend: string;
+  message: string;
+}
+
 export interface FilePage {
   items: ImageFile[];
   total: number;
