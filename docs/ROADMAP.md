@@ -119,3 +119,14 @@ This roadmap documents completed milestones and future engineering goals for **B
 - [x] Keep navigation filters and stack grouping aligned across paginated text and semantic searches.
 - [x] Benchmark a dedicated gallery DTO for the remaining structured metadata fields.
 
+### 🎯 Milestone 14: Multi-Database Support & Team Studio (MySQL & PostgreSQL)
+*(See architectural design specification: [MULTI_DATABASE_COLLABORATION_RFC.md](./MULTI_DATABASE_COLLABORATION_RFC.md))*
+- [ ] Storage Engine trait abstraction with `sqlx` connection pooling for SQLite, MySQL 8.0+, and PostgreSQL 14+.
+- [ ] Keyset/cursor-based deep pagination for 500,000+ asset scale.
+- [ ] Cross-platform storage root mapping (`storage_roots` table and client mount configurations).
+- [ ] Optimistic concurrency control (`version` column) with Last-Write-Wins and set-union conflict resolution.
+- [ ] Tiered real-time change synchronization: default zero-DevOps change log journal polling + PostgreSQL `LISTEN/NOTIFY` / optional WebSocket Hub.
+- [ ] Client-side on-demand local thumbnail caching preserving network storage bandwidth.
+- [ ] Team & Database settings panel with live latency testing and SQLite-to-central migration wizard.
+
+
