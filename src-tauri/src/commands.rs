@@ -13,8 +13,8 @@ use berry_clip::{ClipEngine, ClipModelInfo};
 use berry_domain::{
     plan_prompt_stacks, Album, CheckpointModelStat, CleanupQueueItem, CursorFilePage,
     DatabaseStats, DetectedLora, FilePage, FileSortField, Folder, ImageFile, LoraModel,
-    ModelCacheEntry, PipelineDetectedPath, PromptStackCandidate, PromptStat, SearchCriteria,
-    SimilarityMatch, SortDirection, StackSummary, Tag,
+    ModelCacheEntry, NormalizedPath, PathResolver, PipelineDetectedPath, PromptStackCandidate,
+    PromptStat, SearchCriteria, SimilarityMatch, SortDirection, StackSummary, StorageRoot, Tag,
 };
 use berry_scan::{ScanStats, Scanner};
 use berry_storage::Database;
@@ -1139,6 +1139,67 @@ pub fn restore_database(
     Ok(())
 }
 
+// --- Storage Roots & Path Resolution Commands ---
+
+#[tauri::command]
+pub fn list_storage_roots(state: State<'_, AppState>) -> Result<Vec<StorageRoot>, String> {
+    db(&state)?.list_storage_roots().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_storage_root(
+    root_uuid: String,
+    state: State<'_, AppState>,
+) -> Result<Option<StorageRoot>, String> {
+    db(&state)?
+        .get_storage_root(&root_uuid)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn create_storage_root(root: StorageRoot, state: State<'_, AppState>) -> Result<(), String> {
+    db(&state)?
+        .create_storage_root(&root)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn update_storage_root(root: StorageRoot, state: State<'_, AppState>) -> Result<(), String> {
+    db(&state)?
+        .update_storage_root(&root)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_storage_root(root_uuid: String, state: State<'_, AppState>) -> Result<(), String> {
+    db(&state)?
+        .delete_storage_root(&root_uuid)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn resolve_normalized_path(
+    root_uuid: String,
+    relative_path: String,
+    app: AppHandle,
+) -> Result<Option<String>, String> {
+    let cfg = get_app_config(app)?;
+    let resolver = PathResolver::from_mappings(cfg.root_mappings);
+    Ok(resolver
+        .resolve_absolute(&root_uuid, &relative_path)
+        .map(|p| p.to_string_lossy().to_string()))
+}
+
+#[tauri::command]
+pub fn relativize_local_path(
+    absolute_path: String,
+    app: AppHandle,
+) -> Result<Option<NormalizedPath>, String> {
+    let cfg = get_app_config(app)?;
+    let resolver = PathResolver::from_mappings(cfg.root_mappings);
+    Ok(resolver.relativize(Path::new(&absolute_path)))
+}
+
 /// Open an external URL in the system's default browser.
 #[tauri::command]
 pub fn open_external_url(url: String, app_handle: AppHandle) -> Result<(), String> {
@@ -2193,6 +2254,14 @@ pub struct AppConfig {
     pub comfyui_url: String,
     #[serde(default = "default_webui_url")]
     pub webui_url: String,
+    #[serde(default = "default_storage_backend")]
+    pub storage_backend: String,
+    #[serde(default)]
+    pub remote_connection_url: String,
+    #[serde(default = "default_client_identifier")]
+    pub client_identifier: String,
+    #[serde(default)]
+    pub root_mappings: HashMap<String, String>,
 }
 
 fn default_comfyui_url() -> String {
@@ -2201,6 +2270,14 @@ fn default_comfyui_url() -> String {
 
 fn default_webui_url() -> String {
     "http://127.0.0.1:7860".to_string()
+}
+
+fn default_storage_backend() -> String {
+    "sqlite".to_string()
+}
+
+fn default_client_identifier() -> String {
+    "local_client".to_string()
 }
 
 fn default_auto_stack() -> bool {
@@ -2250,6 +2327,10 @@ impl Default for AppConfig {
             suppressed_warnings: Vec::new(),
             comfyui_url: default_comfyui_url(),
             webui_url: default_webui_url(),
+            storage_backend: default_storage_backend(),
+            remote_connection_url: String::new(),
+            client_identifier: default_client_identifier(),
+            root_mappings: HashMap::new(),
         }
     }
 }
@@ -2273,6 +2354,13 @@ mod app_config_tests {
             .remove("thumbnail_cache_budget_mb");
         value.as_object_mut().unwrap().remove("comfyui_url");
         value.as_object_mut().unwrap().remove("webui_url");
+        value.as_object_mut().unwrap().remove("storage_backend");
+        value
+            .as_object_mut()
+            .unwrap()
+            .remove("remote_connection_url");
+        value.as_object_mut().unwrap().remove("client_identifier");
+        value.as_object_mut().unwrap().remove("root_mappings");
 
         let config: AppConfig = serde_json::from_value(value).unwrap();
         assert!(config.suppressed_warnings.is_empty());
@@ -2281,6 +2369,10 @@ mod app_config_tests {
         assert_eq!(config.thumbnail_cache_budget_mb, 2048);
         assert_eq!(config.comfyui_url, "http://127.0.0.1:8188");
         assert_eq!(config.webui_url, "http://127.0.0.1:7860");
+        assert_eq!(config.storage_backend, "sqlite");
+        assert_eq!(config.remote_connection_url, "");
+        assert_eq!(config.client_identifier, "local_client");
+        assert!(config.root_mappings.is_empty());
     }
 }
 

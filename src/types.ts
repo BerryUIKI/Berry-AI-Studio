@@ -83,6 +83,19 @@ export interface CursorFilePage {
   has_more: boolean;
 }
 
+export interface StorageRoot {
+  root_uuid: string;
+  display_name: string;
+  root_type: string;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface NormalizedPath {
+  root_uuid: string;
+  relative_path: string;
+}
+
 export interface FilePage {
   items: ImageFile[];
   total: number;

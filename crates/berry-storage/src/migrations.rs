@@ -190,6 +190,16 @@ pub const MIGRATIONS: &[&str] = &[
     CREATE INDEX IF NOT EXISTS idx_files_cursor_size ON files(size_bytes DESC, id DESC);
     CREATE INDEX IF NOT EXISTS idx_files_cursor_rating ON files(rating DESC, id DESC);
     "#,
+    // v13: cross-platform storage roots table for multi-workstation mapping.
+    r#"
+    CREATE TABLE storage_roots (
+        root_uuid    TEXT PRIMARY KEY,
+        display_name TEXT NOT NULL,
+        root_type    TEXT NOT NULL DEFAULT 'local_mount',
+        created_at   INTEGER NOT NULL,
+        updated_at   INTEGER NOT NULL
+    ) STRICT;
+    "#,
 ];
 
 /// The schema version the current code migrates databases to.
