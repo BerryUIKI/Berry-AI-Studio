@@ -83,11 +83,14 @@ This roadmap documents completed milestones and future engineering goals for **B
 
 ---
 
-## 🔮 Upcoming Milestones (v0.3.0+)
+### ✅ Milestone 11: Generation Interop & Workflows
+- [x] Drag-and-drop workflow transfer and send-to-WebUI / send-to-ComfyUI via local HTTP API backend proxy.
+- [x] One-click batch cull (automatically keep hero/top-rated images and move drafts to system Trash with review modal).
+- [x] Configurable ComfyUI and SD WebUI endpoints with real-time connectivity testing.
 
-### 🎯 Milestone 11: Generation Interop & Workflows
-- [ ] Drag-and-drop workflow send-to-WebUI / send-to-ComfyUI via WebSocket or Local HTTP API.
-- [ ] One-click batch cull (keep hero/top-rated images and trash remaining drafts).
+---
+
+## 🔮 Upcoming Milestones (v0.3.0+)
 
 ### 🎯 Milestone 12: Cloud Sync & Export Utilities
 - [ ] Encrypted WebDAV / S3 / LAN database synchronization.

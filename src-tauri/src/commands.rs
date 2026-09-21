@@ -2178,6 +2178,18 @@ pub struct AppConfig {
     pub allow_multiple_open_stacks: bool,
     #[serde(default)]
     pub suppressed_warnings: Vec<String>,
+    #[serde(default = "default_comfyui_url")]
+    pub comfyui_url: String,
+    #[serde(default = "default_webui_url")]
+    pub webui_url: String,
+}
+
+fn default_comfyui_url() -> String {
+    "http://127.0.0.1:8188".to_string()
+}
+
+fn default_webui_url() -> String {
+    "http://127.0.0.1:7860".to_string()
 }
 
 fn default_auto_stack() -> bool {
@@ -2225,6 +2237,8 @@ impl Default for AppConfig {
             stack_time_window_minutes: 180,
             allow_multiple_open_stacks: false,
             suppressed_warnings: Vec::new(),
+            comfyui_url: default_comfyui_url(),
+            webui_url: default_webui_url(),
         }
     }
 }
@@ -2246,12 +2260,16 @@ mod app_config_tests {
             .as_object_mut()
             .unwrap()
             .remove("thumbnail_cache_budget_mb");
+        value.as_object_mut().unwrap().remove("comfyui_url");
+        value.as_object_mut().unwrap().remove("webui_url");
 
         let config: AppConfig = serde_json::from_value(value).unwrap();
         assert!(config.suppressed_warnings.is_empty());
         assert_eq!(config.startup_scan_interval_minutes, 360);
         assert_eq!(config.theme, "system");
         assert_eq!(config.thumbnail_cache_budget_mb, 2048);
+        assert_eq!(config.comfyui_url, "http://127.0.0.1:8188");
+        assert_eq!(config.webui_url, "http://127.0.0.1:7860");
     }
 }
 
@@ -3033,4 +3051,138 @@ pub fn auto_stack_images(
         eligible_images: plan.eligible_images,
         skipped_without_prompt: plan.skipped_without_prompt,
     })
+}
+
+// --- Generation Interoperability (ComfyUI & SD WebUI) ---
+
+#[tauri::command]
+pub fn check_generation_service(endpoint: String, service_type: String) -> Result<bool, String> {
+    let base = endpoint.trim_end_matches('/');
+    let agent = ureq::AgentBuilder::new()
+        .timeout_connect(std::time::Duration::from_secs(3))
+        .timeout_read(std::time::Duration::from_secs(3))
+        .build();
+
+    let primary_url = match service_type.as_str() {
+        "comfyui" => format!("{base}/system_stats"),
+        "webui" => format!("{base}/sdapi/v1/options"),
+        _ => format!("{base}/"),
+    };
+
+    if let Ok(res) = agent.get(&primary_url).call() {
+        if res.status() == 200 {
+            return Ok(true);
+        }
+    }
+
+    // Fallback URLs
+    let fallback_url = match service_type.as_str() {
+        "comfyui" => format!("{base}/prompt"),
+        "webui" => format!("{base}/docs"),
+        _ => return Ok(false),
+    };
+
+    if let Ok(res) = agent.get(&fallback_url).call() {
+        if res.status() == 200 {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}
+
+pub fn prepare_comfyui_prompt_payload(parsed: &serde_json::Value) -> serde_json::Value {
+    if parsed.get("prompt").is_some() {
+        parsed.clone()
+    } else {
+        serde_json::json!({
+            "prompt": parsed
+        })
+    }
+}
+
+#[tauri::command]
+pub fn send_to_comfyui(
+    endpoint: String,
+    workflow_json: String,
+) -> Result<serde_json::Value, String> {
+    let base = endpoint.trim_end_matches('/');
+    let target_url = format!("{base}/prompt");
+
+    let parsed: serde_json::Value =
+        serde_json::from_str(&workflow_json).map_err(|e| format!("Invalid workflow JSON: {e}"))?;
+
+    let payload = prepare_comfyui_prompt_payload(&parsed);
+    let body = serde_json::to_string(&payload)
+        .map_err(|e| format!("Failed to serialize ComfyUI payload: {e}"))?;
+
+    let agent = ureq::AgentBuilder::new()
+        .timeout_connect(std::time::Duration::from_secs(5))
+        .timeout_read(std::time::Duration::from_secs(10))
+        .build();
+
+    let res = agent
+        .post(&target_url)
+        .set("Content-Type", "application/json")
+        .send_string(&body)
+        .map_err(|e| format!("Failed to send to ComfyUI ({target_url}): {e}"))?;
+
+    let json: serde_json::Value = serde_json::from_reader(res.into_reader())
+        .map_err(|e| format!("Failed to parse ComfyUI response: {e}"))?;
+
+    Ok(json)
+}
+
+#[tauri::command]
+pub fn send_to_webui(
+    endpoint: String,
+    payload: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let base = endpoint.trim_end_matches('/');
+    let target_url = format!("{base}/sdapi/v1/txt2img");
+
+    let body = serde_json::to_string(&payload)
+        .map_err(|e| format!("Failed to serialize WebUI payload: {e}"))?;
+
+    let agent = ureq::AgentBuilder::new()
+        .timeout_connect(std::time::Duration::from_secs(5))
+        .timeout_read(std::time::Duration::from_secs(30))
+        .build();
+
+    let res = agent
+        .post(&target_url)
+        .set("Content-Type", "application/json")
+        .send_string(&body)
+        .map_err(|e| format!("Failed to send to SD WebUI ({target_url}): {e}"))?;
+
+    let json: serde_json::Value = serde_json::from_reader(res.into_reader())
+        .map_err(|e| format!("Failed to parse SD WebUI response: {e}"))?;
+
+    Ok(json)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_prepare_comfyui_prompt_payload() {
+        let direct_nodes = serde_json::json!({
+            "3": {
+                "class_type": "KSampler",
+                "inputs": { "seed": 12345 }
+            }
+        });
+        let payload = prepare_comfyui_prompt_payload(&direct_nodes);
+        assert!(payload.get("prompt").is_some());
+        assert_eq!(payload["prompt"]["3"]["class_type"], "KSampler");
+
+        let wrapped = serde_json::json!({
+            "prompt": {
+                "4": { "class_type": "VAEDecode" }
+            }
+        });
+        let payload2 = prepare_comfyui_prompt_payload(&wrapped);
+        assert_eq!(payload2["prompt"]["4"]["class_type"], "VAEDecode");
+    }
 }
