@@ -45,9 +45,25 @@ pub fn hmac_sha256(key: &[u8], data: &[u8]) -> Vec<u8> {
     outer.finalize().to_vec()
 }
 
-fn sha256_hex(data: &[u8]) -> String {
+pub(crate) fn sha256_hex(data: &[u8]) -> String {
     let hash = Sha256::digest(data);
     hex::encode(hash)
+}
+
+/// Calculate SHA-256 of an on-disk file in streaming 64KB chunks.
+pub(crate) fn sha256_file(path: &Path) -> std::io::Result<String> {
+    use std::io::Read;
+    let mut file = std::fs::File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 65536];
+    loop {
+        let n = file.read(&mut buffer)?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&buffer[..n]);
+    }
+    Ok(hex::encode(hasher.finalize()))
 }
 
 fn format_iso8601_basic(time: SystemTime) -> (String, String) {
@@ -105,20 +121,20 @@ fn format_iso8601_basic(time: SystemTime) -> (String, String) {
 }
 
 // -----------------------------------------------------------------------------
-// S3 REST Client with AWS Signature Version 4
+// S3 REST Client (AWS SigV4)
 // -----------------------------------------------------------------------------
 
-struct S3Client<'a> {
-    endpoint: &'a str,
-    bucket: &'a str,
-    region: &'a str,
-    access_key: &'a str,
-    secret_key: &'a str,
-    prefix: &'a str,
+pub(crate) struct S3Client<'a> {
+    pub(crate) endpoint: &'a str,
+    pub(crate) bucket: &'a str,
+    pub(crate) region: &'a str,
+    pub(crate) access_key: &'a str,
+    pub(crate) secret_key: &'a str,
+    pub(crate) prefix: &'a str,
 }
 
 impl<'a> S3Client<'a> {
-    fn from_config(config: &'a CloudBackupConfig) -> Result<Self, String> {
+    pub(crate) fn from_config(config: &'a CloudBackupConfig) -> Result<Self, String> {
         let endpoint = config
             .s3_endpoint
             .as_deref()
@@ -149,20 +165,32 @@ impl<'a> S3Client<'a> {
         })
     }
 
-    fn object_key(&self, filename: &str) -> String {
+    pub(crate) fn object_key(&self, filename: &str) -> String {
+        let clean = filename.trim_start_matches('/');
         if self.prefix.is_empty() {
-            filename.to_string()
+            clean.to_string()
         } else {
-            format!("{}/{}", self.prefix, filename)
+            format!("{}/{}", self.prefix, clean)
         }
     }
 
-    fn sign_request(
+    pub(crate) fn sign_request(
         &self,
         method: &str,
         path: &str,
         query: &str,
         payload: &[u8],
+    ) -> (String, Vec<(String, String)>) {
+        self.sign_request_ext(method, path, query, payload, &[])
+    }
+
+    pub(crate) fn sign_request_ext(
+        &self,
+        method: &str,
+        path: &str,
+        query: &str,
+        payload: &[u8],
+        extra_headers: &[(&str, &str)],
     ) -> (String, Vec<(String, String)>) {
         let (date_str, datetime_str) = format_iso8601_basic(SystemTime::now());
 
@@ -177,10 +205,23 @@ impl<'a> S3Client<'a> {
             format!("/{path}")
         };
 
-        let canonical_headers = format!(
-            "host:{host}\nx-amz-content-sha256:{payload_hash}\nx-amz-date:{datetime_str}\n"
-        );
-        let signed_headers = "host;x-amz-content-sha256;x-amz-date";
+        let mut all_signed: Vec<(String, String)> = vec![
+            ("host".to_string(), host.to_string()),
+            ("x-amz-content-sha256".to_string(), payload_hash.clone()),
+            ("x-amz-date".to_string(), datetime_str.clone()),
+        ];
+        for (k, v) in extra_headers {
+            all_signed.push((k.to_lowercase(), v.trim().to_string()));
+        }
+        all_signed.sort_by(|a, b| a.0.cmp(&b.0));
+
+        let mut canonical_headers = String::new();
+        let mut signed_headers_parts = Vec::new();
+        for (k, v) in &all_signed {
+            canonical_headers.push_str(&format!("{k}:{v}\n"));
+            signed_headers_parts.push(k.as_str());
+        }
+        let signed_headers = signed_headers_parts.join(";");
 
         let canonical_request = format!(
             "{method}\n{canonical_uri}\n{query}\n{canonical_headers}\n{signed_headers}\n{payload_hash}"
@@ -205,12 +246,15 @@ impl<'a> S3Client<'a> {
             self.access_key
         );
 
-        let headers = vec![
+        let mut headers = vec![
             ("Host".to_string(), host.to_string()),
             ("x-amz-date".to_string(), datetime_str),
             ("x-amz-content-sha256".to_string(), payload_hash),
             ("Authorization".to_string(), auth_header),
         ];
+        for (k, v) in extra_headers {
+            headers.push((k.to_string(), v.to_string()));
+        }
 
         let target_url = if query.is_empty() {
             format!("{}{canonical_uri}", self.endpoint)
@@ -241,8 +285,17 @@ impl<'a> S3Client<'a> {
 
     pub fn put_object(&self, filename: &str, data: &[u8]) -> Result<(), String> {
         let key = self.object_key(filename);
+        self.put_object_raw(&key, data, None)
+    }
+
+    pub(crate) fn put_object_raw(&self, key: &str, data: &[u8], sha256_hex: Option<&str>) -> Result<(), String> {
         let path = format!("/{}/{}", self.bucket, key);
-        let (url, headers) = self.sign_request("PUT", &path, "", data);
+        let extra = if let Some(sha) = sha256_hex {
+            vec![("x-amz-meta-sha256", sha)]
+        } else {
+            vec![]
+        };
+        let (url, headers) = self.sign_request_ext("PUT", &path, "", data, &extra);
 
         let mut req = ureq::put(&url);
         for (k, v) in headers {
@@ -256,6 +309,27 @@ impl<'a> S3Client<'a> {
             Ok(())
         } else {
             Err(format!("S3 PUT returned status {}", resp.status()))
+        }
+    }
+
+    pub(crate) fn head_object(&self, key: &str) -> Result<Option<(u64, Option<String>, Option<String>)>, String> {
+        let path = format!("/{}/{}", self.bucket, key);
+        let (url, headers) = self.sign_request("HEAD", &path, "", &[]);
+
+        let mut req = ureq::head(&url);
+        for (k, v) in headers {
+            req = req.set(&k, &v);
+        }
+
+        match req.call() {
+            Ok(resp) => {
+                let len = resp.header("Content-Length").and_then(|s| s.parse::<u64>().ok()).unwrap_or(0);
+                let etag = resp.header("ETag").map(|s| s.trim_matches('"').to_string());
+                let sha = resp.header("x-amz-meta-sha256").map(|s| s.to_string());
+                Ok(Some((len, etag, sha)))
+            }
+            Err(ureq::Error::Status(404, _)) => Ok(None),
+            Err(e) => Err(format!("S3 HEAD failed: {e}")),
         }
     }
 
@@ -320,14 +394,14 @@ impl<'a> S3Client<'a> {
 // WebDAV REST Client
 // -----------------------------------------------------------------------------
 
-struct WebDavClient<'a> {
-    endpoint: &'a str,
-    username: &'a str,
-    password: &'a str,
+pub(crate) struct WebDavClient<'a> {
+    pub(crate) endpoint: &'a str,
+    pub(crate) username: &'a str,
+    pub(crate) password: &'a str,
 }
 
 impl<'a> WebDavClient<'a> {
-    fn from_config(config: &'a CloudBackupConfig) -> Result<Self, String> {
+    pub(crate) fn from_config(config: &'a CloudBackupConfig) -> Result<Self, String> {
         let endpoint = config
             .webdav_endpoint
             .as_deref()
@@ -343,7 +417,7 @@ impl<'a> WebDavClient<'a> {
         })
     }
 
-    fn auth_header(&self) -> Option<String> {
+    pub(crate) fn auth_header(&self) -> Option<String> {
         if self.username.is_empty() {
             None
         } else {
@@ -372,8 +446,55 @@ impl<'a> WebDavClient<'a> {
         }
     }
 
-    pub fn put_object(&self, filename: &str, data: &[u8]) -> Result<(), String> {
-        let url = format!("{}/{}", self.endpoint, filename);
+    pub(crate) fn head_object(&self, relative_path: &str) -> Result<Option<(u64, Option<String>)>, String> {
+        let clean = relative_path.trim_start_matches('/');
+        let url = format!("{}/{}", self.endpoint, clean);
+        let mut req = ureq::head(&url);
+        if let Some(auth) = self.auth_header() {
+            req = req.set("Authorization", &auth);
+        }
+
+        match req.call() {
+            Ok(resp) => {
+                let len = resp.header("Content-Length").and_then(|s| s.parse::<u64>().ok()).unwrap_or(0);
+                let etag = resp.header("ETag").map(|s| s.trim_matches('"').to_string());
+                Ok(Some((len, etag)))
+            }
+            Err(ureq::Error::Status(404, _)) => Ok(None),
+            Err(e) => Err(format!("WebDAV HEAD failed: {e}")),
+        }
+    }
+
+    pub(crate) fn ensure_collection(&self, relative_dir: &str) -> Result<(), String> {
+        let clean = relative_dir.trim_matches('/');
+        if clean.is_empty() {
+            return Ok(());
+        }
+        let parts: Vec<&str> = clean.split('/').collect();
+        let mut current = String::new();
+        for part in parts {
+            if current.is_empty() {
+                current = part.to_string();
+            } else {
+                current = format!("{current}/{part}");
+            }
+            let url = format!("{}/{}", self.endpoint, current);
+            let mut req = ureq::request("MKCOL", &url);
+            if let Some(auth) = self.auth_header() {
+                req = req.set("Authorization", &auth);
+            }
+            let _ = req.call(); // 405 Method Not Allowed means collection already exists
+        }
+        Ok(())
+    }
+
+    pub(crate) fn put_object_path(&self, relative_path: &str, data: &[u8]) -> Result<(), String> {
+        let clean = relative_path.trim_start_matches('/');
+        if let Some(idx) = clean.rfind('/') {
+            let parent_dir = &clean[..idx];
+            let _ = self.ensure_collection(parent_dir);
+        }
+        let url = format!("{}/{}", self.endpoint, clean);
         let mut req = ureq::put(&url);
         if let Some(auth) = self.auth_header() {
             req = req.set("Authorization", &auth);
@@ -387,6 +508,10 @@ impl<'a> WebDavClient<'a> {
         } else {
             Err(format!("WebDAV PUT returned status: {}", resp.status()))
         }
+    }
+
+    pub fn put_object(&self, filename: &str, data: &[u8]) -> Result<(), String> {
+        self.put_object_path(filename, data)
     }
 
     pub fn get_object(&self, filename: &str) -> Result<Vec<u8>, String> {

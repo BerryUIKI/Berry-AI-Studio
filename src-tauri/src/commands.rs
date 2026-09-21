@@ -7,7 +7,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
-use std::sync::MutexGuard;
+use std::sync::{Arc, MutexGuard};
 
 use berry_clip::{ClipEngine, ClipModelInfo};
 use berry_domain::{
@@ -3502,6 +3502,60 @@ pub async fn cloud_backup_restore_snapshot(
     }
 
     Ok(res)
+}
+
+#[tauri::command]
+pub async fn cloud_sync_start(
+    app_handle: AppHandle,
+    config: berry_domain::CloudBackupConfig,
+    options: berry_domain::CloudSyncOptions,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let sync_state = Arc::clone(&state.cloud_sync);
+    {
+        let st = sync_state.lock().map_err(|e| format!("Lock error: {e}"))?;
+        if st.is_running {
+            return Err("A media sync operation is already currently running".to_string());
+        }
+    }
+
+    let (items, total_bytes) = {
+        let db_guard = db(&state)?;
+        crate::cloud_sync::collect_sync_items(&db_guard, &options)?
+    };
+
+    crate::cloud_sync::start_cloud_sync(
+        app_handle,
+        config,
+        options,
+        sync_state,
+        items,
+        total_bytes,
+    );
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn cloud_sync_cancel(state: State<'_, AppState>) -> Result<(), String> {
+    crate::cloud_sync::cancel_cloud_sync(&state.cloud_sync);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn cloud_sync_get_progress(
+    state: State<'_, AppState>,
+) -> Result<berry_domain::CloudSyncProgress, String> {
+    let st = state.cloud_sync.lock().map_err(|e| format!("Lock error: {e}"))?;
+    Ok(st.progress.clone())
+}
+
+#[tauri::command]
+pub fn cloud_sync_get_summary(
+    state: State<'_, AppState>,
+) -> Result<Option<berry_domain::CloudSyncResult>, String> {
+    let st = state.cloud_sync.lock().map_err(|e| format!("Lock error: {e}"))?;
+    Ok(st.summary.clone())
 }
 
 #[cfg(test)]
