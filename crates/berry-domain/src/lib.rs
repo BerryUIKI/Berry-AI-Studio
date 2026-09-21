@@ -20,6 +20,7 @@ mod search;
 mod search_parser;
 mod similarity;
 mod stack;
+mod storage_root;
 mod tag;
 
 pub use album::Album;
@@ -38,4 +39,5 @@ pub use search::{CursorFilePage, FilePage, PageCursor, SearchCriteria};
 pub use search_parser::parse_query;
 pub use similarity::SimilarityMatch;
 pub use stack::StackSummary;
+pub use storage_root::{NormalizedPath, PathResolver, StorageRoot};
 pub use tag::Tag;

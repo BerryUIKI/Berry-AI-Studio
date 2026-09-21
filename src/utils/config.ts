@@ -22,6 +22,10 @@ export interface AppConfig {
   suppressed_warnings: string[];
   comfyui_url: string;
   webui_url: string;
+  storage_backend: "sqlite" | "mysql" | "postgres";
+  remote_connection_url: string;
+  client_identifier: string;
+  root_mappings: Record<string, string>;
 }
 
 export const STACK_MERGE_WARNING_ID = "stack_merge";
@@ -56,6 +60,10 @@ const DEFAULT_CONFIG: AppConfig = {
   suppressed_warnings: [],
   comfyui_url: "http://127.0.0.1:8188",
   webui_url: "http://127.0.0.1:7860",
+  storage_backend: "sqlite",
+  remote_connection_url: "",
+  client_identifier: "local_client",
+  root_mappings: {},
 };
 
 /**

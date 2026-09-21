@@ -7,7 +7,7 @@ use berry_domain::{
     Album, CheckpointModelStat, CleanupQueueItem, Container, CursorFilePage, DatabaseStats,
     ExtractedMetadata, FilePage, FileSortField, FilesystemChange, Folder, ImageFile, LoraModel,
     ModelCacheEntry, PageCursor, PromptStat, SearchCriteria, SimilarityMatch, SortDirection,
-    StackSummary, Tag,
+    StackSummary, StorageRoot, Tag,
 };
 use rusqlite::{params, Connection, OpenFlags};
 use uuid::Uuid;
@@ -50,6 +50,8 @@ pub enum DatabaseError {
     LoraNotFound(i64),
     #[error("no image stack with id {0}")]
     StackNotFound(String),
+    #[error("no storage root with uuid {0}")]
+    StorageRootNotFound(String),
     #[error("file {file_id} already belongs to stack {stack_id}")]
     FileAlreadyStacked { file_id: i64, stack_id: String },
     #[error("rating must be between 1 and 10, got {0}")]
@@ -2870,6 +2872,94 @@ impl Database {
         rows.collect::<rusqlite::Result<Vec<_>>>()
             .map_err(Into::into)
     }
+
+    /// Insert a new storage root record.
+    pub fn create_storage_root(&self, root: &StorageRoot) -> Result<(), DatabaseError> {
+        self.conn.execute(
+            "INSERT INTO storage_roots (root_uuid, display_name, root_type, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                root.root_uuid,
+                root.display_name,
+                root.root_type,
+                root.created_at,
+                root.updated_at
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Retrieve a storage root by its unique UUID.
+    pub fn get_storage_root(&self, root_uuid: &str) -> Result<Option<StorageRoot>, DatabaseError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT root_uuid, display_name, root_type, created_at, updated_at
+             FROM storage_roots WHERE root_uuid = ?1",
+        )?;
+        let mut rows = stmt.query([root_uuid])?;
+        if let Some(row) = rows.next()? {
+            Ok(Some(StorageRoot {
+                root_uuid: row.get(0)?,
+                display_name: row.get(1)?,
+                root_type: row.get(2)?,
+                created_at: row.get(3)?,
+                updated_at: row.get(4)?,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// List all registered storage roots ordered by creation time.
+    pub fn list_storage_roots(&self) -> Result<Vec<StorageRoot>, DatabaseError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT root_uuid, display_name, root_type, created_at, updated_at
+             FROM storage_roots ORDER BY created_at ASC, root_uuid ASC",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(StorageRoot {
+                root_uuid: row.get(0)?,
+                display_name: row.get(1)?,
+                root_type: row.get(2)?,
+                created_at: row.get(3)?,
+                updated_at: row.get(4)?,
+            })
+        })?;
+        let mut roots = Vec::new();
+        for row in rows {
+            roots.push(row?);
+        }
+        Ok(roots)
+    }
+
+    /// Update display name, root type, and updated_at for an existing storage root.
+    pub fn update_storage_root(&self, root: &StorageRoot) -> Result<(), DatabaseError> {
+        let rows_affected = self.conn.execute(
+            "UPDATE storage_roots SET display_name = ?1, root_type = ?2, updated_at = ?3
+             WHERE root_uuid = ?4",
+            params![
+                root.display_name,
+                root.root_type,
+                root.updated_at,
+                root.root_uuid
+            ],
+        )?;
+        if rows_affected == 0 {
+            return Err(DatabaseError::StorageRootNotFound(root.root_uuid.clone()));
+        }
+        Ok(())
+    }
+
+    /// Delete a storage root by UUID.
+    pub fn delete_storage_root(&self, root_uuid: &str) -> Result<(), DatabaseError> {
+        let rows_affected = self.conn.execute(
+            "DELETE FROM storage_roots WHERE root_uuid = ?1",
+            params![root_uuid],
+        )?;
+        if rows_affected == 0 {
+            return Err(DatabaseError::StorageRootNotFound(root_uuid.to_string()));
+        }
+        Ok(())
+    }
 }
 
 impl Drop for Database {
@@ -3887,10 +3977,60 @@ mod tests {
     // --- File Embeddings and Similarity Search Tests ---
 
     #[test]
-    fn migration_reaches_schema_version_12() {
+    fn migration_reaches_schema_version_13() {
         let db = Database::connect_in_memory().unwrap();
-        assert_eq!(db.user_version().unwrap(), 12);
-        assert_eq!(LATEST_VERSION, 12);
+        assert_eq!(db.user_version().unwrap(), 13);
+        assert_eq!(LATEST_VERSION, 13);
+    }
+
+    #[test]
+    fn test_storage_root_crud_and_errors() {
+        let db = Database::connect_in_memory().unwrap();
+        assert_eq!(db.list_storage_roots().unwrap().len(), 0);
+
+        let root1 = StorageRoot {
+            root_uuid: "root-nas-01".to_string(),
+            display_name: "Team Studio NAS".to_string(),
+            root_type: "smb".to_string(),
+            created_at: 1000,
+            updated_at: 1000,
+        };
+        db.create_storage_root(&root1).unwrap();
+
+        // Get by UUID
+        let fetched = db
+            .get_storage_root("root-nas-01")
+            .unwrap()
+            .expect("should find root");
+        assert_eq!(fetched, root1);
+
+        // Duplicate UUID rejected
+        assert!(db.create_storage_root(&root1).is_err());
+
+        // List
+        let roots = db.list_storage_roots().unwrap();
+        assert_eq!(roots.len(), 1);
+        assert_eq!(roots[0].display_name, "Team Studio NAS");
+
+        // Update
+        let mut updated = root1.clone();
+        updated.display_name = "Team Studio NAS (Fast NVMe)".to_string();
+        updated.updated_at = 1200;
+        db.update_storage_root(&updated).unwrap();
+        let fetched_updated = db.get_storage_root("root-nas-01").unwrap().unwrap();
+        assert_eq!(fetched_updated.display_name, "Team Studio NAS (Fast NVMe)");
+        assert_eq!(fetched_updated.updated_at, 1200);
+
+        // Delete
+        db.delete_storage_root("root-nas-01").unwrap();
+        assert!(db.get_storage_root("root-nas-01").unwrap().is_none());
+        assert_eq!(db.list_storage_roots().unwrap().len(), 0);
+
+        // Deleting non-existent returns error
+        assert!(matches!(
+            db.delete_storage_root("root-missing"),
+            Err(DatabaseError::StorageRootNotFound(_))
+        ));
     }
 
     #[test]
