@@ -14,6 +14,8 @@ use rayon::prelude::*;
 use zip::write::SimpleFileOptions;
 use zip::ZipWriter;
 
+use crate::html_showcase::{generate_html_showcase, ShowcaseItemMetadata};
+
 /// Sanitize filename by removing invalid OS characters and trimming.
 pub fn sanitize_filename_part(part: &str) -> String {
     let sanitized: String = part
@@ -132,6 +134,7 @@ pub struct ProcessedExportItem {
     pub image_filename: String,
     pub image_bytes: Vec<u8>,
     pub sidecar: Option<(String, Vec<u8>)>,
+    pub showcase_item: Option<ShowcaseItemMetadata>,
 }
 
 /// Process a single image file according to export format, downscaling, and privacy rules.
@@ -169,8 +172,11 @@ pub fn process_single_image(
         && options.privacy == MetadataPrivacyMode::KeepAll
         && options.max_edge.is_none();
 
-    let image_bytes = if is_fast_pass {
-        fs::read(src_path).map_err(|e| format!("Failed to read {}: {e}", file.path))?
+    let (image_bytes, final_width, final_height) = if is_fast_pass {
+        let bytes = fs::read(src_path).map_err(|e| format!("Failed to read {}: {e}", file.path))?;
+        let w = file.metadata.as_ref().and_then(|m| m.width).unwrap_or(0);
+        let h = file.metadata.as_ref().and_then(|m| m.height).unwrap_or(0);
+        (bytes, w, h)
     } else {
         // Decode image
         let reader = ImageReader::open(src_path)
@@ -189,6 +195,8 @@ pub fn process_single_image(
                 img = img.resize(max_edge, max_edge, image::imageops::FilterType::Lanczos3);
             }
         }
+
+        let (w, h) = (img.width(), img.height());
 
         // Encode to target format (pure raster encoding strips all source metadata chunks)
         let mut buffer = Vec::new();
@@ -212,7 +220,7 @@ pub fn process_single_image(
                     .map_err(|e| format!("Failed to encode PNG: {e}"))?;
             }
         }
-        buffer
+        (buffer, w, h)
     };
 
     // Generate optional sidecar
@@ -240,11 +248,57 @@ pub fn process_single_image(
         }
     };
 
+    let showcase_item = if options.export_html_showcase {
+        let (prompt, negative_prompt, model, sampler, seed, cfg_scale, steps) =
+            match options.privacy {
+                MetadataPrivacyMode::KeepAll => (
+                    file.metadata.as_ref().and_then(|m| m.prompt.clone()),
+                    file.metadata
+                        .as_ref()
+                        .and_then(|m| m.negative_prompt.clone()),
+                    file.metadata.as_ref().and_then(|m| m.model_name.clone()),
+                    file.metadata.as_ref().and_then(|m| m.sampler.clone()),
+                    file.metadata.as_ref().and_then(|m| m.seed.clone()),
+                    file.metadata.as_ref().and_then(|m| m.cfg_scale),
+                    file.metadata.as_ref().and_then(|m| m.steps),
+                ),
+                MetadataPrivacyMode::StripPromptOnly => (
+                    None,
+                    None,
+                    file.metadata.as_ref().and_then(|m| m.model_name.clone()),
+                    file.metadata.as_ref().and_then(|m| m.sampler.clone()),
+                    file.metadata.as_ref().and_then(|m| m.seed.clone()),
+                    file.metadata.as_ref().and_then(|m| m.cfg_scale),
+                    file.metadata.as_ref().and_then(|m| m.steps),
+                ),
+                MetadataPrivacyMode::StripAllAiMetadata | MetadataPrivacyMode::StripAll => {
+                    (None, None, None, None, None, None, None)
+                }
+            };
+
+        Some(ShowcaseItemMetadata {
+            filename: image_filename.clone(),
+            width: final_width,
+            height: final_height,
+            prompt,
+            negative_prompt,
+            model,
+            sampler,
+            seed,
+            cfg_scale,
+            steps,
+            rating: file.rating,
+        })
+    } else {
+        None
+    };
+
     Ok(ProcessedExportItem {
         base_filename: base_stem,
         image_filename,
         image_bytes,
         sidecar,
+        showcase_item,
     })
 }
 
@@ -313,6 +367,7 @@ where
         SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
     let processed_counter = AtomicUsize::new(0);
+    let mut showcase_items = Vec::new();
 
     // Process files in bounded chunks of 16 to keep memory usage strictly bounded
     for (chunk_idx, chunk) in files.chunks(16).enumerate() {
@@ -356,6 +411,10 @@ where
                         }
                     }
 
+                    if let Some(showcase) = item.showcase_item {
+                        showcase_items.push(showcase);
+                    }
+
                     progress_callback(ExportProgressEvent {
                         current,
                         total,
@@ -366,6 +425,31 @@ where
                 Err(err) => {
                     errors.push(err);
                 }
+            }
+        }
+    }
+
+    if options.export_html_showcase && !showcase_items.is_empty() {
+        let title = options
+            .html_title
+            .as_deref()
+            .filter(|s| !s.trim().is_empty())
+            .unwrap_or("Berry AI Studio Showcase");
+        let html_content = generate_html_showcase(title, &showcase_items);
+        let html_bytes = html_content.as_bytes();
+        let html_len = html_bytes.len() as u64;
+
+        if let Some(ref mut zip) = zip_writer {
+            use std::io::Write;
+            let _ = zip.start_file("index.html", zip_options);
+            let _ = zip.write_all(html_bytes);
+            total_bytes_written += html_len;
+        } else {
+            let out_html_path = dest_path.join("index.html");
+            if let Err(e) = fs::write(&out_html_path, html_bytes) {
+                errors.push(format!("Failed to write index.html: {e}"));
+            } else {
+                total_bytes_written += html_len;
             }
         }
     }
@@ -482,6 +566,8 @@ mod tests {
             destination_path: dir.path().join("output.zip").to_string_lossy().to_string(),
             as_zip: true,
             max_edge: Some(100),
+            export_html_showcase: true,
+            html_title: Some("My Test Showcase".to_string()),
         };
 
         let processed = process_single_image(&file, &options, 0).unwrap();
@@ -505,5 +591,14 @@ mod tests {
             String::from_utf8(sidecar_bytes).unwrap(),
             "beautiful sunset, masterpiece"
         );
+
+        // Verify showcase item
+        assert!(processed.showcase_item.is_some());
+        let showcase = processed.showcase_item.unwrap();
+        assert_eq!(showcase.filename, "dreamshaper_v8_1_sample.webp");
+        assert_eq!(showcase.width, 100);
+        assert_eq!(showcase.height, 50);
+        // Privacy was StripAllAiMetadata so prompt is stripped
+        assert!(showcase.prompt.is_none());
     }
 }

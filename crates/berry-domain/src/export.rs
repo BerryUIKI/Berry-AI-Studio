@@ -64,6 +64,12 @@ pub struct ExportOptions {
     pub as_zip: bool,
     /// Optional maximum bounding edge (in pixels) for downscaling.
     pub max_edge: Option<u32>,
+    /// If true, generate a self-contained offline HTML showcase (index.html) along with the exported images.
+    #[serde(default)]
+    pub export_html_showcase: bool,
+    /// Optional custom title for the HTML showcase gallery.
+    #[serde(default)]
+    pub html_title: Option<String>,
 }
 
 /// Real-time progress update emitted during batch export.
@@ -102,6 +108,8 @@ mod tests {
             destination_path: "C:\\Exports\\batch.zip".to_string(),
             as_zip: true,
             max_edge: Some(2048),
+            export_html_showcase: true,
+            html_title: Some("My Cyberpunk Album".to_string()),
         };
 
         let json = serde_json::to_string(&options).unwrap();
