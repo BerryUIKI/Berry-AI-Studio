@@ -69,3 +69,84 @@ export function collapseStackMembers(
     return file.path === heroPaths.get(file.stack_id);
   });
 }
+
+export interface CullStackResult {
+  hero: ImageFile;
+  drafts: ImageFile[];
+}
+
+/**
+ * Identify draft images to cull within a stack.
+ *
+ * Rules:
+ * - Exactly one hero is preserved: highest rating, then smallest stack_order, then smallest id.
+ * - Drafts are all other members whose rating is lower than the hero (or all other members if all unrated).
+ */
+export function identifyStackDrafts(
+  files: ImageFile[],
+  stackId: string,
+  minKeepRating: number = 0,
+): CullStackResult | null {
+  const members = files.filter((f) => f.stack_id === stackId);
+  if (members.length <= 1) return null;
+
+  let hero = members[0];
+  for (const member of members.slice(1)) {
+    const memberRating = member.rating ?? 0;
+    const heroRating = hero.rating ?? 0;
+    if (memberRating > heroRating) {
+      hero = member;
+    } else if (memberRating === heroRating) {
+      const memberOrder = member.stack_order ?? Number.MAX_SAFE_INTEGER;
+      const heroOrder = hero.stack_order ?? Number.MAX_SAFE_INTEGER;
+      if (memberOrder < heroOrder) {
+        hero = member;
+      } else if (memberOrder === heroOrder && (member.id ?? 0) < (hero.id ?? 0)) {
+        hero = member;
+      }
+    }
+  }
+
+  const drafts = members.filter((m) => {
+    if (m.id === hero.id || m.path === hero.path) return false;
+    const rating = m.rating ?? 0;
+    const heroRating = hero.rating ?? 0;
+    if (minKeepRating > 0) {
+      return rating < minKeepRating;
+    }
+    return heroRating > 0 ? rating < heroRating : true;
+  });
+
+  return { hero, drafts };
+}
+
+/**
+ * Identify all draft images to cull from a list of selected files or stacks.
+ */
+export function identifyMultiStackDrafts(
+  files: ImageFile[],
+  selectedFilePaths?: Set<string>,
+): { heroes: ImageFile[]; drafts: ImageFile[] } {
+  const targetFiles =
+    selectedFilePaths && selectedFilePaths.size > 0
+      ? files.filter((f) => selectedFilePaths.has(f.path))
+      : files;
+
+  const stackIds = new Set<string>();
+  for (const file of targetFiles) {
+    if (file.stack_id) stackIds.add(file.stack_id);
+  }
+
+  const allHeroes: ImageFile[] = [];
+  const allDrafts: ImageFile[] = [];
+
+  for (const stackId of stackIds) {
+    const result = identifyStackDrafts(files, stackId);
+    if (result && result.drafts.length > 0) {
+      allHeroes.push(result.hero);
+      allDrafts.push(...result.drafts);
+    }
+  }
+
+  return { heroes: allHeroes, drafts: allDrafts };
+}

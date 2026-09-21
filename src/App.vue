@@ -29,6 +29,8 @@ import FileList from "./components/FileList.vue";
 import VirtualGrid from "./components/VirtualGrid.vue";
 import {
   collapseStackMembers,
+  identifyMultiStackDrafts,
+  identifyStackDrafts,
   resolveStackHeroPaths,
   summarizeResultStacks,
 } from "./utils/stack";
@@ -68,6 +70,9 @@ const OnboardingModal = defineAsyncComponent(() => import("./components/Onboardi
 const CompareModal = defineAsyncComponent(() => import("./components/CompareModal.vue"));
 const StackMergeWarningModal = defineAsyncComponent(
   () => import("./components/StackMergeWarningModal.vue"),
+);
+const CullDraftsModal = defineAsyncComponent(
+  () => import("./components/CullDraftsModal.vue"),
 );
 
 const info = ref<AppInfo | null>(null);
@@ -128,6 +133,9 @@ let onboardingDismissedThisSession = false;
 const compareModalOpen = ref(false);
 const compareImages = ref<ImageFile[]>([]);
 const stackMergeWarningOpen = ref(false);
+const cullModalOpen = ref(false);
+const cullHeroes = ref<ImageFile[]>([]);
+const cullDrafts = ref<ImageFile[]>([]);
 
 interface StackMergePlan {
   targetStackId: string;
@@ -1132,6 +1140,50 @@ async function onCompareSetHero(img: ImageFile) {
   await setStackHero(img);
 }
 
+async function onCullStack(stackId: string) {
+  let stackFiles = files.value.filter((f) => f.stack_id === stackId);
+  if (stackFiles.length <= 1) {
+    try {
+      const members = await invoke<ImageFile[]>("get_stack_members", { stackId });
+      if (members.length > 1) {
+        stackFiles = members;
+      }
+    } catch (err) {
+      console.warn("Failed to load stack members for cull:", err);
+    }
+  }
+  const result = identifyStackDrafts(stackFiles, stackId);
+  if (!result || result.drafts.length === 0) return;
+  cullHeroes.value = result.hero ? [result.hero] : [];
+  cullDrafts.value = result.drafts;
+  cullModalOpen.value = true;
+}
+
+function onBatchCullDrafts() {
+  const result = identifyMultiStackDrafts(files.value, selectedFilePaths.value);
+  if (result.drafts.length === 0) return;
+  cullHeroes.value = result.heroes;
+  cullDrafts.value = result.drafts;
+  cullModalOpen.value = true;
+}
+
+async function onConfirmCull(draftPaths: string[]) {
+  cullModalOpen.value = false;
+  if (draftPaths.length === 0) return;
+  try {
+    await invoke("trash_files", { filePaths: draftPaths });
+    const nextSelection = new Set(selectedFilePaths.value);
+    for (const p of draftPaths) {
+      nextSelection.delete(p);
+    }
+    selectedFilePaths.value = nextSelection;
+    await refreshCounts();
+    await loadFiles();
+  } catch (err) {
+    console.error("Failed to cull drafts:", err);
+  }
+}
+
 async function onOnboardingComplete() {
   // Immediately prevent any re-opening — this is the critical guard
   onboardingDismissedThisSession = true;
@@ -1972,6 +2024,7 @@ function onResetZoom() {
             @find-similar="handleFindSimilar"
             @toggle-stack-expand="onToggleStackExpand"
             @compare-stack="onTriggerCompare"
+            @cull-stack="onCullStack"
             @load-more="loadMoreFiles"
           />
 
@@ -2006,6 +2059,7 @@ function onResetZoom() {
             @move="onBatchMove"
             @copy="onBatchCopy"
             @trash="onBatchTrash"
+            @cull-drafts="onBatchCullDrafts"
           />
         </div>
       </main>
@@ -2196,6 +2250,15 @@ function onResetZoom() {
       :image-count="pendingStackMerge?.standaloneFileIds.length ?? 0"
       @cancel="cancelStackMerge"
       @confirm="confirmStackMerge"
+    />
+
+    <CullDraftsModal
+      v-if="cullModalOpen"
+      :open="cullModalOpen"
+      :heroes="cullHeroes"
+      :drafts="cullDrafts"
+      @close="cullModalOpen = false"
+      @confirm="onConfirmCull"
     />
   </div>
 </template>
