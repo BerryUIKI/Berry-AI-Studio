@@ -55,6 +55,9 @@ pub fn parse_easydiffusion(json_str: &str) -> Option<ExtractedMetadata> {
         sampler,
         model_name,
         model_hash: None,
+        duration_seconds: None,
+        fps: None,
+        video_codec: None,
     })
 }
 
@@ -117,6 +120,9 @@ pub fn parse_stableswarm(json_str: &str) -> Option<ExtractedMetadata> {
         sampler,
         model_name,
         model_hash: None,
+        duration_seconds: None,
+        fps: None,
+        video_codec: None,
     })
 }
 

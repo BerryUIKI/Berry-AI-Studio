@@ -18,6 +18,8 @@ const JPEG_SIGNATURE: [u8; 3] = [0xFF, 0xD8, 0xFF];
 const RIFF_SIGNATURE: [u8; 4] = *b"RIFF";
 /// Bytes 8..12 of a WebP file.
 const WEBP_SIGNATURE: [u8; 4] = *b"WEBP";
+/// WebM / Matroska EBML signature `1A 45 DF A3`.
+const WEBM_SIGNATURE: [u8; 4] = [0x1A, 0x45, 0xDF, 0xA3];
 
 /// Detect the container format of a file from its leading bytes.
 ///
@@ -39,6 +41,10 @@ pub fn detect_container(bytes: &[u8]) -> Option<Container> {
 
     if bytes.len() >= 8 && bytes[4..8] == *b"ftyp" {
         return Some(Container::Mp4);
+    }
+
+    if bytes.len() >= WEBM_SIGNATURE.len() && bytes[..WEBM_SIGNATURE.len()] == WEBM_SIGNATURE {
+        return Some(Container::Webm);
     }
 
     None
@@ -75,6 +81,15 @@ mod tests {
         let mut bytes = b"\x00\x00\x00\x18ftypmp42".to_vec();
         bytes.extend_from_slice(b"\x00\x00\x00\x00");
         assert_eq!(detect_container(&bytes), Some(Container::Mp4));
+    }
+
+    #[test]
+    fn detects_webm_signature() {
+        let mut bytes = vec![0x1A, 0x45, 0xDF, 0xA3];
+        bytes.extend_from_slice(
+            b"\x9F\x42\x86\x81\x01\x42\xF7\x81\x01\x42\xF2\x81\x04\x42\xF3\x81\x08\x42\x82\x84webm",
+        );
+        assert_eq!(detect_container(&bytes), Some(Container::Webm));
     }
 
     #[test]

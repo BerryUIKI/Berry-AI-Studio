@@ -7,9 +7,10 @@ use serde::{Deserialize, Serialize};
 /// Each variant corresponds to a known on-disk metadata format. Detection and
 /// parsing of each format is implemented in `berry-metadata` (full parsers
 /// arrive in M2); this enum is the shared vocabulary.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum MetadataFormat {
     /// AUTOMATIC1111 / SD.Next PNGInfo `parameters` text chunk.
+    #[default]
     A1111,
     /// InvokeAI (Dream / sd-metadata / invokeai_metadata).
     InvokeAI,

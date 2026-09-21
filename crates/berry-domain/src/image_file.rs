@@ -17,6 +17,8 @@ pub enum Container {
     WebP,
     /// MP4 (`.mp4`).
     Mp4,
+    /// WebM (`.webm`).
+    Webm,
     /// Plain text (`.txt`) sidecar metadata file.
     Txt,
 }
@@ -29,7 +31,7 @@ impl Container {
 
     /// Whether this container holds a video.
     pub const fn is_video(self) -> bool {
-        matches!(self, Self::Mp4)
+        matches!(self, Self::Mp4 | Self::Webm)
     }
 
     /// A canonical file extension for the container, without the leading dot.
@@ -39,6 +41,7 @@ impl Container {
             Self::Jpeg => "jpg",
             Self::WebP => "webp",
             Self::Mp4 => "mp4",
+            Self::Webm => "webm",
             Self::Txt => "txt",
         }
     }
@@ -55,6 +58,7 @@ impl Container {
             "jpg" => Some(Self::Jpeg),
             "webp" => Some(Self::WebP),
             "mp4" => Some(Self::Mp4),
+            "webm" => Some(Self::Webm),
             "txt" => Some(Self::Txt),
             _ => None,
         }
@@ -142,6 +146,8 @@ mod tests {
     fn mp4_is_a_video() {
         assert!(Container::Mp4.is_video());
         assert!(!Container::Mp4.is_image());
+        assert!(Container::Webm.is_video());
+        assert!(!Container::Webm.is_image());
     }
 
     #[test]
@@ -158,6 +164,7 @@ mod tests {
             Container::Jpeg,
             Container::WebP,
             Container::Mp4,
+            Container::Webm,
             Container::Txt,
         ] {
             assert_eq!(Container::from_id(container.id()), Some(container));

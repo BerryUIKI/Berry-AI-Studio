@@ -2,7 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { DetectedLora, ImageFile, Tag } from "../types";
-import { assetUrl, formatBytes, formatPlatformName, getFileName, normalizePath } from "../utils/image";
+import { assetUrl, formatBytes, formatDuration, formatPlatformName, getFileName, normalizePath } from "../utils/image";
 import { getThumbnailUrl } from "../utils/thumbnail";
 import { t } from "../i18n";
 import {
@@ -317,6 +317,15 @@ function onWorkflowDragStart(e: DragEvent) {
             <span class="meta-tag uppercase">{{ formatPlatformName(file.metadata?.format) || file.container }}</span>
             <span v-if="file.metadata?.width && file.metadata?.height" class="meta-tag">
               {{ file.metadata.width }} × {{ file.metadata.height }}
+            </span>
+            <span v-if="file.metadata?.duration_seconds" class="meta-tag duration-tag">
+              ⏱ {{ formatDuration(file.metadata.duration_seconds) }}
+            </span>
+            <span v-if="file.metadata?.fps" class="meta-tag">
+              {{ Math.round(file.metadata.fps) }} fps
+            </span>
+            <span v-if="file.metadata?.video_codec" class="meta-tag uppercase">
+              {{ file.metadata.video_codec }}
             </span>
             <span v-if="file.size_bytes" class="meta-tag">
               {{ formatBytes(file.size_bytes) }}

@@ -59,3 +59,27 @@ export function formatPlatformName(format: string | null | undefined): string {
   if (lower === "sd" || lower === "stablediffusion") return "SD";
   return format;
 }
+
+/**
+ * Format seconds into mm:ss or hh:mm:ss.
+ */
+export function formatDuration(totalSeconds?: number | null): string {
+  if (totalSeconds == null || isNaN(totalSeconds) || totalSeconds < 0) return "00:00";
+  const s = Math.floor(totalSeconds);
+  const hrs = Math.floor(s / 3600);
+  const mins = Math.floor((s % 3600) / 60);
+  const secs = s % 60;
+  if (hrs > 0) {
+    return `${hrs.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  }
+  return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+}
+
+/**
+ * Check whether a container string represents video media.
+ */
+export function isVideoContainer(container: string | null | undefined): boolean {
+  if (!container) return false;
+  const c = container.toLowerCase();
+  return c === "mp4" || c === "webm";
+}

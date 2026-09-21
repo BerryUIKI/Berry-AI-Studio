@@ -538,6 +538,9 @@ mod tests {
             sampler: Some("Euler a".to_string()),
             model_name: Some("dreamshaper_v8".to_string()),
             model_hash: Some("abcdef12".to_string()),
+            duration_seconds: None,
+            fps: None,
+            video_codec: None,
         };
 
         let file = ImageFile {

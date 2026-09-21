@@ -4,13 +4,16 @@ import type { ImageFile } from "../types";
 import {
   assetUrl,
   formatBytes,
+  formatDuration,
   formatPlatformName,
   getFileName,
+  isVideoContainer,
   normalizePath,
 } from "../utils/image";
 import {
   beginThumbnailRequestCycle,
   cancelThumbnailRequests,
+  captureAndSaveVideoThumbnail,
   getThumbnailTier,
   getThumbnailUrl,
   getThumbnailUrlSync,
@@ -405,6 +408,56 @@ function toggleSelect(file: ImageFile) {
   emit("toggleSelect", file);
 }
 
+// Video hover scrubbing state
+const hoveredVideoPath = ref<string | null>(null);
+const hoveredVideoProgress = ref<number>(0);
+const hoveredVideoCurrentTime = ref<number>(0);
+const hoveredVideoDuration = ref<number>(0);
+let videoHoverTimer: ReturnType<typeof setTimeout> | null = null;
+
+function onVideoMouseEnter(file: ImageFile) {
+  if (!isVideoContainer(file.container)) return;
+  if (videoHoverTimer) clearTimeout(videoHoverTimer);
+  videoHoverTimer = setTimeout(() => {
+    hoveredVideoPath.value = file.path;
+    hoveredVideoProgress.value = 0;
+    hoveredVideoCurrentTime.value = 0;
+    hoveredVideoDuration.value = file.metadata?.duration_seconds || 0;
+  }, 60);
+}
+
+function onVideoMouseMove(e: MouseEvent, file: ImageFile) {
+  if (!isVideoContainer(file.container) || hoveredVideoPath.value !== file.path) return;
+  const target = e.currentTarget as HTMLElement | null;
+  if (!target) return;
+  const rect = target.getBoundingClientRect();
+  const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / (rect.width || 1)));
+  hoveredVideoProgress.value = ratio;
+
+  const videoEl = target.querySelector("video") as HTMLVideoElement | null;
+  if (videoEl && videoEl.duration && !isNaN(videoEl.duration)) {
+    videoEl.currentTime = ratio * videoEl.duration;
+    hoveredVideoCurrentTime.value = videoEl.currentTime;
+    hoveredVideoDuration.value = videoEl.duration;
+  } else if (file.metadata?.duration_seconds) {
+    hoveredVideoCurrentTime.value = ratio * file.metadata.duration_seconds;
+    hoveredVideoDuration.value = file.metadata.duration_seconds;
+  }
+}
+
+function onVideoMouseLeave() {
+  if (videoHoverTimer) clearTimeout(videoHoverTimer);
+  hoveredVideoPath.value = null;
+  hoveredVideoProgress.value = 0;
+  hoveredVideoCurrentTime.value = 0;
+}
+
+function onVideoLoadedData(e: Event, file: ImageFile) {
+  const video = e.target as HTMLVideoElement | null;
+  if (!video) return;
+  void captureAndSaveVideoThumbnail(file, video);
+}
+
 function isStacked(file: ImageFile): boolean {
   return Boolean(file.stack_id && (props.stackMap?.[file.stack_id]?.count ?? 1) > 1);
 }
@@ -612,6 +665,9 @@ function onDragStart(e: DragEvent, file: ImageFile) {
             @click="onCardClick(file, $event)"
             @dblclick="activateFile(file)"
             @contextmenu.prevent="emit('findSimilar', file)"
+            @mouseenter="onVideoMouseEnter(file)"
+            @mousemove="onVideoMouseMove($event, file)"
+            @mouseleave="onVideoMouseLeave"
           >
             <div
               class="thumbnail-wrapper"
@@ -636,9 +692,21 @@ function onDragStart(e: DragEvent, file: ImageFile) {
               >
                 🔍
               </button>
+
+              <!-- Video actively scrubbing on hover -->
+              <video
+                v-if="isVideoContainer(file.container) && hoveredVideoPath === file.path"
+                :src="assetUrl(file.path)"
+                class="thumbnail-img thumbnail-video video-active"
+                :class="{ 'nsfw-blurred': blurNsfw && file.is_nsfw && !revealedNsfw.has(file.path) }"
+                muted
+                playsinline
+                preload="auto"
+              />
+
+              <!-- Cached WebP thumbnail or image -->
               <img
-                v-if="
-                  file.container !== 'mp4' &&
+                v-else-if="
                   file.container !== 'txt' &&
                   !failedImages.has(file.path) &&
                   getCardImageSrc(file, Math.max(width || itemWidth, imageHeight))
@@ -651,24 +719,29 @@ function onDragStart(e: DragEvent, file: ImageFile) {
                 decoding="async"
                 @error="onImageError(file.path)"
               />
+
+              <!-- Video poster when not actively hovered and no cached thumbnail -->
+              <video
+                v-else-if="isVideoContainer(file.container)"
+                :src="assetUrl(file.path)"
+                class="thumbnail-img thumbnail-video video-poster"
+                :class="{ 'nsfw-blurred': blurNsfw && file.is_nsfw && !revealedNsfw.has(file.path) }"
+                muted
+                preload="metadata"
+                playsinline
+                @loadeddata="onVideoLoadedData($event, file)"
+              />
+
               <div
                 v-else-if="
-                  file.container !== 'mp4' &&
+                  !isVideoContainer(file.container) &&
                   file.container !== 'txt' &&
                   !failedImages.has(file.path)
                 "
                 class="thumbnail-pending"
                 aria-hidden="true"
               />
-              <video
-                v-else-if="file.container === 'mp4'"
-                :src="assetUrl(file.path)"
-                class="thumbnail-img thumbnail-video"
-                :class="{ 'nsfw-blurred': blurNsfw && file.is_nsfw && !revealedNsfw.has(file.path) }"
-                muted
-                preload="metadata"
-                playsinline
-              />
+
               <div
                 v-else-if="failedImages.has(file.path)"
                 class="thumbnail-fallback thumbnail-failed"
@@ -688,14 +761,33 @@ function onDragStart(e: DragEvent, file: ImageFile) {
                 <span class="fallback-text">{{ file.container.toUpperCase() }}</span>
               </div>
 
-              <!-- Video badge -->
+              <!-- Static Video badge -->
               <span
-                v-if="file.container === 'mp4'"
+                v-if="isVideoContainer(file.container) && hoveredVideoPath !== file.path"
                 class="card-badge badge-video"
-                title="Video (MP4)"
+                :title="`Video (${file.container.toUpperCase()})`"
               >
-                ▶ MP4
+                ▶ {{ formatDuration(file.metadata?.duration_seconds) || file.container.toUpperCase() }}
               </span>
+
+              <!-- Dynamic Hover Scrubbing Time Badge -->
+              <span
+                v-if="isVideoContainer(file.container) && hoveredVideoPath === file.path"
+                class="card-badge badge-video-scrub"
+              >
+                {{ formatDuration(hoveredVideoCurrentTime) }} / {{ formatDuration(hoveredVideoDuration || file.metadata?.duration_seconds) }}
+              </span>
+
+              <!-- Mini Timeline Scrubber Track -->
+              <div
+                v-if="isVideoContainer(file.container) && hoveredVideoPath === file.path"
+                class="card-video-scrubber"
+              >
+                <div
+                  class="card-video-scrubber-progress"
+                  :style="{ width: `${hoveredVideoProgress * 100}%` }"
+                />
+              </div>
 
               <!-- NSFW blur overlay -->
               <div
@@ -1162,15 +1254,51 @@ function onDragStart(e: DragEvent, file: ImageFile) {
 .badge-video {
   top: 6px;
   left: 6px;
-  background: rgba(18, 181, 203, 0.85);
+  background: rgba(14, 165, 233, 0.9);
   color: #fff;
   font-weight: 700;
   letter-spacing: 0.05em;
+  backdrop-filter: blur(4px);
+}
+
+.badge-video-scrub {
+  top: 6px;
+  left: 6px;
+  background: rgba(15, 23, 42, 0.85);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  font-family: ui-monospace, monospace;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  backdrop-filter: blur(4px);
+  z-index: 4;
+}
+
+.card-video-scrubber {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 3;
+}
+
+.card-video-scrubber-progress {
+  height: 100%;
+  background: #38bdf8;
+  border-radius: 0 2px 2px 0;
 }
 
 .thumbnail-video {
   background: #000;
   pointer-events: none;
+}
+
+.video-active {
+  object-fit: cover;
+  width: 100%;
+  height: 100%;
 }
 
 .badge-rating {

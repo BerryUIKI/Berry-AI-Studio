@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { ImageFile } from "../types";
-import { assetUrl, formatBytes, formatPlatformName, getFileName } from "../utils/image";
+import { assetUrl, formatBytes, formatDuration, formatPlatformName, getFileName, isVideoContainer } from "../utils/image";
 import { t } from "../i18n";
 
 const props = defineProps<{
@@ -139,6 +139,103 @@ async function setRating(r: number) {
   }
 }
 
+// Video Player Controls & State
+const videoRef = ref<HTMLVideoElement | null>(null);
+const isPlaying = ref(true);
+const isLooping = ref(true);
+const isMuted = ref(false);
+const playbackRate = ref(1.0);
+const videoCurrentTime = ref(0);
+const videoDuration = ref(0);
+const showWorkflowInspector = ref(false);
+const workflowCopied = ref(false);
+
+const playbackRates = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+
+function togglePlay() {
+  if (!videoRef.value) return;
+  if (videoRef.value.paused) {
+    videoRef.value.play().catch(() => {});
+    isPlaying.value = true;
+  } else {
+    videoRef.value.pause();
+    isPlaying.value = false;
+  }
+}
+
+function toggleLoop() {
+  isLooping.value = !isLooping.value;
+  if (videoRef.value) {
+    videoRef.value.loop = isLooping.value;
+  }
+}
+
+function toggleMute() {
+  isMuted.value = !isMuted.value;
+  if (videoRef.value) {
+    videoRef.value.muted = isMuted.value;
+  }
+}
+
+function setPlaybackRate(rate: number) {
+  playbackRate.value = rate;
+  if (videoRef.value) {
+    videoRef.value.playbackRate = rate;
+  }
+}
+
+function stepFrame(forward: boolean) {
+  if (!videoRef.value) return;
+  videoRef.value.pause();
+  isPlaying.value = false;
+  const fps = props.file.metadata?.fps || 30;
+  const step = 1 / fps;
+  if (forward) {
+    videoRef.value.currentTime = Math.min(videoRef.value.duration || 0, videoRef.value.currentTime + step);
+  } else {
+    videoRef.value.currentTime = Math.max(0, videoRef.value.currentTime - step);
+  }
+}
+
+function onVideoTimeUpdate() {
+  if (!videoRef.value) return;
+  videoCurrentTime.value = videoRef.value.currentTime;
+  if (!videoDuration.value && videoRef.value.duration) {
+    videoDuration.value = videoRef.value.duration;
+  }
+}
+
+function onVideoLoadedMetadata() {
+  if (!videoRef.value) return;
+  videoDuration.value = videoRef.value.duration;
+  videoRef.value.playbackRate = playbackRate.value;
+  videoRef.value.loop = isLooping.value;
+  videoRef.value.muted = isMuted.value;
+  if (isPlaying.value) {
+    videoRef.value.play().catch(() => {});
+  }
+}
+
+function seekVideo(e: MouseEvent) {
+  if (!videoRef.value || !videoDuration.value) return;
+  const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+  const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  videoRef.value.currentTime = ratio * videoDuration.value;
+  videoCurrentTime.value = videoRef.value.currentTime;
+}
+
+async function copyWorkflow() {
+  const json = props.file.metadata?.parameters || props.file.metadata?.raw;
+  if (!json) return;
+  try {
+    await navigator.clipboard.writeText(json);
+    workflowCopied.value = true;
+    setTimeout(() => (workflowCopied.value = false), 2000);
+  } catch (err) {
+    console.error("Workflow copy failed:", err);
+  }
+}
+
 async function toggleFavorite() {
   if (!props.file.id) return;
   const nextVal = !props.file.is_favorite;
@@ -154,6 +251,10 @@ async function toggleFavorite() {
 function handleKeyDown(e: KeyboardEvent) {
   if (e.key === "Escape") {
     e.preventDefault();
+    if (showWorkflowInspector.value) {
+      showWorkflowInspector.value = false;
+      return;
+    }
     emit("close");
     return;
   }
@@ -175,6 +276,39 @@ function handleKeyDown(e: KeyboardEvent) {
   if (["0", "1", "2", "3", "4", "5"].includes(e.key)) {
     e.preventDefault();
     void setRating(parseInt(e.key, 10));
+    return;
+  }
+  if (isVideoContainer(props.file.container)) {
+    if (e.code === "Space") {
+      e.preventDefault();
+      togglePlay();
+      return;
+    }
+    if (e.key === "." || e.key === ">") {
+      e.preventDefault();
+      stepFrame(true);
+      return;
+    }
+    if (e.key === "," || e.key === "<") {
+      e.preventDefault();
+      stepFrame(false);
+      return;
+    }
+    if (e.key === "l" || e.key === "L") {
+      e.preventDefault();
+      toggleLoop();
+      return;
+    }
+    if (e.key === "m" || e.key === "M") {
+      e.preventDefault();
+      toggleMute();
+      return;
+    }
+    if (e.key === "i" || e.key === "I") {
+      e.preventDefault();
+      showWorkflowInspector.value = !showWorkflowInspector.value;
+      return;
+    }
   }
 }
 
@@ -200,6 +334,15 @@ onUnmounted(() => {
         <span class="file-name">{{ getFileName(file.path) }}</span>
         <span v-if="file.metadata?.width && file.metadata?.height" class="badge">
           {{ file.metadata.width }} × {{ file.metadata.height }}
+        </span>
+        <span v-if="file.metadata?.duration_seconds" class="badge">
+          ⏱ {{ formatDuration(file.metadata.duration_seconds) }}
+        </span>
+        <span v-if="file.metadata?.fps" class="badge">
+          {{ Math.round(file.metadata.fps) }} fps
+        </span>
+        <span v-if="file.metadata?.video_codec" class="badge">
+          {{ file.metadata.video_codec }}
         </span>
         <span v-if="file.size_bytes" class="badge">
           {{ formatBytes(file.size_bytes) }}
@@ -251,14 +394,28 @@ onUnmounted(() => {
         ‹
       </button>
 
-      <!-- Main Scaled Image -->
+      <!-- Main Scaled Media Container -->
       <div
         class="img-container"
         :style="{
           transform: `translate(${translateX}px, ${translateY}px) scale(${scale})`,
         }"
       >
+        <video
+          v-if="isVideoContainer(file.container)"
+          ref="videoRef"
+          :src="assetUrl(file.path)"
+          :loop="isLooping"
+          :muted="isMuted"
+          playsinline
+          class="lightbox-video"
+          :class="{ blurred: file.is_nsfw && !revealedNsfw }"
+          @timeupdate="onVideoTimeUpdate"
+          @loadedmetadata="onVideoLoadedMetadata"
+          @click.stop="togglePlay"
+        />
         <img
+          v-else
           :src="assetUrl(file.path)"
           :alt="getFileName(file.path)"
           :class="{ blurred: file.is_nsfw && !revealedNsfw }"
@@ -282,6 +439,91 @@ onUnmounted(() => {
         @click.stop="next"
       >
         ›
+      </button>
+    </div>
+
+    <!-- Video Player Floating HUD -->
+    <div v-if="isVideoContainer(file.container)" class="video-player-bar">
+      <button
+        type="button"
+        class="v-ctrl-btn play-btn"
+        :title="`${isPlaying ? t.preview.pause : t.preview.play} (Space)`"
+        @click.stop="togglePlay"
+      >
+        {{ isPlaying ? '⏸' : '▶' }}
+      </button>
+      <button
+        type="button"
+        class="v-ctrl-btn"
+        :title="`${t.preview.stepBackward} (,)`"
+        @click.stop="stepFrame(false)"
+      >
+        ⏮
+      </button>
+      <button
+        type="button"
+        class="v-ctrl-btn"
+        :title="`${t.preview.stepForward} (.)`"
+        @click.stop="stepFrame(true)"
+      >
+        ⏭
+      </button>
+
+      <span class="video-time-display">
+        {{ formatDuration(videoCurrentTime) }} / {{ formatDuration(videoDuration || file.metadata?.duration_seconds || 0) }}
+      </span>
+
+      <!-- Scrubber -->
+      <div class="video-scrubber" @click.stop="seekVideo">
+        <div
+          class="video-scrubber-fill"
+          :style="{ width: `${videoDuration ? (videoCurrentTime / videoDuration) * 100 : 0}%` }"
+        ></div>
+      </div>
+
+      <!-- Loop Toggle -->
+      <button
+        type="button"
+        class="v-ctrl-btn"
+        :class="{ active: isLooping }"
+        :title="`${t.preview.loop} (L)`"
+        @click.stop="toggleLoop"
+      >
+        🔁
+      </button>
+
+      <!-- Playback Speed -->
+      <select
+        :value="playbackRate"
+        class="v-speed-select"
+        :title="t.preview.playbackSpeed"
+        @change="setPlaybackRate(Number(($event.target as HTMLSelectElement).value))"
+        @click.stop
+      >
+        <option v-for="rate in playbackRates" :key="rate" :value="rate">
+          {{ rate }}x
+        </option>
+      </select>
+
+      <!-- Mute Toggle -->
+      <button
+        type="button"
+        class="v-ctrl-btn"
+        :title="`${isMuted ? t.preview.unmute : t.preview.mute} (M)`"
+        @click.stop="toggleMute"
+      >
+        {{ isMuted ? '🔇' : '🔊' }}
+      </button>
+
+      <!-- Workflow Inspector Toggle Button -->
+      <button
+        type="button"
+        class="v-ctrl-btn workflow-btn"
+        :class="{ active: showWorkflowInspector }"
+        :title="`${t.preview.videoWorkflow} (I)`"
+        @click.stop="showWorkflowInspector = !showWorkflowInspector"
+      >
+        <span>⚡ {{ t.preview.videoWorkflow }}</span>
       </button>
     </div>
 
@@ -337,6 +579,90 @@ onUnmounted(() => {
         </button>
       </div>
     </footer>
+
+    <!-- Video / Generation Workflow Inspector Slide-out Drawer -->
+    <div
+      v-if="showWorkflowInspector"
+      class="workflow-inspector-panel"
+      @click.stop
+    >
+      <div class="inspector-header">
+        <h4>⚡ {{ t.preview.videoWorkflow }}</h4>
+        <button
+          type="button"
+          class="hud-btn close-hud"
+          @click="showWorkflowInspector = false"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div class="inspector-content">
+        <div class="info-section">
+          <div v-if="file.metadata?.model_name" class="info-item">
+            <span class="info-key">{{ t.preview.modelName }}</span>
+            <span class="info-val highlight">{{ file.metadata.model_name }}</span>
+          </div>
+          <div v-if="file.metadata?.sampler" class="info-item">
+            <span class="info-key">{{ t.preview.sampler }}</span>
+            <span class="info-val">{{ file.metadata.sampler }}</span>
+          </div>
+          <div v-if="file.metadata?.steps" class="info-item">
+            <span class="info-key">{{ t.preview.steps }}</span>
+            <span class="info-val">{{ file.metadata.steps }}</span>
+          </div>
+          <div v-if="file.metadata?.cfg_scale" class="info-item">
+            <span class="info-key">{{ t.preview.cfgScale }}</span>
+            <span class="info-val">{{ file.metadata.cfg_scale }}</span>
+          </div>
+          <div v-if="file.metadata?.seed" class="info-item">
+            <span class="info-key">{{ t.preview.seed }}</span>
+            <span class="info-val">{{ file.metadata.seed }}</span>
+          </div>
+          <div v-if="file.metadata?.duration_seconds" class="info-item">
+            <span class="info-key">{{ t.preview.duration }}</span>
+            <span class="info-val">{{ formatDuration(file.metadata.duration_seconds) }}</span>
+          </div>
+          <div v-if="file.metadata?.fps" class="info-item">
+            <span class="info-key">{{ t.preview.fps }}</span>
+            <span class="info-val">{{ Math.round(file.metadata.fps) }} fps</span>
+          </div>
+          <div v-if="file.metadata?.video_codec" class="info-item">
+            <span class="info-key">{{ t.preview.codec }}</span>
+            <span class="info-val">{{ file.metadata.video_codec }}</span>
+          </div>
+        </div>
+
+        <!-- Prompts -->
+        <div v-if="file.metadata?.prompt" class="prompt-box">
+          <div class="prompt-box-header">
+            <span>{{ t.preview.prompt }}</span>
+            <button type="button" class="mini-copy-btn" @click="copyPrompt">
+              {{ promptCopied ? t.preview.copied : t.preview.copyPrompt }}
+            </button>
+          </div>
+          <p class="prompt-text">{{ file.metadata.prompt }}</p>
+        </div>
+
+        <div v-if="file.metadata?.negative_prompt" class="prompt-box">
+          <div class="prompt-box-header">
+            <span>{{ t.preview.negativePrompt }}</span>
+          </div>
+          <p class="prompt-text negative">{{ file.metadata.negative_prompt }}</p>
+        </div>
+
+        <!-- Raw JSON / Workflow Parameters -->
+        <div v-if="file.metadata?.parameters || file.metadata?.raw" class="workflow-raw-box">
+          <div class="prompt-box-header">
+            <span>Workflow Graph / Metadata</span>
+            <button type="button" class="mini-copy-btn" @click="copyWorkflow">
+              {{ workflowCopied ? t.preview.workflowCopied : t.preview.copyWorkflow }}
+            </button>
+          </div>
+          <pre class="raw-pre">{{ file.metadata.parameters || file.metadata.raw }}</pre>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -584,5 +910,264 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.img-container video {
+  max-width: 90vw;
+  max-height: 82vh;
+  object-fit: contain;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
+  border-radius: 4px;
+}
+
+.img-container video.blurred {
+  filter: blur(30px);
+}
+
+.video-player-bar {
+  position: absolute;
+  bottom: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(18, 18, 22, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(12px);
+  padding: 6px 14px;
+  border-radius: 999px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
+  z-index: 20;
+}
+
+.v-ctrl-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #e2e8f0;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.v-ctrl-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.v-ctrl-btn.active {
+  background: rgba(99, 102, 241, 0.3);
+  border-color: rgba(99, 102, 241, 0.6);
+  color: #818cf8;
+}
+
+.v-ctrl-btn.play-btn {
+  font-size: 1rem;
+  padding: 4px 10px;
+}
+
+.video-time-display {
+  font-size: 0.76rem;
+  color: #94a3b8;
+  font-family: monospace;
+  white-space: nowrap;
+}
+
+.video-scrubber {
+  width: 140px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.video-scrubber-fill {
+  height: 100%;
+  background: #6366f1;
+  border-radius: 999px;
+  transition: width 0.05s linear;
+}
+
+.v-speed-select {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #e2e8f0;
+  font-size: 0.74rem;
+  border-radius: 4px;
+  padding: 2px 4px;
+  outline: none;
+  cursor: pointer;
+}
+
+.v-speed-select option {
+  background: #18181b;
+  color: #f8fafc;
+}
+
+.workflow-btn {
+  font-size: 0.76rem;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.3);
+  color: #a5b4fc;
+}
+
+.workflow-inspector-panel {
+  position: absolute;
+  top: 54px;
+  right: 18px;
+  bottom: 70px;
+  width: 380px;
+  max-width: calc(100vw - 36px);
+  background: rgba(18, 18, 22, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+  z-index: 30;
+  overflow: hidden;
+  animation: slideInRight 0.2s ease-out;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.inspector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.inspector-header h4 {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #f8fafc;
+}
+
+.inspector-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.info-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.info-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.78rem;
+}
+
+.info-key {
+  color: #94a3b8;
+}
+
+.info-val {
+  color: #e2e8f0;
+  font-weight: 500;
+}
+
+.info-val.highlight {
+  color: #818cf8;
+  font-weight: 600;
+}
+
+.prompt-box,
+.workflow-raw-box {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.prompt-box-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.mini-copy-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #cbd5e1;
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.mini-copy-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.prompt-text {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: #e2e8f0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.prompt-text.negative {
+  color: #fca5a5;
+}
+
+.raw-pre {
+  margin: 0;
+  font-size: 0.72rem;
+  font-family: monospace;
+  color: #a5b4fc;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 8px;
+  border-radius: 6px;
+  max-height: 200px;
+  overflow: auto;
+  white-space: pre;
 }
 </style>

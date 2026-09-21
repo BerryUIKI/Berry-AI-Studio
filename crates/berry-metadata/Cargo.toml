@@ -10,3 +10,6 @@ berry-domain = { path = "../berry-domain" }
 kamadak-exif = "0.6.1"
 serde_json = "1"
 
+[dev-dependencies]
+tempfile = "3"
+

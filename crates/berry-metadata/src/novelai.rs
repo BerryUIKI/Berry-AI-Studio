@@ -65,6 +65,9 @@ pub fn parse_novelai(json_str: &str, description: Option<&str>) -> Option<Extrac
         sampler,
         model_name,
         model_hash: None,
+        duration_seconds: None,
+        fps: None,
+        video_codec: None,
     })
 }
 

@@ -96,6 +96,37 @@ export function criteriaToQuery(c: SearchCriteria): string {
     parts.push("is:sfw");
   }
 
+  // Media Type
+  if (c.media_type) {
+    parts.push(`type:${c.media_type}`);
+  }
+
+  // Duration
+  if (c.min_duration != null && c.max_duration != null) {
+    if (c.min_duration === c.max_duration) {
+      parts.push(`duration:${c.min_duration}`);
+    } else {
+      parts.push(`duration:${c.min_duration}..${c.max_duration}`);
+    }
+  } else if (c.min_duration != null) {
+    parts.push(`duration:>=${c.min_duration}`);
+  } else if (c.max_duration != null) {
+    parts.push(`duration:<=${c.max_duration}`);
+  }
+
+  // FPS
+  if (c.min_fps != null && c.max_fps != null) {
+    if (c.min_fps === c.max_fps) {
+      parts.push(`fps:${c.min_fps}`);
+    } else {
+      parts.push(`fps:${c.min_fps}..${c.max_fps}`);
+    }
+  } else if (c.min_fps != null) {
+    parts.push(`fps:>=${c.min_fps}`);
+  } else if (c.max_fps != null) {
+    parts.push(`fps:<=${c.max_fps}`);
+  }
+
   return parts.join(" ");
 }
 
@@ -114,5 +145,8 @@ export function countActiveFilters(c: SearchCriteria): number {
   if (c.min_aesthetic != null || c.max_aesthetic != null) count++;
   if (c.is_favorite != null) count++;
   if (c.is_nsfw != null) count++;
+  if (c.media_type) count++;
+  if (c.min_duration != null || c.max_duration != null) count++;
+  if (c.min_fps != null || c.max_fps != null) count++;
   return count;
 }

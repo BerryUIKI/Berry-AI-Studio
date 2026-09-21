@@ -1468,6 +1468,64 @@ pub async fn get_or_create_thumbnail(
     .map_err(|e| e.to_string())?
 }
 
+/// Save a video thumbnail captured client-side into the thumbnail disk cache.
+#[tauri::command]
+pub async fn save_video_thumbnail(
+    file_id: i64,
+    modified_at: i64,
+    max_edge: u32,
+    base64_data: String,
+    app_handle: AppHandle,
+) -> Result<String, String> {
+    use tauri::Manager;
+    let data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {e}"))?;
+    let db_path = data_dir.join("berry.db");
+    tauri::async_runtime::spawn_blocking(move || {
+        let thumb_dir = data_dir.join("thumbnails");
+        let _ = std::fs::create_dir_all(&thumb_dir);
+        let dst_path = thumb_dir.join(format!("{file_id}_{modified_at}_{max_edge}.webp"));
+
+        let raw_base64 = if let Some(idx) = base64_data.find(',') {
+            &base64_data[idx + 1..]
+        } else {
+            &base64_data
+        };
+
+        use base64::Engine;
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(raw_base64.trim())
+            .map_err(|e| format!("Invalid base64 payload: {e}"))?;
+
+        std::fs::write(&dst_path, &bytes)
+            .map_err(|e| format!("Failed to write video thumbnail: {e}"))?;
+
+        let now_sec = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+
+        if let Ok(db) = berry_storage::Database::connect(&db_path) {
+            let entry = berry_storage::ThumbnailCacheEntry {
+                file_id,
+                modified_at,
+                max_edge,
+                codec: "webp".to_string(),
+                path: dst_path.to_string_lossy().to_string(),
+                size_bytes: bytes.len() as u64,
+                last_accessed_at: now_sec,
+            };
+            let _ = db.upsert_thumbnail_cache_entries(&[entry]);
+        }
+
+        Ok(dst_path.to_string_lossy().to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[derive(Deserialize)]
 pub struct BatchThumbnailItem {
     pub file_id: i64,
