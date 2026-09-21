@@ -93,9 +93,10 @@ This roadmap documents completed milestones and future engineering goals for **B
 ## 🔮 Upcoming Milestones (v0.3.0+)
 
 ### 🎯 Milestone 12: Cloud Sync & Export Utilities
-- [ ] Encrypted WebDAV / S3 / LAN database synchronization.
-- [ ] Batch format conversion (WebP lossless / JPG) and metadata stripping for publishing.
-- [ ] Export curated collections into HTML galleries and ZIP archives.
+- [x] **Milestone 12.1: Batch Transcoding, Privacy Stripping & Packaging**: Multi-threaded format conversion (WebP/JPEG/PNG), 4-tier privacy metadata stripping, downscaling constraints, customizable filename templates, sidecars (.txt/.json), and Directory / ZIP archive export.
+- [ ] **Milestone 12.2: Standalone Interactive HTML Showcase Generator**: Self-contained zero-dependency HTML+CSS+JS photo album export with responsive gallery, lightbox preview, and prompt metadata viewer.
+- [ ] **Milestone 12.3: S3 & WebDAV Snapshot Cloud Backup & Restore**: Automated and manual snapshots of SQLite database and configurations to AWS S3, Cloudflare R2, MinIO, or WebDAV servers.
+- [ ] **Milestone 12.4: Incremental Remote Asset Mirroring & Delta Sync**: ETag / SHA-256 incremental media sync with background concurrency and bandwidth throttling.
 
 ### 🎯 Milestone 13: Large-Library Performance
 
