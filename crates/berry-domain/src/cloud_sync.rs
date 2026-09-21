@@ -3,53 +3,38 @@
 use serde::{Deserialize, Serialize};
 
 /// Direction of incremental mirroring.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CloudSyncDirection {
     /// Mirror local media files up to cloud/remote storage.
+    #[default]
     UploadToRemote,
     /// Mirror remote media files down to local library storage.
     DownloadFromRemote,
 }
 
-impl Default for CloudSyncDirection {
-    fn default() -> Self {
-        Self::UploadToRemote
-    }
-}
-
 /// Strategy for detecting whether a file has changed remotely.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CloudSyncStrategy {
     /// Compares file size and modified timestamp / remote ETag without reading the entire file.
+    #[default]
     FastFingerprint,
     /// Calculates complete SHA-256 hash for strict delta verification.
     Sha256Checksum,
 }
 
-impl Default for CloudSyncStrategy {
-    fn default() -> Self {
-        Self::FastFingerprint
-    }
-}
-
 /// Phase of the sync process.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CloudSyncPhase {
+    #[default]
     Idle,
     Scanning,
     Syncing,
     Completed,
     Cancelled,
     Failed,
-}
-
-impl Default for CloudSyncPhase {
-    fn default() -> Self {
-        Self::Idle
-    }
 }
 
 /// Options configured by the user for media delta mirroring.

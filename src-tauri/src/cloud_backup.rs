@@ -67,7 +67,10 @@ pub(crate) fn sha256_file(path: &Path) -> std::io::Result<String> {
 }
 
 fn format_iso8601_basic(time: SystemTime) -> (String, String) {
-    let secs = time.duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+    let secs = time
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
     let days = secs / 86400;
     let day_secs = secs % 86400;
     let hours = day_secs / 3600;
@@ -123,6 +126,8 @@ fn format_iso8601_basic(time: SystemTime) -> (String, String) {
 // -----------------------------------------------------------------------------
 // S3 REST Client (AWS SigV4)
 // -----------------------------------------------------------------------------
+
+pub(crate) type S3ObjectHeadMeta = (u64, Option<String>, Option<String>);
 
 pub(crate) struct S3Client<'a> {
     pub(crate) endpoint: &'a str,
@@ -194,7 +199,10 @@ impl<'a> S3Client<'a> {
     ) -> (String, Vec<(String, String)>) {
         let (date_str, datetime_str) = format_iso8601_basic(SystemTime::now());
 
-        let url_parsed = self.endpoint.trim_start_matches("https://").trim_start_matches("http://");
+        let url_parsed = self
+            .endpoint
+            .trim_start_matches("https://")
+            .trim_start_matches("http://");
         let host = url_parsed.split('/').next().unwrap_or(url_parsed);
 
         let payload_hash = sha256_hex(payload);
@@ -288,7 +296,12 @@ impl<'a> S3Client<'a> {
         self.put_object_raw(&key, data, None)
     }
 
-    pub(crate) fn put_object_raw(&self, key: &str, data: &[u8], sha256_hex: Option<&str>) -> Result<(), String> {
+    pub(crate) fn put_object_raw(
+        &self,
+        key: &str,
+        data: &[u8],
+        sha256_hex: Option<&str>,
+    ) -> Result<(), String> {
         let path = format!("/{}/{}", self.bucket, key);
         let extra = if let Some(sha) = sha256_hex {
             vec![("x-amz-meta-sha256", sha)]
@@ -312,7 +325,7 @@ impl<'a> S3Client<'a> {
         }
     }
 
-    pub(crate) fn head_object(&self, key: &str) -> Result<Option<(u64, Option<String>, Option<String>)>, String> {
+    pub(crate) fn head_object(&self, key: &str) -> Result<Option<S3ObjectHeadMeta>, String> {
         let path = format!("/{}/{}", self.bucket, key);
         let (url, headers) = self.sign_request("HEAD", &path, "", &[]);
 
@@ -323,7 +336,10 @@ impl<'a> S3Client<'a> {
 
         match req.call() {
             Ok(resp) => {
-                let len = resp.header("Content-Length").and_then(|s| s.parse::<u64>().ok()).unwrap_or(0);
+                let len = resp
+                    .header("Content-Length")
+                    .and_then(|s| s.parse::<u64>().ok())
+                    .unwrap_or(0);
                 let etag = resp.header("ETag").map(|s| s.trim_matches('"').to_string());
                 let sha = resp.header("x-amz-meta-sha256").map(|s| s.to_string());
                 Ok(Some((len, etag, sha)))
@@ -446,7 +462,10 @@ impl<'a> WebDavClient<'a> {
         }
     }
 
-    pub(crate) fn head_object(&self, relative_path: &str) -> Result<Option<(u64, Option<String>)>, String> {
+    pub(crate) fn head_object(
+        &self,
+        relative_path: &str,
+    ) -> Result<Option<(u64, Option<String>)>, String> {
         let clean = relative_path.trim_start_matches('/');
         let url = format!("{}/{}", self.endpoint, clean);
         let mut req = ureq::head(&url);
@@ -456,7 +475,10 @@ impl<'a> WebDavClient<'a> {
 
         match req.call() {
             Ok(resp) => {
-                let len = resp.header("Content-Length").and_then(|s| s.parse::<u64>().ok()).unwrap_or(0);
+                let len = resp
+                    .header("Content-Length")
+                    .and_then(|s| s.parse::<u64>().ok())
+                    .unwrap_or(0);
                 let etag = resp.header("ETag").map(|s| s.trim_matches('"').to_string());
                 Ok(Some((len, etag)))
             }
@@ -768,7 +790,7 @@ pub fn list_cloud_snapshots(config: &CloudBackupConfig) -> Result<Vec<CloudSnaps
                     }
                 }
             }
-            snapshots.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+            snapshots.sort_by_key(|b| std::cmp::Reverse(b.created_at));
             Ok(snapshots)
         }
         CloudStorageProvider::WebDav => {
@@ -782,7 +804,7 @@ pub fn list_cloud_snapshots(config: &CloudBackupConfig) -> Result<Vec<CloudSnaps
                     }
                 }
             }
-            snapshots.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+            snapshots.sort_by_key(|b| std::cmp::Reverse(b.created_at));
             Ok(snapshots)
         }
         CloudStorageProvider::S3 => {
@@ -796,7 +818,7 @@ pub fn list_cloud_snapshots(config: &CloudBackupConfig) -> Result<Vec<CloudSnaps
                     }
                 }
             }
-            snapshots.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+            snapshots.sort_by_key(|b| std::cmp::Reverse(b.created_at));
             Ok(snapshots)
         }
     }
@@ -889,8 +911,8 @@ pub fn restore_cloud_snapshot(
 }
 
 fn extract_manifest_from_zip_bytes(bytes: &[u8]) -> Result<CloudSnapshotMeta, String> {
-    let mut archive = ZipArchive::new(Cursor::new(bytes))
-        .map_err(|e| format!("Invalid zip archive: {e}"))?;
+    let mut archive =
+        ZipArchive::new(Cursor::new(bytes)).map_err(|e| format!("Invalid zip archive: {e}"))?;
     let mut file = archive
         .by_name("manifest.json")
         .map_err(|_| "Missing manifest.json".to_string())?;

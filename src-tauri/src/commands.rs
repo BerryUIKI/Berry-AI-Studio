@@ -3488,7 +3488,8 @@ pub async fn cloud_backup_restore_snapshot(
     // Release database lock during file operations
     drop(db(&state)?);
 
-    let res = crate::cloud_backup::restore_cloud_snapshot(&active_db_path, &config, &snapshot_filename)?;
+    let res =
+        crate::cloud_backup::restore_cloud_snapshot(&active_db_path, &config, &snapshot_filename)?;
 
     // Reconnect database in state
     match berry_storage::Database::connect(&active_db_path) {
@@ -3546,7 +3547,10 @@ pub fn cloud_sync_cancel(state: State<'_, AppState>) -> Result<(), String> {
 pub fn cloud_sync_get_progress(
     state: State<'_, AppState>,
 ) -> Result<berry_domain::CloudSyncProgress, String> {
-    let st = state.cloud_sync.lock().map_err(|e| format!("Lock error: {e}"))?;
+    let st = state
+        .cloud_sync
+        .lock()
+        .map_err(|e| format!("Lock error: {e}"))?;
     Ok(st.progress.clone())
 }
 
@@ -3554,7 +3558,10 @@ pub fn cloud_sync_get_progress(
 pub fn cloud_sync_get_summary(
     state: State<'_, AppState>,
 ) -> Result<Option<berry_domain::CloudSyncResult>, String> {
-    let st = state.cloud_sync.lock().map_err(|e| format!("Lock error: {e}"))?;
+    let st = state
+        .cloud_sync
+        .lock()
+        .map_err(|e| format!("Lock error: {e}"))?;
     Ok(st.summary.clone())
 }
 

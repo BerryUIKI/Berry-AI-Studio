@@ -1,6 +1,6 @@
-mod commands;
 pub mod cloud_backup;
 pub mod cloud_sync;
+mod commands;
 mod watcher;
 
 use std::sync::atomic::AtomicU64;

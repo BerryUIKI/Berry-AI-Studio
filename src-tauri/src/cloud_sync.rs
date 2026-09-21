@@ -142,7 +142,15 @@ pub fn start_cloud_sync(
     });
 
     thread::spawn(move || {
-        run_cloud_sync_worker(app, config, options, sync_state, cancel_flag, items, total_bytes);
+        run_cloud_sync_worker(
+            app,
+            config,
+            options,
+            sync_state,
+            cancel_flag,
+            items,
+            total_bytes,
+        );
     });
 }
 
@@ -267,11 +275,7 @@ fn run_cloud_sync_worker(
                 let elapsed_secs = start_time.elapsed().as_secs_f64().max(0.001);
                 let speed = (cur_transferred as f64 / elapsed_secs) as u64;
                 let remaining_bytes = total_bytes.saturating_sub(cur_transferred);
-                let eta = if speed > 0 {
-                    Some(remaining_bytes / speed)
-                } else {
-                    None
-                };
+                let eta = remaining_bytes.checked_div(speed);
 
                 {
                     let mut state = sync_state_ref.lock().unwrap();
@@ -286,7 +290,7 @@ fn run_cloud_sync_worker(
 
                 // Periodic emit (every few files to avoid GUI flooding)
                 let total_done = cur_completed + cur_skipped + cur_failed;
-                if total_done % 5 == 0 || total_done == total_files {
+                if total_done.is_multiple_of(5) || total_done == total_files {
                     let state = sync_state_ref.lock().unwrap();
                     let _ = app_handle.emit("cloud-sync://progress", state.progress.clone());
                 }
@@ -352,7 +356,9 @@ pub fn collect_sync_items(
     db: &Database,
     options: &CloudSyncOptions,
 ) -> Result<(Vec<SyncItem>, u64), String> {
-    let folders = db.list_folders().map_err(|e| format!("Failed to list folders: {e}"))?;
+    let folders = db
+        .list_folders()
+        .map_err(|e| format!("Failed to list folders: {e}"))?;
 
     let folder_id_filter = options.folder_ids.as_ref();
 
@@ -375,7 +381,11 @@ pub fn collect_sync_items(
             .list_file_fingerprints(folder.id)
             .map_err(|e| format!("Failed to list files for folder {}: {e}", folder_name))?;
 
-        let folder_path_clean = folder.path.replace('\\', "/").trim_end_matches('/').to_string();
+        let folder_path_clean = folder
+            .path
+            .replace('\\', "/")
+            .trim_end_matches('/')
+            .to_string();
 
         for (file_path, size_bytes, _mtime, _has_meta) in fingerprints {
             let path_obj = PathBuf::from(&file_path);
@@ -429,11 +439,18 @@ fn sync_single_item(
     rate_limiter: &Arc<Mutex<RateLimiter>>,
 ) -> Result<SyncOutcome, String> {
     if !item.local_path.exists() {
-        return Err(format!("Local file does not exist: {}", item.local_path.display()));
+        return Err(format!(
+            "Local file does not exist: {}",
+            item.local_path.display()
+        ));
     }
 
-    let local_metadata = fs::metadata(&item.local_path)
-        .map_err(|e| format!("Failed to read metadata for {}: {e}", item.local_path.display()))?;
+    let local_metadata = fs::metadata(&item.local_path).map_err(|e| {
+        format!(
+            "Failed to read metadata for {}: {e}",
+            item.local_path.display()
+        )
+    })?;
     let local_len = local_metadata.len();
 
     // Check remote existence & determine delta
@@ -469,25 +486,21 @@ fn sync_single_item(
             let s3 = S3Client::from_config(config)?;
             let object_key = s3.object_key(&item.remote_key);
             match s3.head_object(&object_key)? {
-                Some((remote_len, _etag, remote_sha)) => {
-                    if remote_len == local_len {
-                        match options.strategy {
-                            CloudSyncStrategy::FastFingerprint => true,
-                            CloudSyncStrategy::Sha256Checksum => {
-                                let local_hash = sha256_file(&item.local_path).unwrap_or_default();
-                                if let Some(ref remote_h) = remote_sha {
-                                    remote_h == &local_hash
-                                } else {
-                                    // If remote doesn't have custom sha256 header, fallback to size match
-                                    true
-                                }
+                Some((remote_len, _etag, remote_sha)) if remote_len == local_len => {
+                    match options.strategy {
+                        CloudSyncStrategy::FastFingerprint => true,
+                        CloudSyncStrategy::Sha256Checksum => {
+                            let local_hash = sha256_file(&item.local_path).unwrap_or_default();
+                            if let Some(ref remote_h) = remote_sha {
+                                remote_h == &local_hash
+                            } else {
+                                // If remote doesn't have custom sha256 header, fallback to size match
+                                true
                             }
                         }
-                    } else {
-                        false
                     }
                 }
-                None => false,
+                _ => false,
             }
         }
         CloudStorageProvider::WebDav => {
@@ -526,8 +539,9 @@ fn sync_single_item(
                 .ok_or_else(|| "Local backup path not configured".to_string())?;
             let target = PathBuf::from(base_dir).join(&item.remote_key);
             if let Some(parent) = target.parent() {
-                fs::create_dir_all(parent)
-                    .map_err(|e| format!("Failed to create directories for {}: {e}", target.display()))?;
+                fs::create_dir_all(parent).map_err(|e| {
+                    format!("Failed to create directories for {}: {e}", target.display())
+                })?;
             }
             fs::write(&target, &data)
                 .map_err(|e| format!("Failed to write {}: {e}", target.display()))?;
@@ -565,7 +579,7 @@ mod tests {
 
     #[test]
     fn test_rate_limiter_throttling() {
-        let mut limiter = RateLimiter::new(500); // 500 KB/s
+        let limiter = RateLimiter::new(500); // 500 KB/s
         assert_eq!(limiter.bytes_per_sec, 500 * 1024);
         assert_eq!(limiter.capacity, 1000.0 * 1024.0);
     }
