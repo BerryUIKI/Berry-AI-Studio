@@ -712,6 +712,30 @@ const targetTitle = computed(() => {
   }
 });
 
+const galleryContextKey = computed(() => {
+  if (similaritySourceFile.value) {
+    return `similarity-${similaritySourceFile.value.id ?? similaritySourceFile.value.path}`;
+  }
+  if (searchQuery.value.trim()) {
+    return `search-${searchQuery.value.trim()}`;
+  }
+  switch (activeTarget.value.type) {
+    case "folder":
+      return `folder-${activeTarget.value.folder.id}`;
+    case "album":
+      return `album-${activeTarget.value.album.id}`;
+    case "tag":
+      return `tag-${activeTarget.value.tag.id}`;
+    case "favorites":
+      return "favorites";
+    case "nsfw":
+      return "nsfw";
+    case "all":
+    default:
+      return "all";
+  }
+});
+
 async function onFolderScanned(_folderId: number) {
   await refreshCounts();
   await reloadFiltersMeta();
@@ -1941,6 +1965,7 @@ function onResetZoom() {
             :stack-map="stackMap"
             :expanded-stacks="expandedStacks"
             :layout="viewMode"
+            :context-key="galleryContextKey"
             @select="onFileSelected"
             @activate="onActivateFile"
             @toggle-select="toggleSelectFile"

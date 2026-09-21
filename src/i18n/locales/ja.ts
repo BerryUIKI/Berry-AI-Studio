@@ -97,6 +97,7 @@ export const ja: typeof en = {
     rating: "評価",
     unrated: "未評価",
     clickToReveal: "クリックしてセンシティブ画像を表示",
+    retryThumbnail: "サムネイルを再読み込み",
     copyPrompt: "プロンプトをコピー",
     copyNegative: "ネガティブをコピー",
     copyAll: "全メタデータをコピー",
@@ -548,5 +549,8 @@ export const ja: typeof en = {
     generatingThumb: "⚡ サムネイル生成中:",
     scanning: "スキャン中:",
     ready: "準備完了",
+    activity: "バックグラウンド",
+    watcherActive: "監視アクティブ",
+    watcherDegraded: "監視警告",
   },
 };

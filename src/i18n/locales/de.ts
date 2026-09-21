@@ -97,6 +97,7 @@ export const de: typeof en = {
     rating: "Bewertung",
     unrated: "Unbewertet",
     clickToReveal: "Klicken, um sensible Inhalte anzuzeigen",
+    retryThumbnail: "Miniaturansicht erneut laden",
     copyPrompt: "Prompt kopieren",
     copyNegative: "Negativen Prompt kopieren",
     copyAll: "Gesamte Metadaten kopieren",
@@ -548,5 +549,8 @@ export const de: typeof en = {
     generatingThumb: "⚡ Vorschaubilder generieren:",
     scanning: "Scannen:",
     ready: "Bereit",
+    activity: "Aktivität",
+    watcherActive: "Dateiwächter aktiv",
+    watcherDegraded: "Dateiwächter Warnung",
   },
 };

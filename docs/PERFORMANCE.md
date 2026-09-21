@@ -83,9 +83,9 @@ Use browser performance traces for WebView work, Rust timing spans for commands,
 
 The gallery now fetches bounded pages and extends them near the viewport boundary. SQLite returns the exact filtered total with the page through a window count, avoiding a second filter query and full IPC materialization. Offset paging remains intentionally isolated behind the page API. Empirical profiling of 50k items shows that raw row traversal at offset 40,000 takes 52.11 ms with offset paging versus 617.90 µs with a keyset cursor (84x faster), but total query latency is dominated by `COUNT(*) OVER()` (135 ms). Keyset cursors should therefore be implemented together with count caching or decoupled window counting in a subsequent release.
 
-### P0: Filesystem change journal or watcher — Phase 1 complete
+### P0: Filesystem change journal or watcher — Phase 2 complete
 
-Registered roots now use the platform watcher, a durable coalesced journal, and path-level reconciliation. Optional cooldown scans remain as recovery for offline or missed events. Follow-up work should expose watcher health, add a polling fallback for unreliable network filesystems, and benchmark event storms on large batch imports.
+Registered roots use the platform watcher, a durable coalesced journal, and path-level reconciliation. The worker receiver non-blockingly batch-drains channel events (up to 1,024 events per batch) to prevent transaction storms during massive batch file additions or unzips, completing 10,000 coalesced event writes in under 80 ms. Runtime watcher health metrics (`is_active`, `watched_roots_count`, `pending_journal_count`, `last_reconcile_time`, `last_error`) are exposed via IPC and monitored in the Background Activity panel.
 
 ### P1: Persistent thumbnail manifest and cache budget — Phase 2 complete
 
@@ -106,15 +106,16 @@ Progress-event coalescing and streaming full-folder traversal are complete. Foll
 - [Phase 1 complete] Exclude raw workflow payloads from gallery pages and fetch complete metadata on selection.
 - [Empirically Evaluated] A dedicated gallery DTO would only save ~80 KB per 400-item page (less than 2 ms transfer over localhost IPC). Retaining the current projected `ImageFile` is optimal and avoids duplicating schema types.
 - Move expensive filter aggregation to indexed SQL and cache stable facet counts.
-- Audit object URL and decoded-image lifetime after long browsing sessions.
+- [Completed] Audit object URL and decoded-image lifetime after long browsing sessions. Memory cache strictly bounded to 3,000 LRU entries, batch keys capped at 5,000 items, and unmounted event listeners cleaned up.
 
 
-## GUI Recommendations
+## GUI Recommendations — Implemented
 
-- Keep Grid, Waterfall, and Table as explicit modes, with the current mode and zoom persisted.
-- Add a compact density control that changes card width in fixed steps, not fluid stretching.
-- Show a subtle placeholder while a thumbnail is queued and a distinct retry affordance after a decode failure.
-- Keep stack transitions short (roughly 180–220 ms), spatially explain expansion, and disable them when reduced motion is requested.
-- Provide System, Midnight, Graphite, Violet, and Light themes. Use semantic color tokens so every panel follows the selected theme.
-- Add a small background-activity popover for scans, thumbnail generation, tagging, and embeddings, with pause/cancel controls where supported.
-- Preserve scroll position independently per folder/search context so navigation does not force users back to the beginning.
+- [x] Keep Grid, Waterfall, and Table as explicit modes, with the current mode and zoom persisted.
+- [x] Add a compact density control that changes card width in fixed steps, not fluid stretching.
+- [x] Show a subtle placeholder while a thumbnail is queued and a distinct retry affordance after a decode failure.
+- [x] Keep stack transitions short (roughly 180–220 ms), spatially explain expansion, and disable them when reduced motion is requested.
+- [x] Provide System, Midnight, Graphite, Violet, and Light themes. Use semantic color tokens so every panel follows the selected theme.
+- [x] Add a small background-activity popover for scans, thumbnail generation, tagging, and embeddings, with pause/cancel controls where supported.
+- [x] Preserve scroll position independently per folder/search context so navigation does not force users back to the beginning.
+

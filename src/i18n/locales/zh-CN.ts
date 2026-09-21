@@ -97,6 +97,7 @@ export const zhCN: typeof en = {
     rating: "评分",
     unrated: "未评分",
     clickToReveal: "点击查看敏感内容",
+    retryThumbnail: "重试加载缩略图",
     copyPrompt: "复制提示词",
     copyNegative: "复制负向提示词",
     copyAll: "复制全部元数据",
@@ -548,5 +549,8 @@ export const zhCN: typeof en = {
     generatingThumb: "⚡ 正在生成缩略图:",
     scanning: "正在扫描:",
     ready: "就绪",
+    activity: "后台任务",
+    watcherActive: "文件监视正常",
+    watcherDegraded: "文件监视警告",
   },
 };

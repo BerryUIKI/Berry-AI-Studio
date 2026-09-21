@@ -97,6 +97,7 @@ export const fr: typeof en = {
     rating: "Note",
     unrated: "Non noté",
     clickToReveal: "Cliquer pour afficher le contenu sensible",
+    retryThumbnail: "Réessayer la miniature",
     copyPrompt: "Copier le prompt",
     copyNegative: "Copier le prompt négatif",
     copyAll: "Copier toutes les métadonnées",
@@ -548,5 +549,8 @@ export const fr: typeof en = {
     generatingThumb: "⚡ Génération des miniatures :",
     scanning: "Analyse en cours :",
     ready: "Prêt",
+    activity: "Activité",
+    watcherActive: "Surveillance active",
+    watcherDegraded: "Surveillance avertissement",
   },
 };

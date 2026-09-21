@@ -97,6 +97,7 @@ export const zhTW: typeof en = {
     rating: "評分",
     unrated: "未評分",
     clickToReveal: "點擊檢視敏感內容",
+    retryThumbnail: "重試載入縮圖",
     copyPrompt: "複製提示詞",
     copyNegative: "複製負向提示詞",
     copyAll: "複製全部元數據",
@@ -548,5 +549,8 @@ export const zhTW: typeof en = {
     generatingThumb: "⚡ 正在產生縮圖:",
     scanning: "正在掃描:",
     ready: "就緒",
+    activity: "後台任務",
+    watcherActive: "檔案監視正常",
+    watcherDegraded: "檔案監視警告",
   },
 };

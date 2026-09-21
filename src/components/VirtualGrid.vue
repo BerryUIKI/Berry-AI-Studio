@@ -37,6 +37,7 @@ const props = withDefaults(
     stackMap?: Record<string, { count: number; heroId: number | null }>;
     expandedStacks?: Set<string>;
     layout?: "grid" | "masonry";
+    contextKey?: string;
   }>(),
   {
     selectedFile: null,
@@ -74,6 +75,32 @@ const revealedNsfw = ref<Set<string>>(new Set());
 function onImageError(path: string) {
   failedImages.value.add(path);
 }
+
+function retryImage(file: ImageFile) {
+  failedImages.value.delete(file.path);
+  getThumbnailUrl(file, Math.max(itemWidth.value, rowHeight.value)).catch(() => {});
+}
+
+// Persist and restore gallery scroll position per folder/search context
+const contextScrollPositions = new Map<string, number>();
+
+watch(
+  () => props.contextKey,
+  (newKey, oldKey) => {
+    if (oldKey !== undefined && containerRef.value) {
+      contextScrollPositions.set(oldKey, containerRef.value.scrollTop);
+    }
+    if (newKey !== undefined && containerRef.value) {
+      const saved = contextScrollPositions.get(newKey) ?? 0;
+      requestAnimationFrame(() => {
+        if (containerRef.value) {
+          containerRef.value.scrollTop = saved;
+          scrollTop.value = saved;
+        }
+      });
+    }
+  },
+);
 
 function toggleNsfwReveal(path: string) {
   if (revealedNsfw.value.has(path)) {
@@ -641,6 +668,21 @@ function onDragStart(e: DragEvent, file: ImageFile) {
                 preload="metadata"
                 playsinline
               />
+              <div
+                v-else-if="failedImages.has(file.path)"
+                class="thumbnail-fallback thumbnail-failed"
+              >
+                <span class="fallback-text">{{ file.container.toUpperCase() }}</span>
+                <button
+                  type="button"
+                  class="retry-thumb-btn"
+                  :title="t.preview.retryThumbnail"
+                  :aria-label="t.preview.retryThumbnail"
+                  @click.stop="retryImage(file)"
+                >
+                  ↻
+                </button>
+              </div>
               <div v-else class="thumbnail-fallback">
                 <span class="fallback-text">{{ file.container.toUpperCase() }}</span>
               </div>
@@ -1047,6 +1089,39 @@ function onDragStart(e: DragEvent, file: ImageFile) {
   align-items: center;
   justify-content: center;
   color: #888;
+}
+
+.thumbnail-fallback.thumbnail-failed {
+  flex-direction: column;
+  gap: 6px;
+}
+
+.retry-thumb-btn {
+  background: rgba(0, 0, 0, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #38bdf8;
+  border-radius: 4px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.15s ease;
+}
+
+.retry-thumb-btn:hover {
+  background: #0284c7;
+  color: #fff;
+  border-color: #38bdf8;
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .retry-thumb-btn:hover {
+    transform: none;
+  }
 }
 
 .fallback-text {

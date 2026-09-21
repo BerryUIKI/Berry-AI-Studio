@@ -95,6 +95,7 @@ export const en = {
     rating: "Rating",
     unrated: "Unrated",
     clickToReveal: "Click to reveal sensitive content",
+    retryThumbnail: "Retry loading thumbnail",
     copyPrompt: "Copy Prompt",
     copyNegative: "Copy Negative",
     copyAll: "Copy Full Metadata",
@@ -546,5 +547,8 @@ export const en = {
     generatingThumb: "⚡ Generating thumbnails:",
     scanning: "Scanning:",
     ready: "Ready",
+    activity: "Activity",
+    watcherActive: "Watcher Active",
+    watcherDegraded: "Watcher Warning",
   },
 };
