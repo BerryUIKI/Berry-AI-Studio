@@ -11,10 +11,10 @@ use std::sync::MutexGuard;
 
 use berry_clip::{ClipEngine, ClipModelInfo};
 use berry_domain::{
-    plan_prompt_stacks, Album, CheckpointModelStat, CleanupQueueItem, DatabaseStats, DetectedLora,
-    FilePage, FileSortField, Folder, ImageFile, LoraModel, ModelCacheEntry, PipelineDetectedPath,
-    PromptStackCandidate, PromptStat, SearchCriteria, SimilarityMatch, SortDirection, StackSummary,
-    Tag,
+    plan_prompt_stacks, Album, CheckpointModelStat, CleanupQueueItem, CursorFilePage,
+    DatabaseStats, DetectedLora, FilePage, FileSortField, Folder, ImageFile, LoraModel,
+    ModelCacheEntry, PipelineDetectedPath, PromptStackCandidate, PromptStat, SearchCriteria,
+    SimilarityMatch, SortDirection, StackSummary, Tag,
 };
 use berry_scan::{ScanStats, Scanner};
 use berry_storage::Database;
@@ -234,6 +234,17 @@ pub async fn search_files_page(
 ) -> Result<FilePage, String> {
     db(&state)?
         .search_gallery_files_page(&criteria)
+        .map_err(|e| e.to_string())
+}
+
+/// Search a keyset cursor paginated result page for ultra-low latency scrolling.
+#[tauri::command]
+pub async fn search_files_cursor_page(
+    criteria: SearchCriteria,
+    state: State<'_, AppState>,
+) -> Result<CursorFilePage, String> {
+    db(&state)?
+        .search_gallery_files_cursor_page(&criteria)
         .map_err(|e| e.to_string())
 }
 

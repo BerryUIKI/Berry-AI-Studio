@@ -4,13 +4,15 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use berry_domain::{
-    Album, CheckpointModelStat, CleanupQueueItem, Container, DatabaseStats, ExtractedMetadata,
-    FilePage, FileSortField, FilesystemChange, Folder, ImageFile, LoraModel, ModelCacheEntry,
-    PromptStat, SearchCriteria, SimilarityMatch, SortDirection, StackSummary, Tag,
+    Album, CheckpointModelStat, CleanupQueueItem, Container, CursorFilePage, DatabaseStats,
+    ExtractedMetadata, FilePage, FileSortField, FilesystemChange, Folder, ImageFile, LoraModel,
+    ModelCacheEntry, PageCursor, PromptStat, SearchCriteria, SimilarityMatch, SortDirection,
+    StackSummary, Tag,
 };
 use rusqlite::{params, Connection, OpenFlags};
 use uuid::Uuid;
 
+use crate::engine::{DatabaseDialect, StorageEngine};
 use crate::migrations::{LATEST_VERSION, MIGRATIONS};
 
 /// One persistent thumbnail cache entry keyed by source revision and size tier.
@@ -650,7 +652,29 @@ impl Database {
         )
     }
 
-    fn build_search_filter(criteria: &SearchCriteria) -> (String, Vec<rusqlite::types::Value>) {
+    /// Search a keyset cursor paginated page with full metadata.
+    pub fn search_files_cursor_page(
+        &self,
+        criteria: &SearchCriteria,
+    ) -> Result<CursorFilePage, DatabaseError> {
+        self.search_files_cursor_page_with_metadata(criteria, "metadata")
+    }
+
+    /// Search a keyset cursor paginated gallery page while excluding raw metadata
+    /// payloads that the list UI never renders.
+    pub fn search_gallery_files_cursor_page(
+        &self,
+        criteria: &SearchCriteria,
+    ) -> Result<CursorFilePage, DatabaseError> {
+        self.search_files_cursor_page_with_metadata(
+            criteria,
+            "CASE WHEN metadata IS NULL THEN NULL ELSE json_set(metadata, '$.parameters', NULL, '$.raw', NULL) END",
+        )
+    }
+
+    fn build_search_filter_conditions(
+        criteria: &SearchCriteria,
+    ) -> (Vec<String>, Vec<rusqlite::types::Value>) {
         let mut conditions = Vec::new();
         let mut params = Vec::new();
 
@@ -764,6 +788,11 @@ impl Database {
             params.push(rusqlite::types::Value::Integer(tid));
         }
 
+        (conditions, params)
+    }
+
+    fn build_search_filter(criteria: &SearchCriteria) -> (String, Vec<rusqlite::types::Value>) {
+        let (conditions, params) = Self::build_search_filter_conditions(criteria);
         let where_clause = if conditions.is_empty() {
             String::new()
         } else {
@@ -841,6 +870,192 @@ impl Database {
             total,
             offset,
             has_more,
+        })
+    }
+
+    fn search_files_cursor_page_with_metadata(
+        &self,
+        criteria: &SearchCriteria,
+        metadata_projection: &str,
+    ) -> Result<CursorFilePage, DatabaseError> {
+        let (mut conditions, mut params) = Self::build_search_filter_conditions(criteria);
+        let sort = criteria.sort.unwrap_or(FileSortField::ModifiedAt);
+        let direction = criteria.direction.unwrap_or(SortDirection::Desc);
+
+        if let Some(cursor) = &criteria.cursor {
+            let cursor_cond = match (sort, direction) {
+                (FileSortField::ModifiedAt, SortDirection::Desc) => {
+                    let cursor_mtime: i64 = cursor.sort_value.parse().unwrap_or(0);
+                    params.push(rusqlite::types::Value::Integer(cursor_mtime));
+                    params.push(rusqlite::types::Value::Integer(cursor_mtime));
+                    params.push(rusqlite::types::Value::Integer(cursor.id));
+                    "(modified_at < ? OR (modified_at = ? AND id < ?))".to_string()
+                }
+                (FileSortField::ModifiedAt, SortDirection::Asc) => {
+                    let cursor_mtime: i64 = cursor.sort_value.parse().unwrap_or(0);
+                    params.push(rusqlite::types::Value::Integer(cursor_mtime));
+                    params.push(rusqlite::types::Value::Integer(cursor_mtime));
+                    params.push(rusqlite::types::Value::Integer(cursor.id));
+                    "(modified_at > ? OR (modified_at = ? AND id > ?))".to_string()
+                }
+                (FileSortField::SizeBytes, SortDirection::Desc) => {
+                    let cursor_size: i64 = cursor.sort_value.parse().unwrap_or(0);
+                    params.push(rusqlite::types::Value::Integer(cursor_size));
+                    params.push(rusqlite::types::Value::Integer(cursor_size));
+                    params.push(rusqlite::types::Value::Integer(cursor.id));
+                    "(size_bytes < ? OR (size_bytes = ? AND id < ?))".to_string()
+                }
+                (FileSortField::SizeBytes, SortDirection::Asc) => {
+                    let cursor_size: i64 = cursor.sort_value.parse().unwrap_or(0);
+                    params.push(rusqlite::types::Value::Integer(cursor_size));
+                    params.push(rusqlite::types::Value::Integer(cursor_size));
+                    params.push(rusqlite::types::Value::Integer(cursor.id));
+                    "(size_bytes > ? OR (size_bytes = ? AND id > ?))".to_string()
+                }
+                (FileSortField::Path, SortDirection::Desc) => {
+                    params.push(rusqlite::types::Value::Text(cursor.sort_value.clone()));
+                    params.push(rusqlite::types::Value::Text(cursor.sort_value.clone()));
+                    params.push(rusqlite::types::Value::Integer(cursor.id));
+                    "(path < ? OR (path = ? AND id < ?))".to_string()
+                }
+                (FileSortField::Path, SortDirection::Asc) => {
+                    params.push(rusqlite::types::Value::Text(cursor.sort_value.clone()));
+                    params.push(rusqlite::types::Value::Text(cursor.sort_value.clone()));
+                    params.push(rusqlite::types::Value::Integer(cursor.id));
+                    "(path > ? OR (path = ? AND id > ?))".to_string()
+                }
+                (FileSortField::Rating, SortDirection::Desc) => {
+                    if let Ok(r) = cursor.sort_value.parse::<i64>() {
+                        params.push(rusqlite::types::Value::Integer(r));
+                        params.push(rusqlite::types::Value::Integer(r));
+                        params.push(rusqlite::types::Value::Integer(cursor.id));
+                        "((rating < ? AND rating IS NOT NULL) OR (rating = ? AND id < ?) OR rating IS NULL)".to_string()
+                    } else {
+                        params.push(rusqlite::types::Value::Integer(cursor.id));
+                        "(rating IS NULL AND id < ?)".to_string()
+                    }
+                }
+                (FileSortField::Rating, SortDirection::Asc) => {
+                    if let Ok(r) = cursor.sort_value.parse::<i64>() {
+                        params.push(rusqlite::types::Value::Integer(r));
+                        params.push(rusqlite::types::Value::Integer(r));
+                        params.push(rusqlite::types::Value::Integer(cursor.id));
+                        "((rating > ? AND rating IS NOT NULL) OR (rating = ? AND id > ?) OR rating IS NULL)".to_string()
+                    } else {
+                        params.push(rusqlite::types::Value::Integer(cursor.id));
+                        "(rating IS NULL AND id > ?)".to_string()
+                    }
+                }
+                (FileSortField::AestheticScore, SortDirection::Desc) => {
+                    if let Ok(s) = cursor.sort_value.parse::<f64>() {
+                        params.push(rusqlite::types::Value::Real(s));
+                        params.push(rusqlite::types::Value::Real(s));
+                        params.push(rusqlite::types::Value::Integer(cursor.id));
+                        "((aesthetic_score < ? AND aesthetic_score IS NOT NULL) OR (aesthetic_score = ? AND id < ?) OR aesthetic_score IS NULL)".to_string()
+                    } else {
+                        params.push(rusqlite::types::Value::Integer(cursor.id));
+                        "(aesthetic_score IS NULL AND id < ?)".to_string()
+                    }
+                }
+                (FileSortField::AestheticScore, SortDirection::Asc) => {
+                    if let Ok(s) = cursor.sort_value.parse::<f64>() {
+                        params.push(rusqlite::types::Value::Real(s));
+                        params.push(rusqlite::types::Value::Real(s));
+                        params.push(rusqlite::types::Value::Integer(cursor.id));
+                        "((aesthetic_score > ? AND aesthetic_score IS NOT NULL) OR (aesthetic_score = ? AND id > ?) OR aesthetic_score IS NULL)".to_string()
+                    } else {
+                        params.push(rusqlite::types::Value::Integer(cursor.id));
+                        "(aesthetic_score IS NULL AND id > ?)".to_string()
+                    }
+                }
+            };
+            conditions.push(cursor_cond);
+        }
+
+        let where_clause = if conditions.is_empty() {
+            String::new()
+        } else {
+            format!(" WHERE {}", conditions.join(" AND "))
+        };
+
+        let order_clause = match (sort, direction) {
+            (FileSortField::ModifiedAt, SortDirection::Asc) => "modified_at ASC, id ASC",
+            (FileSortField::ModifiedAt, SortDirection::Desc) => "modified_at DESC, id DESC",
+            (FileSortField::Path, SortDirection::Asc) => "path ASC, id ASC",
+            (FileSortField::Path, SortDirection::Desc) => "path DESC, id DESC",
+            (FileSortField::SizeBytes, SortDirection::Asc) => "size_bytes ASC, id ASC",
+            (FileSortField::SizeBytes, SortDirection::Desc) => "size_bytes DESC, id DESC",
+            (FileSortField::Rating, SortDirection::Asc) => "rating ASC NULLS LAST, id ASC",
+            (FileSortField::Rating, SortDirection::Desc) => "rating DESC NULLS LAST, id DESC",
+            (FileSortField::AestheticScore, SortDirection::Asc) => {
+                "aesthetic_score ASC NULLS LAST, id ASC"
+            }
+            (FileSortField::AestheticScore, SortDirection::Desc) => {
+                "aesthetic_score DESC NULLS LAST, id DESC"
+            }
+        };
+
+        let page_limit = criteria.limit.unwrap_or(50).max(1);
+        let fetch_limit = page_limit + 1;
+        params.push(rusqlite::types::Value::Integer(fetch_limit as i64));
+
+        let total_projection = if criteria.cursor.is_none() {
+            "COUNT(*) OVER()"
+        } else {
+            "0"
+        };
+
+        let sql = format!(
+            "SELECT id, folder_id, path, container, size_bytes, modified_at, {metadata_projection} AS metadata, rating, aesthetic_score, is_favorite, is_nsfw, stack_id, stack_order, {total_projection} AS total_count
+             FROM files{where_clause} ORDER BY {order_clause} LIMIT ?"
+        );
+
+        let mut stmt = self.conn.prepare(&sql)?;
+        let mut rows = stmt.query(rusqlite::params_from_iter(&params))?;
+        let mut files = Vec::new();
+        let mut total = None;
+
+        while let Some(row) = rows.next()? {
+            if files.is_empty() && criteria.cursor.is_none() {
+                total = Some(row.get::<_, i64>(13)? as usize);
+            }
+            files.push(Self::map_row(row)?);
+        }
+
+        if criteria.cursor.is_none() && files.is_empty() {
+            total = Some(0);
+        }
+
+        let has_more = files.len() > page_limit;
+        if has_more {
+            files.truncate(page_limit);
+        }
+
+        let next_cursor = if has_more {
+            files.last().map(|f| PageCursor {
+                sort_value: match sort {
+                    FileSortField::ModifiedAt => f.modified_at.to_string(),
+                    FileSortField::SizeBytes => f.size_bytes.to_string(),
+                    FileSortField::Path => f.path.clone(),
+                    FileSortField::Rating => f.rating.map(|r| r.to_string()).unwrap_or_default(),
+                    FileSortField::AestheticScore => {
+                        f.aesthetic_score.map(|s| s.to_string()).unwrap_or_default()
+                    }
+                },
+                id: f.id.unwrap_or(0),
+            })
+        } else {
+            None
+        };
+
+        let prev_cursor = criteria.cursor.clone();
+
+        Ok(CursorFilePage {
+            items: files,
+            next_cursor,
+            prev_cursor,
+            has_more,
+            total: total.unwrap_or(0),
         })
     }
 
@@ -2663,6 +2878,26 @@ impl Drop for Database {
     }
 }
 
+impl StorageEngine for Database {
+    fn dialect(&self) -> DatabaseDialect {
+        DatabaseDialect::Sqlite
+    }
+
+    fn search_files_cursor_page(
+        &self,
+        criteria: &SearchCriteria,
+    ) -> Result<CursorFilePage, DatabaseError> {
+        self.search_files_cursor_page(criteria)
+    }
+
+    fn search_gallery_files_cursor_page(
+        &self,
+        criteria: &SearchCriteria,
+    ) -> Result<CursorFilePage, DatabaseError> {
+        self.search_gallery_files_cursor_page(criteria)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3652,10 +3887,118 @@ mod tests {
     // --- File Embeddings and Similarity Search Tests ---
 
     #[test]
-    fn migration_reaches_schema_version_11() {
+    fn migration_reaches_schema_version_12() {
         let db = Database::connect_in_memory().unwrap();
-        assert_eq!(db.user_version().unwrap(), 11);
-        assert_eq!(LATEST_VERSION, 11);
+        assert_eq!(db.user_version().unwrap(), 12);
+        assert_eq!(LATEST_VERSION, 12);
+    }
+
+    #[test]
+    fn test_keyset_cursor_pagination_modified_at_desc() {
+        let db = Database::connect_in_memory().unwrap();
+        let folder = db.add_folder("/test").unwrap();
+
+        for i in 1..=5 {
+            let mut img = image(folder.id, &format!("/test/{i}.png"));
+            img.modified_at = i * 10;
+            db.upsert_file(&img).unwrap();
+        }
+
+        // Complete set in descending modified_at
+        let all = db
+            .search_files(&SearchCriteria {
+                sort: Some(FileSortField::ModifiedAt),
+                direction: Some(SortDirection::Desc),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(all.len(), 5);
+        assert_eq!(all[0].path, "/test/5.png");
+
+        // Page 1: limit 2, cursor None
+        let page1 = db
+            .search_files_cursor_page(&SearchCriteria {
+                limit: Some(2),
+                sort: Some(FileSortField::ModifiedAt),
+                direction: Some(SortDirection::Desc),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(page1.items.len(), 2);
+        assert_eq!(page1.items[0].path, "/test/5.png");
+        assert_eq!(page1.items[1].path, "/test/4.png");
+        assert_eq!(page1.total, 5);
+        assert!(page1.has_more);
+        assert!(page1.prev_cursor.is_none());
+        let c1 = page1.next_cursor.expect("cursor after page 1");
+
+        // Page 2: limit 2, cursor c1
+        let page2 = db
+            .search_files_cursor_page(&SearchCriteria {
+                limit: Some(2),
+                cursor: Some(c1.clone()),
+                sort: Some(FileSortField::ModifiedAt),
+                direction: Some(SortDirection::Desc),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(page2.items.len(), 2);
+        assert_eq!(page2.items[0].path, "/test/3.png");
+        assert_eq!(page2.items[1].path, "/test/2.png");
+        assert_eq!(page2.total, 0);
+        assert!(page2.has_more);
+        assert_eq!(page2.prev_cursor, Some(c1));
+        let c2 = page2.next_cursor.expect("cursor after page 2");
+
+        // Page 3: limit 2, cursor c2
+        let page3 = db
+            .search_files_cursor_page(&SearchCriteria {
+                limit: Some(2),
+                cursor: Some(c2.clone()),
+                sort: Some(FileSortField::ModifiedAt),
+                direction: Some(SortDirection::Desc),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(page3.items.len(), 1);
+        assert_eq!(page3.items[0].path, "/test/1.png");
+        assert!(!page3.has_more);
+        assert!(page3.next_cursor.is_none());
+        assert_eq!(page3.prev_cursor, Some(c2));
+    }
+
+    #[test]
+    fn test_keyset_cursor_pagination_empty_database() {
+        let db = Database::connect_in_memory().unwrap();
+        let page = db
+            .search_files_cursor_page(&SearchCriteria {
+                limit: Some(10),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(page.items.len(), 0);
+        assert_eq!(page.total, 0);
+        assert!(!page.has_more);
+        assert!(page.next_cursor.is_none());
+        assert!(page.prev_cursor.is_none());
+    }
+
+    #[test]
+    fn test_keyset_cursor_storage_engine_trait() {
+        let db = Database::connect_in_memory().unwrap();
+        let engine: &dyn StorageEngine = &db;
+        assert_eq!(engine.dialect(), DatabaseDialect::Sqlite);
+
+        let folder = db.add_folder("/gallery").unwrap();
+        let mut img = image(folder.id, "/gallery/card.png");
+        img.modified_at = 100;
+        db.upsert_file(&img).unwrap();
+
+        let page = engine
+            .search_gallery_files_cursor_page(&SearchCriteria::default())
+            .unwrap();
+        assert_eq!(page.items.len(), 1);
+        assert_eq!(page.items[0].path, "/gallery/card.png");
     }
 
     #[test]

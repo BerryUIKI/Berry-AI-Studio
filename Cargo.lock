@@ -426,6 +426,7 @@ version = "0.2.1"
 dependencies = [
  "berry-domain",
  "rusqlite",
+ "serde",
  "serde_json",
  "tempfile",
  "thiserror 2.0.20",
