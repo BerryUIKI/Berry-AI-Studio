@@ -798,7 +798,7 @@ mod tests {
         );
         assert!(err.is_err());
         let after_canceled = get_thumbnail_queue_diagnostics().canceled;
-        assert!(after_canceled >= before_canceled + 1);
+        assert!(after_canceled > before_canceled);
 
         // 2. Manifest hit increments manifest_hits and completed counters
         let cached_path = get_thumbnail_path(&dir, 2, 20, 256);
@@ -820,8 +820,8 @@ mod tests {
         assert!(ok.is_ok());
         let after_hits = get_thumbnail_queue_diagnostics().manifest_hits;
         let after_completed = get_thumbnail_queue_diagnostics().completed;
-        assert!(after_hits >= before_hits + 1);
-        assert!(after_completed >= before_completed + 1);
+        assert!(after_hits > before_hits);
+        assert!(after_completed > before_completed);
 
         drop(db);
         fs::remove_dir_all(dir).unwrap();

@@ -5,6 +5,8 @@
 //! 2. Deep pagination query latency (offset paging vs keyset cursor) across 1k, 10k, 50k datasets
 //! 3. 50k thumbnail manifest synchronization / legacy adoption time and throughput
 
+#![allow(clippy::manual_is_multiple_of)]
+
 use berry_domain::{
     Container, ExtractedMetadata, FileSortField, ImageFile, MetadataFormat, SearchCriteria,
     SortDirection,
@@ -233,7 +235,7 @@ fn benchmark_library_queries(size: usize) {
             let rows = stmt
                 .query_map(
                     rusqlite::params![folder.id, cursor_mtime, cursor_id],
-                    |row| Ok(row.get::<_, i64>(0)?),
+                    |row| row.get::<_, i64>(0),
                 )
                 .unwrap();
             let ids: Vec<i64> = rows.filter_map(Result::ok).collect();
@@ -259,7 +261,7 @@ fn benchmark_library_queries(size: usize) {
                 .unwrap();
             let rows = stmt
                 .query_map(rusqlite::params![folder.id, deep_offset as i64], |row| {
-                    Ok(row.get::<_, i64>(0)?)
+                    row.get::<_, i64>(0)
                 })
                 .unwrap();
             let ids: Vec<i64> = rows.filter_map(Result::ok).collect();
