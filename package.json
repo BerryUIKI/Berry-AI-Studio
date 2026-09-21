@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
-    "test:stack": "node --experimental-strip-types --test tests/stack-collapse.test.mjs tests/thumbnail-tier.test.mjs tests/search-query.test.mjs tests/gallery-layout.test.mjs",
+    "test:stack": "node --experimental-strip-types --test tests/stack-collapse.test.mjs tests/thumbnail-tier.test.mjs tests/search-query.test.mjs tests/gallery-layout.test.mjs tests/cull-drafts.test.mjs",
     "test:memory": "node --test tests/memory-audit.test.mjs",
     "bench:scroll": "node --experimental-strip-types --test tests/frontend-scroll-bench.mjs",
     "preview": "vite preview",

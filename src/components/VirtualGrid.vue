@@ -60,6 +60,7 @@ const emit = defineEmits<{
   (e: "findSimilar", file: ImageFile): void;
   (e: "toggleStackExpand", stackId: string): void;
   (e: "compareStack", stackId: string): void;
+  (e: "cullStack", stackId: string): void;
   (e: "loadMore"): void;
 }>();
 
@@ -786,6 +787,17 @@ function onDragStart(e: DragEvent, file: ImageFile) {
                 >
                   ⚖️
                 </button>
+
+                <!-- Stack cull drafts trigger button -->
+                <button
+                  v-if="file.stack_id && (stackMap?.[file.stack_id]?.count ?? 1) > 1"
+                  type="button"
+                  class="card-stack-cull-btn"
+                  :title="t.stack.cullDrafts || 'Cull Lower-Rated Drafts'"
+                  @click.stop="emit('cullStack', file.stack_id)"
+                >
+                  🧹
+                </button>
               </template>
             </div>
 
@@ -1288,12 +1300,43 @@ function onDragStart(e: DragEvent, file: ImageFile) {
   border-color: #818cf8;
 }
 
+.card-stack-cull-btn {
+  position: absolute;
+  top: 6px;
+  right: 90px;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #fbbf24;
+  font-size: 0.75em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  z-index: 2;
+  transition: all 0.15s ease;
+}
+
+.grid-card:hover .card-stack-cull-btn {
+  opacity: 1;
+}
+
+.card-stack-cull-btn:hover {
+  background: #d97706;
+  border-color: #f59e0b;
+  color: #fff;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .grid-card,
   .grid-card.is-collapsed-stack,
   .card-select-btn,
   .badge-stack,
   .card-stack-compare-btn,
+  .card-stack-cull-btn,
   .card-similar-btn {
     transition: none;
     animation: none;
