@@ -4,12 +4,12 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use berry_domain::{
-    Album, CheckpointModelStat, CleanupQueueItem, Container, CursorFilePage, DatabaseStats,
-    ExtractedMetadata, FilePage, FileSortField, FilesystemChange, Folder, ImageFile, LoraModel,
-    ModelCacheEntry, PageCursor, PromptStat, SearchCriteria, SimilarityMatch, SortDirection,
-    StackSummary, StorageRoot, Tag,
+    Album, ChangeLogEntry, ChangeLogSyncQuery, CheckpointModelStat, CleanupQueueItem, Container,
+    CursorFilePage, DatabaseStats, ExtractedMetadata, FilePage, FileSortField, FilesystemChange,
+    Folder, ImageFile, LoraModel, ModelCacheEntry, MutationResult, PageCursor, PromptStat,
+    SearchCriteria, SimilarityMatch, SortDirection, StackSummary, StorageRoot, Tag,
 };
-use rusqlite::{params, Connection, OpenFlags};
+use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
 use uuid::Uuid;
 
 use crate::engine::{DatabaseDialect, StorageEngine};
@@ -1141,6 +1141,86 @@ impl Database {
         }
         tx.commit()?;
         Ok(count)
+    }
+
+    /// Update user rating with Optimistic Concurrency Control (OCC) and automatic change log journaling.
+    pub fn set_file_rating_occ(
+        &self,
+        file_id: i64,
+        rating: Option<u8>,
+        expected_version: Option<i64>,
+        client_id: &str,
+    ) -> Result<MutationResult, DatabaseError> {
+        if let Some(r) = rating {
+            if !(1..=10).contains(&r) {
+                return Err(DatabaseError::InvalidRating(r));
+            }
+        }
+
+        // Check if file exists and get current version
+        let mut check_stmt = self
+            .conn
+            .prepare("SELECT version FROM files WHERE id = ?1")?;
+        let current_version: Option<i64> = check_stmt
+            .query_row([file_id], |row| row.get(0))
+            .optional()?;
+        let current_version = match current_version {
+            Some(v) => v,
+            None => return Err(DatabaseError::FileNotFound(file_id)),
+        };
+
+        // If expected_version is specified and differs, detect conflict immediately
+        if let Some(exp) = expected_version {
+            if exp != current_version {
+                return Ok(MutationResult {
+                    success: false,
+                    current_version,
+                    rows_affected: 0,
+                    conflict_detected: true,
+                });
+            }
+        }
+
+        let new_version = current_version + 1;
+        let affected = self.conn.execute(
+            "UPDATE files SET rating = ?1, version = ?2 WHERE id = ?3 AND version = ?4",
+            params![
+                rating.map(|r| r as i64),
+                new_version,
+                file_id,
+                current_version
+            ],
+        )?;
+
+        if affected == 0 {
+            // Mid-air collision right during execution
+            let latest_version: i64 = self
+                .conn
+                .query_row(
+                    "SELECT version FROM files WHERE id = ?1",
+                    [file_id],
+                    |row| row.get(0),
+                )
+                .unwrap_or(current_version);
+
+            return Ok(MutationResult {
+                success: false,
+                current_version: latest_version,
+                rows_affected: 0,
+                conflict_detected: true,
+            });
+        }
+
+        // Record to change_log
+        let payload = serde_json::json!({ "rating": rating, "version": new_version }).to_string();
+        let _ = self.record_change("file.rated", file_id, None, client_id, Some(&payload));
+
+        Ok(MutationResult {
+            success: true,
+            current_version: new_version,
+            rows_affected: 1,
+            conflict_detected: false,
+        })
     }
 
     /// Number of indexed files in a folder.
@@ -2960,6 +3040,136 @@ impl Database {
         }
         Ok(())
     }
+
+    /// Record an event into the shared change log journal.
+    pub fn record_change(
+        &self,
+        event_type: &str,
+        entity_id: i64,
+        secondary_id: Option<&str>,
+        client_id: &str,
+        payload: Option<&str>,
+    ) -> Result<i64, DatabaseError> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+
+        self.conn.execute(
+            "INSERT INTO change_log (event_type, entity_id, secondary_id, client_id, payload, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![event_type, entity_id, secondary_id, client_id, payload, now],
+        )?;
+
+        Ok(self.conn.last_insert_rowid())
+    }
+
+    /// Fetch change log journal entries strictly newer than `after_id`.
+    pub fn fetch_changes(
+        &self,
+        query: &ChangeLogSyncQuery,
+    ) -> Result<Vec<ChangeLogEntry>, DatabaseError> {
+        let limit = query.limit.clamp(1, 1000);
+        let mut entries = Vec::new();
+
+        if let Some(ref exclude_client) = query.exclude_client_id {
+            let mut stmt = self.conn.prepare(
+                "SELECT id, event_type, entity_id, secondary_id, client_id, payload, created_at
+                 FROM change_log
+                 WHERE id > ?1 AND client_id != ?2
+                 ORDER BY id ASC
+                 LIMIT ?3",
+            )?;
+            let rows = stmt.query_map(
+                params![query.after_id, exclude_client, limit as i64],
+                |row| {
+                    Ok(ChangeLogEntry {
+                        id: row.get(0)?,
+                        event_type: row.get(1)?,
+                        entity_id: row.get(2)?,
+                        secondary_id: row.get(3)?,
+                        client_id: row.get(4)?,
+                        payload: row.get(5)?,
+                        created_at: row.get(6)?,
+                    })
+                },
+            )?;
+            for row in rows {
+                entries.push(row?);
+            }
+        } else {
+            let mut stmt = self.conn.prepare(
+                "SELECT id, event_type, entity_id, secondary_id, client_id, payload, created_at
+                 FROM change_log
+                 WHERE id > ?1
+                 ORDER BY id ASC
+                 LIMIT ?2",
+            )?;
+            let rows = stmt.query_map(params![query.after_id, limit as i64], |row| {
+                Ok(ChangeLogEntry {
+                    id: row.get(0)?,
+                    event_type: row.get(1)?,
+                    entity_id: row.get(2)?,
+                    secondary_id: row.get(3)?,
+                    client_id: row.get(4)?,
+                    payload: row.get(5)?,
+                    created_at: row.get(6)?,
+                })
+            })?;
+            for row in rows {
+                entries.push(row?);
+            }
+        }
+
+        Ok(entries)
+    }
+
+    /// Returns the maximum change log sequence ID recorded in the journal.
+    pub fn get_latest_change_id(&self) -> Result<i64, DatabaseError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT COALESCE(MAX(id), 0) FROM change_log")?;
+        let max_id: i64 = stmt.query_row([], |row| row.get(0))?;
+        Ok(max_id)
+    }
+
+    /// Prune old change log entries to manage database size.
+    pub fn prune_change_log(
+        &self,
+        older_than_secs: i64,
+        max_keep: usize,
+    ) -> Result<usize, DatabaseError> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+
+        let min_id_to_keep: i64 = self
+            .conn
+            .query_row(
+                "SELECT COALESCE(MIN(id), 0) FROM (
+                    SELECT id FROM change_log ORDER BY id DESC LIMIT ?1
+                )",
+                [max_keep as i64],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
+
+        let deleted = if older_than_secs <= 0 {
+            self.conn.execute(
+                "DELETE FROM change_log WHERE id < ?1",
+                params![min_id_to_keep],
+            )?
+        } else {
+            let cutoff = now.saturating_sub(older_than_secs);
+            self.conn.execute(
+                "DELETE FROM change_log WHERE created_at <= ?1 AND id < ?2",
+                params![cutoff, min_id_to_keep],
+            )?
+        };
+
+        Ok(deleted)
+    }
 }
 
 impl Drop for Database {
@@ -3977,10 +4187,122 @@ mod tests {
     // --- File Embeddings and Similarity Search Tests ---
 
     #[test]
-    fn migration_reaches_schema_version_13() {
+    fn migration_reaches_schema_version_14() {
         let db = Database::connect_in_memory().unwrap();
-        assert_eq!(db.user_version().unwrap(), 13);
-        assert_eq!(LATEST_VERSION, 13);
+        assert_eq!(db.user_version().unwrap(), 14);
+        assert_eq!(LATEST_VERSION, 14);
+    }
+
+    #[test]
+    fn test_set_file_rating_occ_and_collision_detection() {
+        let db = Database::connect_in_memory().unwrap();
+        let folder = db.add_folder("/occ_test").unwrap();
+        let file_id = db
+            .upsert_file(&image(folder.id, "/occ_test/img.png"))
+            .unwrap();
+
+        // User A performs initial rating at version 1
+        let res_a = db
+            .set_file_rating_occ(file_id, Some(5), Some(1), "client_a")
+            .unwrap();
+        assert!(res_a.success);
+        assert_eq!(res_a.current_version, 2);
+        assert_eq!(res_a.rows_affected, 1);
+        assert!(!res_a.conflict_detected);
+
+        // User B tries to update based on stale version 1
+        let res_b = db
+            .set_file_rating_occ(file_id, Some(8), Some(1), "client_b")
+            .unwrap();
+        assert!(!res_b.success);
+        assert_eq!(res_b.current_version, 2);
+        assert_eq!(res_b.rows_affected, 0);
+        assert!(res_b.conflict_detected);
+
+        // User B observes conflict, accepts new baseline (version 2), and sets rating
+        let res_b_retry = db
+            .set_file_rating_occ(file_id, Some(8), Some(2), "client_b")
+            .unwrap();
+        assert!(res_b_retry.success);
+        assert_eq!(res_b_retry.current_version, 3);
+        assert_eq!(res_b_retry.rows_affected, 1);
+        assert!(!res_b_retry.conflict_detected);
+
+        // Verify change_log has entries for both successful mutations
+        let changes = db
+            .fetch_changes(&ChangeLogSyncQuery {
+                after_id: 0,
+                exclude_client_id: None,
+                limit: 10,
+            })
+            .unwrap();
+        assert_eq!(changes.len(), 2);
+        assert_eq!(changes[0].client_id, "client_a");
+        assert_eq!(changes[0].event_type, "file.rated");
+        assert_eq!(changes[1].client_id, "client_b");
+    }
+
+    #[test]
+    fn test_change_log_journal_record_fetch_and_prune() {
+        let db = Database::connect_in_memory().unwrap();
+        let id1 = db
+            .record_change(
+                "tag.created",
+                101,
+                None,
+                "client_a",
+                Some(r#"{"name":"tag1"}"#),
+            )
+            .unwrap();
+        let id2 = db
+            .record_change(
+                "file.rated",
+                202,
+                None,
+                "client_b",
+                Some(r#"{"rating":10}"#),
+            )
+            .unwrap();
+        assert!(id2 > id1);
+
+        assert_eq!(db.get_latest_change_id().unwrap(), id2);
+
+        // Fetch excluding client_a -> only returns client_b
+        let changes = db
+            .fetch_changes(&ChangeLogSyncQuery {
+                after_id: 0,
+                exclude_client_id: Some("client_a".to_string()),
+                limit: 50,
+            })
+            .unwrap();
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0].entity_id, 202);
+        assert_eq!(changes[0].client_id, "client_b");
+
+        // Fetch after id1
+        let changes_after = db
+            .fetch_changes(&ChangeLogSyncQuery {
+                after_id: id1,
+                exclude_client_id: None,
+                limit: 50,
+            })
+            .unwrap();
+        assert_eq!(changes_after.len(), 1);
+        assert_eq!(changes_after[0].id, id2);
+
+        // Prune with max_keep=1
+        let pruned = db.prune_change_log(0, 1).unwrap();
+        assert_eq!(pruned, 1); // 1 deleted, 1 kept
+
+        let remaining = db
+            .fetch_changes(&ChangeLogSyncQuery {
+                after_id: 0,
+                exclude_client_id: None,
+                limit: 50,
+            })
+            .unwrap();
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0].id, id2);
     }
 
     #[test]

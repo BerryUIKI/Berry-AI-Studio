@@ -11,10 +11,11 @@ use std::sync::MutexGuard;
 
 use berry_clip::{ClipEngine, ClipModelInfo};
 use berry_domain::{
-    plan_prompt_stacks, Album, CheckpointModelStat, CleanupQueueItem, CursorFilePage,
-    DatabaseStats, DetectedLora, FilePage, FileSortField, Folder, ImageFile, LoraModel,
-    ModelCacheEntry, NormalizedPath, PathResolver, PipelineDetectedPath, PromptStackCandidate,
-    PromptStat, SearchCriteria, SimilarityMatch, SortDirection, StackSummary, StorageRoot, Tag,
+    plan_prompt_stacks, Album, ChangeLogEntry, ChangeLogSyncQuery, CheckpointModelStat,
+    CleanupQueueItem, CursorFilePage, DatabaseStats, DetectedLora, FilePage, FileSortField, Folder,
+    ImageFile, LoraModel, ModelCacheEntry, MutationResult, NormalizedPath, PathResolver,
+    PipelineDetectedPath, PromptStackCandidate, PromptStat, SearchCriteria, SimilarityMatch,
+    SortDirection, StackSummary, StorageRoot, Tag,
 };
 use berry_scan::{ScanStats, Scanner};
 use berry_storage::Database;
@@ -1198,6 +1199,49 @@ pub fn relativize_local_path(
     let cfg = get_app_config(app)?;
     let resolver = PathResolver::from_mappings(cfg.root_mappings);
     Ok(resolver.relativize(Path::new(&absolute_path)))
+}
+
+// --- Real-time Change Log & OCC Commands ---
+
+#[tauri::command]
+pub fn fetch_change_log(
+    query: ChangeLogSyncQuery,
+    state: State<'_, AppState>,
+) -> Result<Vec<ChangeLogEntry>, String> {
+    db(&state)?.fetch_changes(&query).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn record_change_event(
+    event_type: String,
+    entity_id: i64,
+    secondary_id: Option<String>,
+    client_id: String,
+    payload: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<i64, String> {
+    db(&state)?
+        .record_change(
+            &event_type,
+            entity_id,
+            secondary_id.as_deref(),
+            &client_id,
+            payload.as_deref(),
+        )
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn set_file_rating_occ(
+    file_id: i64,
+    rating: Option<u8>,
+    expected_version: Option<i64>,
+    client_id: String,
+    state: State<'_, AppState>,
+) -> Result<MutationResult, String> {
+    db(&state)?
+        .set_file_rating_occ(file_id, rating, expected_version, &client_id)
+        .map_err(|e| e.to_string())
 }
 
 /// Open an external URL in the system's default browser.
