@@ -150,6 +150,7 @@ pub fn run() {
             commands::fetch_change_log,
             commands::record_change_event,
             commands::set_file_rating_occ,
+            commands::test_database_connection,
             commands::open_external_url,
             commands::get_or_create_thumbnail,
             commands::batch_generate_thumbnails,

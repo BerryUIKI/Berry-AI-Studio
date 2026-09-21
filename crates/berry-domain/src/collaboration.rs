@@ -48,6 +48,15 @@ pub struct ChangeLogSyncQuery {
     pub limit: u32,
 }
 
+/// Result of a remote database ping and latency check.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DatabasePingResult {
+    pub success: bool,
+    pub latency_ms: u64,
+    pub backend: String,
+    pub message: String,
+}
+
 impl Default for ChangeLogSyncQuery {
     fn default() -> Self {
         Self {

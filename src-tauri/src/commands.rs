@@ -12,10 +12,10 @@ use std::sync::MutexGuard;
 use berry_clip::{ClipEngine, ClipModelInfo};
 use berry_domain::{
     plan_prompt_stacks, Album, ChangeLogEntry, ChangeLogSyncQuery, CheckpointModelStat,
-    CleanupQueueItem, CursorFilePage, DatabaseStats, DetectedLora, FilePage, FileSortField, Folder,
-    ImageFile, LoraModel, ModelCacheEntry, MutationResult, NormalizedPath, PathResolver,
-    PipelineDetectedPath, PromptStackCandidate, PromptStat, SearchCriteria, SimilarityMatch,
-    SortDirection, StackSummary, StorageRoot, Tag,
+    CleanupQueueItem, CursorFilePage, DatabasePingResult, DatabaseStats, DetectedLora, FilePage,
+    FileSortField, Folder, ImageFile, LoraModel, ModelCacheEntry, MutationResult, NormalizedPath,
+    PathResolver, PipelineDetectedPath, PromptStackCandidate, PromptStat, SearchCriteria,
+    SimilarityMatch, SortDirection, StackSummary, StorageRoot, Tag,
 };
 use berry_scan::{ScanStats, Scanner};
 use berry_storage::Database;
@@ -1242,6 +1242,108 @@ pub fn set_file_rating_occ(
     db(&state)?
         .set_file_rating_occ(file_id, rating, expected_version, &client_id)
         .map_err(|e| e.to_string())
+}
+
+/// Test connection and measure ping latency for local SQLite or remote MySQL / PostgreSQL databases.
+#[tauri::command]
+pub fn test_database_connection(
+    backend: String,
+    connection_url: String,
+    state: State<'_, AppState>,
+) -> Result<DatabasePingResult, String> {
+    let backend_lower = backend.trim().to_lowercase();
+    let start = std::time::Instant::now();
+
+    match backend_lower.as_str() {
+        "sqlite" => {
+            let db = db(&state)?;
+            let stats = db.get_database_stats().map_err(|e| e.to_string())?;
+            let latency_ms = start.elapsed().as_millis() as u64;
+            Ok(DatabasePingResult {
+                success: true,
+                latency_ms,
+                backend: "sqlite".to_string(),
+                message: format!(
+                    "Local SQLite connected ({file_count} assets indexed).",
+                    file_count = stats.file_count
+                ),
+            })
+        }
+        "mysql" | "postgres" | "postgresql" => {
+            let default_port = if backend_lower == "mysql" { 3306 } else { 5432 };
+            let trimmed = connection_url.trim();
+            if trimmed.is_empty() {
+                return Ok(DatabasePingResult {
+                    success: false,
+                    latency_ms: 0,
+                    backend: backend_lower,
+                    message: "Connection URL is empty.".to_string(),
+                });
+            }
+
+            let without_scheme = trimmed
+                .strip_prefix("mysql://")
+                .or_else(|| trimmed.strip_prefix("postgres://"))
+                .or_else(|| trimmed.strip_prefix("postgresql://"))
+                .unwrap_or(trimmed);
+
+            let without_auth = without_scheme
+                .rsplit_once('@')
+                .map(|(_, host_part)| host_part)
+                .unwrap_or(without_scheme);
+
+            let host_port_part = without_auth
+                .split_once('/')
+                .map(|(host_part, _)| host_part)
+                .unwrap_or(without_auth);
+
+            let (host, port) = if let Some((h, p)) = host_port_part.split_once(':') {
+                (h, p.parse::<u16>().unwrap_or(default_port))
+            } else {
+                (host_port_part, default_port)
+            };
+
+            let socket_addr_str = format!("{host}:{port}");
+            use std::net::ToSocketAddrs;
+            let addrs = socket_addr_str
+                .to_socket_addrs()
+                .map_err(|e| format!("Failed to resolve hostname {host}: {e}"))?;
+
+            let mut connected = false;
+            let mut last_err = String::new();
+
+            for addr in addrs {
+                match std::net::TcpStream::connect_timeout(&addr, std::time::Duration::from_secs(3))
+                {
+                    Ok(_) => {
+                        connected = true;
+                        break;
+                    }
+                    Err(e) => {
+                        last_err = e.to_string();
+                    }
+                }
+            }
+
+            let latency_ms = start.elapsed().as_millis() as u64;
+            if connected {
+                Ok(DatabasePingResult {
+                    success: true,
+                    latency_ms,
+                    backend: backend_lower,
+                    message: format!("Host reachable at {host}:{port} ({latency_ms} ms ping)."),
+                })
+            } else {
+                Ok(DatabasePingResult {
+                    success: false,
+                    latency_ms,
+                    backend: backend_lower,
+                    message: format!("Connection failed to {host}:{port}: {last_err}"),
+                })
+            }
+        }
+        other => Err(format!("Unsupported database backend: {other}")),
+    }
 }
 
 /// Open an external URL in the system's default browser.

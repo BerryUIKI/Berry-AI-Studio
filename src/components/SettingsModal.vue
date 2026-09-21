@@ -29,6 +29,8 @@ import {
 import { applyTheme, normalizeTheme, type AppTheme } from "../utils/theme";
 import ThumbnailDiagnosticsModal from "./ThumbnailDiagnosticsModal.vue";
 import { checkServiceStatus } from "../utils/generation";
+import { open } from "@tauri-apps/plugin-dialog";
+import { collaborationSync, pingDatabase } from "../utils/collaborationSync";
 
 const showDiagnosticsModal = ref(false);
 
@@ -54,7 +56,7 @@ const emit = defineEmits<{
   }): void;
 }>();
 
-const activeTab = ref<"general" | "display" | "stacking" | "interop" | "parsers" | "about">("general");
+const activeTab = ref<"general" | "display" | "stacking" | "interop" | "collaboration" | "parsers" | "about">("general");
 
 // Settings state (backed by persistent config.json)
 const selectedLocale = ref<LocaleSetting>(currentLocaleSetting.value);
@@ -78,6 +80,64 @@ const comfyuiUrl = ref("http://127.0.0.1:8188");
 const webuiUrl = ref("http://127.0.0.1:7860");
 const comfyStatus = ref<"unknown" | "checking" | "online" | "offline">("unknown");
 const webuiStatus = ref<"unknown" | "checking" | "online" | "offline">("unknown");
+
+// Collaboration & Database state
+const storageBackend = ref<"sqlite" | "mysql" | "postgres">("sqlite");
+const remoteConnectionUrl = ref("");
+const clientIdentifier = ref("local_client");
+const rootMappings = ref<Record<string, string>>({});
+const pingStatus = ref<"unknown" | "testing" | "success" | "error">("unknown");
+const pingLatency = ref<number | null>(null);
+const pingMessage = ref("");
+const newMappingUuid = ref("");
+const newMappingPath = ref("");
+const lastSyncDisplay = ref("never");
+
+async function handlePingDatabase() {
+  pingStatus.value = "testing";
+  pingMessage.value = "";
+  pingLatency.value = null;
+  try {
+    const res = await pingDatabase(storageBackend.value, remoteConnectionUrl.value);
+    if (res.success) {
+      pingStatus.value = "success";
+      pingLatency.value = res.latency_ms;
+      pingMessage.value = res.message;
+    } else {
+      pingStatus.value = "error";
+      pingMessage.value = res.message;
+    }
+  } catch (err: any) {
+    pingStatus.value = "error";
+    pingMessage.value = String(err);
+  }
+}
+
+async function handleBrowseMappingPath() {
+  const selected = await open({ directory: true, multiple: false });
+  if (typeof selected === "string") {
+    newMappingPath.value = selected;
+  }
+}
+
+function addRootMappingEntry() {
+  const uuid = newMappingUuid.value.trim();
+  const path = newMappingPath.value.trim();
+  if (uuid && path) {
+    rootMappings.value = {
+      ...rootMappings.value,
+      [uuid]: path,
+    };
+    newMappingUuid.value = "";
+    newMappingPath.value = "";
+  }
+}
+
+function removeRootMappingEntry(uuid: string) {
+  const next = { ...rootMappings.value };
+  delete next[uuid];
+  rootMappings.value = next;
+}
 
 async function checkComfyConnection() {
   comfyStatus.value = "checking";
@@ -131,6 +191,16 @@ async function loadSettingsAndPaths() {
     webuiUrl.value = config.webui_url || "http://127.0.0.1:7860";
     comfyStatus.value = "unknown";
     webuiStatus.value = "unknown";
+
+    storageBackend.value = config.storage_backend || "sqlite";
+    remoteConnectionUrl.value = config.remote_connection_url || "";
+    clientIdentifier.value = config.client_identifier || "local_client";
+    rootMappings.value = config.root_mappings || {};
+    pingStatus.value = "unknown";
+    pingLatency.value = null;
+    pingMessage.value = "";
+    const lastSync = collaborationSync.getLastSyncTime();
+    lastSyncDisplay.value = lastSync > 0 ? new Date(lastSync).toLocaleTimeString() : "ready";
 
     storagePaths.value = await getStoragePaths();
   } catch (e) {
@@ -218,6 +288,10 @@ async function saveSettings() {
       allow_multiple_open_stacks: allowMultipleStacksOpen.value,
       comfyui_url: comfyuiUrl.value,
       webui_url: webuiUrl.value,
+      storage_backend: storageBackend.value,
+      remote_connection_url: remoteConnectionUrl.value,
+      client_identifier: clientIdentifier.value,
+      root_mappings: rootMappings.value,
     });
   } catch (e) {
     console.error("Failed to save config.json:", e);
@@ -295,6 +369,16 @@ async function saveSettings() {
             @click="activeTab = 'interop'"
           >
             <span aria-hidden="true">🔌</span><span>{{ t.interop.title }}</span>
+          </button>
+          <button
+            type="button"
+            class="tab-btn"
+            :class="{ active: activeTab === 'collaboration' }"
+            role="tab"
+            :aria-selected="activeTab === 'collaboration'"
+            @click="activeTab = 'collaboration'"
+          >
+            <span aria-hidden="true">👥</span><span>{{ t.settings.tabs.collaboration || 'Team & Database' }}</span>
           </button>
           <button
             type="button"
@@ -622,6 +706,128 @@ async function saveSettings() {
                 >
                   {{ webuiStatus === 'online' ? '🟢 ' + t.interop.online : '🔴 ' + t.interop.offline }}
                 </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab: Team Collaboration & Database -->
+          <div v-if="activeTab === 'collaboration'" class="settings-panel">
+            <div class="panel-heading">
+              <h4 class="panel-title">{{ t.settings.collaborationTitle }}</h4>
+              <p class="panel-subtitle">{{ t.settings.collaborationSubtitle }}</p>
+            </div>
+
+            <!-- Database Engine Backend -->
+            <div class="setting-row">
+              <div class="row-info">
+                <span class="row-label">{{ t.settings.storageBackend }}</span>
+                <span class="row-desc">{{ t.settings.storageBackendDesc }}</span>
+              </div>
+              <select v-model="storageBackend" class="select-input">
+                <option value="sqlite">{{ t.settings.backendSqlite }}</option>
+                <option value="mysql">{{ t.settings.backendMysql }}</option>
+                <option value="postgres">{{ t.settings.backendPostgres }}</option>
+              </select>
+            </div>
+
+            <!-- Client Identifier -->
+            <div class="setting-row">
+              <div class="row-info">
+                <span class="row-label">{{ t.settings.clientId }}</span>
+                <span class="row-desc">{{ t.settings.clientIdDesc }}</span>
+              </div>
+              <input
+                v-model="clientIdentifier"
+                type="text"
+                class="url-input"
+                :placeholder="t.settings.clientIdPlaceholder"
+              />
+            </div>
+
+            <!-- Remote Connection URL (when MySQL or Postgres selected) -->
+            <div v-if="storageBackend !== 'sqlite'" class="setting-row">
+              <div class="row-info">
+                <span class="row-label">{{ t.settings.remoteUrl }}</span>
+                <span class="row-desc">{{ t.settings.remoteUrlDesc }}</span>
+              </div>
+              <div class="interop-row-control">
+                <input
+                  v-model="remoteConnectionUrl"
+                  type="text"
+                  class="url-input"
+                  :placeholder="storageBackend === 'mysql' ? 'mysql://user:pass@192.168.1.100:3306/berry' : 'postgres://user:pass@192.168.1.100:5432/berry'"
+                />
+                <button
+                  type="button"
+                  class="btn-test-conn"
+                  :disabled="pingStatus === 'testing'"
+                  @click="handlePingDatabase"
+                >
+                  {{ pingStatus === 'testing' ? t.settings.testingConnection : t.settings.testConnection }}
+                </button>
+              </div>
+            </div>
+
+            <!-- Connection Ping Result Banner -->
+            <div v-if="storageBackend !== 'sqlite' && pingStatus !== 'unknown'" class="setting-row ping-result-row">
+              <span class="status-pill" :class="pingStatus === 'success' ? 'online' : 'offline'">
+                {{ pingStatus === 'success' ? '🟢 ' + t.settings.connectionSuccess + (pingLatency !== null ? ' (' + pingLatency + ' ms)' : '') : '🔴 ' + t.settings.connectionFailed }}
+              </span>
+              <span class="ping-message">{{ pingMessage }}</span>
+            </div>
+
+            <!-- Real-time Sync Status -->
+            <div class="setting-row">
+              <div class="row-info">
+                <span class="row-label">{{ t.settings.syncStatus }}</span>
+                <span class="row-desc">{{ t.settings.lastSynced }}: {{ lastSyncDisplay }}</span>
+              </div>
+              <span class="status-pill" :class="storageBackend === 'sqlite' ? 'offline' : 'online'">
+                {{ storageBackend === 'sqlite' ? t.settings.syncIdle : t.settings.syncActive }}
+              </span>
+            </div>
+
+            <!-- Storage Roots & Local Mount Mappings -->
+            <div class="settings-subsection">
+              <h5 class="subsection-title">{{ t.settings.rootMappingsTitle }}</h5>
+              <p class="panel-subtitle">{{ t.settings.rootMappingsDesc }}</p>
+
+              <div v-if="Object.keys(rootMappings).length > 0" class="mappings-list">
+                <div v-for="(path, uuid) in rootMappings" :key="uuid" class="mapping-item">
+                  <span class="mapping-uuid">{{ uuid }}</span>
+                  <span class="mapping-arrow">➔</span>
+                  <span class="mapping-path">{{ path }}</span>
+                  <button type="button" class="btn-remove-mapping" @click="removeRootMappingEntry(String(uuid))">
+                    {{ t.settings.removeRootMapping }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- Add Root Mapping Input Row -->
+              <div class="add-mapping-row">
+                <input
+                  v-model="newMappingUuid"
+                  type="text"
+                  class="mapping-input-uuid"
+                  :placeholder="t.settings.rootUuid"
+                />
+                <input
+                  v-model="newMappingPath"
+                  type="text"
+                  class="mapping-input-path"
+                  :placeholder="t.settings.localMountPath"
+                />
+                <button type="button" class="btn-browse-mapping" @click="handleBrowseMappingPath">
+                  {{ t.settings.browseMount }}
+                </button>
+                <button
+                  type="button"
+                  class="btn-add-mapping"
+                  :disabled="!newMappingUuid.trim() || !newMappingPath.trim()"
+                  @click="addRootMappingEntry"
+                >
+                  {{ t.settings.addRootMapping }}
+                </button>
               </div>
             </div>
           </div>
@@ -1324,6 +1530,144 @@ async function saveSettings() {
   background: rgba(245, 158, 11, 0.15);
   color: #fbbf24;
   border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.ping-result-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.ping-message {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #94a3b8);
+}
+
+.settings-subsection {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.subsection-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-primary, #f1f5f9);
+  margin: 0 0 4px 0;
+}
+
+.mappings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.mapping-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 6px;
+  font-size: 0.82rem;
+}
+
+.mapping-uuid {
+  font-family: monospace;
+  font-weight: 600;
+  color: var(--accent-color, #38bdf8);
+}
+
+.mapping-arrow {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.mapping-path {
+  flex: 1;
+  font-family: monospace;
+  color: var(--text-secondary, #cbd5e1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-remove-mapping {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.btn-remove-mapping:hover {
+  background: rgba(239, 68, 68, 0.25);
+}
+
+.add-mapping-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.mapping-input-uuid {
+  width: 140px;
+  padding: 7px 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: var(--text-primary, #f1f5f9);
+  font-size: 0.82rem;
+}
+
+.mapping-input-path {
+  flex: 1;
+  padding: 7px 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: var(--text-primary, #f1f5f9);
+  font-size: 0.82rem;
+}
+
+.btn-browse-mapping {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: var(--text-primary, #f1f5f9);
+  padding: 7px 12px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-browse-mapping:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.btn-add-mapping {
+  background: var(--accent-color, #0284c7);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: #ffffff;
+  padding: 7px 14px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-add-mapping:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 @media (prefers-reduced-motion: reduce) {

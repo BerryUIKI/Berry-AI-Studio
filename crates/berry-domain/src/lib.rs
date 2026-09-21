@@ -26,7 +26,7 @@ mod tag;
 
 pub use album::Album;
 pub use checkpoint::{CheckpointModelStat, ModelCacheEntry};
-pub use collaboration::{ChangeLogEntry, ChangeLogSyncQuery, MutationResult};
+pub use collaboration::{ChangeLogEntry, ChangeLogSyncQuery, DatabasePingResult, MutationResult};
 pub use database_stats::DatabaseStats;
 pub use extracted_metadata::ExtractedMetadata;
 pub use filesystem_change::FilesystemChange;

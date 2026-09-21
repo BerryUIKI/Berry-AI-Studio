@@ -50,6 +50,7 @@ import {
 } from "./utils/config";
 import { checkForUpdates } from "./utils/updater";
 import { applyTheme, normalizeTheme, type AppTheme } from "./utils/theme";
+import { collaborationSync } from "./utils/collaborationSync";
 
 const LightboxModal = defineAsyncComponent(() => import("./components/LightboxModal.vue"));
 const FilterDrawer = defineAsyncComponent(() => import("./components/FilterDrawer.vue"));
@@ -304,7 +305,7 @@ let unlisten: UnlistenFn | null = null;
 let unlistenLibraryChanges: UnlistenFn | null = null;
 let libraryRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 
-function scheduleLibraryRefresh(_event: LibraryFilesChanged) {
+function scheduleLibraryRefresh(_event?: LibraryFilesChanged) {
   if (libraryRefreshTimer) clearTimeout(libraryRefreshTimer);
   libraryRefreshTimer = setTimeout(() => {
     libraryRefreshTimer = null;
@@ -572,6 +573,14 @@ onMounted(async () => {
         }
       });
     }
+
+    if (cfg.storage_backend && cfg.storage_backend !== "sqlite") {
+      collaborationSync.init(cfg.client_identifier || "local_client");
+      collaborationSync.onBatch(() => {
+        scheduleLibraryRefresh();
+      });
+      collaborationSync.start();
+    }
   } catch (e) {
     error.value = String(e);
   }
@@ -605,6 +614,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener("keydown", handleWindowKeyDown);
+  collaborationSync.stop();
   if (organizeLibraryNoticeTimer) clearTimeout(organizeLibraryNoticeTimer);
   if (libraryRefreshTimer) clearTimeout(libraryRefreshTimer);
   unlisten?.();
