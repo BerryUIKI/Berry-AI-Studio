@@ -1,6 +1,15 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from "vue";
-import type { AppInfo } from "../types";
+import { invoke } from "@tauri-apps/api/core";
+import type {
+  AppInfo,
+  CloudBackupConfig,
+  CloudBackupResult,
+  CloudPingResult,
+  CloudRestoreResult,
+  CloudSnapshotMeta,
+  CloudStorageProvider,
+} from "../types";
 import {
   clearThumbnailCache,
   getThumbnailCacheBudgetMb,
@@ -58,7 +67,7 @@ const emit = defineEmits<{
   }): void;
 }>();
 
-const activeTab = ref<"general" | "display" | "stacking" | "interop" | "collaboration" | "parsers" | "about">("general");
+const activeTab = ref<"general" | "display" | "stacking" | "interop" | "collaboration" | "cloudBackup" | "parsers" | "about">("general");
 
 // Settings state (backed by persistent config.json)
 const selectedLocale = ref<LocaleSetting>(currentLocaleSetting.value);
@@ -153,6 +162,146 @@ async function checkWebuiConnection() {
   webuiStatus.value = ok ? "online" : "offline";
 }
 
+// Cloud Backup state
+const cloudProvider = ref<CloudStorageProvider>("local_path");
+const cloudLocalPath = ref("");
+const cloudWebdavEndpoint = ref("");
+const cloudWebdavUsername = ref("");
+const cloudWebdavPassword = ref("");
+const cloudS3Endpoint = ref("");
+const cloudS3Bucket = ref("");
+const cloudS3Region = ref("auto");
+const cloudS3AccessKey = ref("");
+const cloudS3SecretKey = ref("");
+const cloudS3Prefix = ref("backups/");
+const cloudAutoBackup = ref(false);
+const cloudAutoIntervalDays = ref(7);
+
+const cloudPingStatus = ref<"unknown" | "testing" | "success" | "error">("unknown");
+const cloudPingLatency = ref<number | null>(null);
+const cloudPingMessage = ref("");
+
+const cloudSnapshots = ref<CloudSnapshotMeta[]>([]);
+const cloudSnapshotsLoading = ref(false);
+const cloudCreatingSnapshot = ref(false);
+const cloudRestoringSnapshot = ref(false);
+const cloudActionMessage = ref("");
+const cloudActionError = ref("");
+const newSnapshotDescription = ref("");
+
+function getCurrentCloudConfig(): CloudBackupConfig {
+  return {
+    provider: cloudProvider.value,
+    local_path: cloudLocalPath.value.trim() || null,
+    webdav_endpoint: cloudWebdavEndpoint.value.trim() || null,
+    webdav_username: cloudWebdavUsername.value.trim() || null,
+    webdav_password: cloudWebdavPassword.value || null,
+    s3_endpoint: cloudS3Endpoint.value.trim() || null,
+    s3_bucket: cloudS3Bucket.value.trim() || null,
+    s3_region: cloudS3Region.value.trim() || "auto",
+    s3_access_key: cloudS3AccessKey.value.trim() || null,
+    s3_secret_key: cloudS3SecretKey.value.trim() || null,
+    s3_prefix: cloudS3Prefix.value.trim() || "backups/",
+    auto_backup_enabled: cloudAutoBackup.value,
+    auto_backup_interval_days: cloudAutoIntervalDays.value,
+  };
+}
+
+async function handleBrowseLocalBackupPath() {
+  const selected = await open({ directory: true, multiple: false });
+  if (typeof selected === "string") {
+    cloudLocalPath.value = selected;
+  }
+}
+
+async function handleTestCloudConnection() {
+  cloudPingStatus.value = "testing";
+  cloudPingMessage.value = "";
+  cloudPingLatency.value = null;
+  try {
+    const res = await invoke<CloudPingResult>("cloud_backup_test_connection", {
+      config: getCurrentCloudConfig(),
+    });
+    if (res.success) {
+      cloudPingStatus.value = "success";
+      cloudPingLatency.value = res.latency_ms;
+      cloudPingMessage.value = res.message;
+    } else {
+      cloudPingStatus.value = "error";
+      cloudPingMessage.value = res.message;
+    }
+  } catch (err: any) {
+    cloudPingStatus.value = "error";
+    cloudPingMessage.value = String(err);
+  }
+}
+
+async function handleCreateSnapshot() {
+  cloudCreatingSnapshot.value = true;
+  cloudActionMessage.value = "";
+  cloudActionError.value = "";
+  try {
+    const res = await invoke<CloudBackupResult>("cloud_backup_create_snapshot", {
+      config: getCurrentCloudConfig(),
+      description: newSnapshotDescription.value.trim() || null,
+    });
+    if (res.success && res.snapshot) {
+      cloudActionMessage.value = `✓ Snapshot created: ${res.snapshot.filename} (${(res.snapshot.size_bytes / 1024 / 1024).toFixed(2)} MB)`;
+      newSnapshotDescription.value = "";
+      await handleListSnapshots();
+    } else {
+      cloudActionError.value = res.error || "Failed to create snapshot";
+    }
+  } catch (err: any) {
+    cloudActionError.value = String(err);
+  } finally {
+    cloudCreatingSnapshot.value = false;
+  }
+}
+
+async function handleListSnapshots() {
+  cloudSnapshotsLoading.value = true;
+  cloudActionError.value = "";
+  try {
+    cloudSnapshots.value = await invoke<CloudSnapshotMeta[]>("cloud_backup_list_snapshots", {
+      config: getCurrentCloudConfig(),
+    });
+  } catch (err: any) {
+    cloudActionError.value = String(err);
+  } finally {
+    cloudSnapshotsLoading.value = false;
+  }
+}
+
+async function handleRestoreSnapshot(snapshot: CloudSnapshotMeta) {
+  const confirmed = window.confirm(
+    t.value.settings.cloudBackup.restoreConfirm.replace('{name}', snapshot.filename)
+  );
+  if (!confirmed) return;
+
+  cloudRestoringSnapshot.value = true;
+  cloudActionMessage.value = "";
+  cloudActionError.value = "";
+  try {
+    const res = await invoke<CloudRestoreResult>("cloud_backup_restore_snapshot", {
+      config: getCurrentCloudConfig(),
+      snapshotFilename: snapshot.filename,
+    });
+    if (res.success) {
+      cloudActionMessage.value = `✓ Successfully restored! (${res.restored_files_count} files in ${res.duration_ms} ms). Reloading...`;
+      setTimeout(() => {
+        window.location.reload();
+      }, 1200);
+    } else {
+      cloudActionError.value = res.error || "Restore failed";
+    }
+  } catch (err: any) {
+    cloudActionError.value = String(err);
+  } finally {
+    cloudRestoringSnapshot.value = false;
+  }
+}
+
 // Storage paths state
 const storagePaths = ref<StoragePaths | null>(null);
 
@@ -191,18 +340,32 @@ async function loadSettingsAndPaths() {
     warningResetMessage.value = "";
     comfyuiUrl.value = config.comfyui_url || "http://127.0.0.1:8188";
     webuiUrl.value = config.webui_url || "http://127.0.0.1:7860";
-    comfyStatus.value = "unknown";
-    webuiStatus.value = "unknown";
+    void checkComfyConnection();
+    void checkWebuiConnection();
 
     storageBackend.value = config.storage_backend || "sqlite";
     remoteConnectionUrl.value = config.remote_connection_url || "";
     clientIdentifier.value = config.client_identifier || "local_client";
-    rootMappings.value = config.root_mappings || {};
-    pingStatus.value = "unknown";
-    pingLatency.value = null;
-    pingMessage.value = "";
+    rootMappings.value = config.root_mappings ? { ...config.root_mappings } : {};
     const lastSync = collaborationSync.getLastSyncTime();
     lastSyncDisplay.value = lastSync > 0 ? new Date(lastSync).toLocaleTimeString() : "ready";
+
+    const cb = config.cloud_backup;
+    if (cb) {
+      cloudProvider.value = cb.provider || "local_path";
+      cloudLocalPath.value = cb.local_path || "";
+      cloudWebdavEndpoint.value = cb.webdav_endpoint || "";
+      cloudWebdavUsername.value = cb.webdav_username || "";
+      cloudWebdavPassword.value = cb.webdav_password || "";
+      cloudS3Endpoint.value = cb.s3_endpoint || "";
+      cloudS3Bucket.value = cb.s3_bucket || "";
+      cloudS3Region.value = cb.s3_region || "auto";
+      cloudS3AccessKey.value = cb.s3_access_key || "";
+      cloudS3SecretKey.value = cb.s3_secret_key || "";
+      cloudS3Prefix.value = cb.s3_prefix || "backups/";
+      cloudAutoBackup.value = cb.auto_backup_enabled ?? false;
+      cloudAutoIntervalDays.value = cb.auto_backup_interval_days ?? 7;
+    }
 
     storagePaths.value = await getStoragePaths();
   } catch (e) {
@@ -294,6 +457,7 @@ async function saveSettings() {
       remote_connection_url: remoteConnectionUrl.value,
       client_identifier: clientIdentifier.value,
       root_mappings: rootMappings.value,
+      cloud_backup: getCurrentCloudConfig(),
     });
   } catch (e) {
     console.error("Failed to save config.json:", e);
@@ -381,6 +545,16 @@ async function saveSettings() {
             @click="activeTab = 'collaboration'"
           >
             <span aria-hidden="true">👥</span><span>{{ t.settings.tabs.collaboration || 'Team & Database' }}</span>
+          </button>
+          <button
+            type="button"
+            class="tab-btn"
+            :class="{ active: activeTab === 'cloudBackup' }"
+            role="tab"
+            :aria-selected="activeTab === 'cloudBackup'"
+            @click="activeTab = 'cloudBackup'; handleListSnapshots();"
+          >
+            <span aria-hidden="true">☁️</span><span>{{ t.settings.tabs.cloudBackup }}</span>
           </button>
           <button
             type="button"
@@ -847,6 +1021,277 @@ async function saveSettings() {
                 >
                   🚀 {{ t.settings.openMigrationWizard }}
                 </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab: Cloud Snapshot Backup & Restore -->
+          <div v-if="activeTab === 'cloudBackup'" class="settings-panel">
+            <div class="panel-heading">
+              <h4 class="panel-title">{{ t.settings.cloudBackup.title }}</h4>
+              <p class="panel-subtitle">{{ t.settings.cloudBackup.subtitle }}</p>
+            </div>
+
+            <!-- Provider Selection -->
+            <div class="setting-row">
+              <div class="row-info">
+                <span class="row-label">{{ t.settings.cloudBackup.provider }}</span>
+              </div>
+              <select v-model="cloudProvider" class="select-input">
+                <option value="local_path">{{ t.settings.cloudBackup.providerLocal }}</option>
+                <option value="webdav">{{ t.settings.cloudBackup.providerWebdav }}</option>
+                <option value="s3">{{ t.settings.cloudBackup.providerS3 }}</option>
+              </select>
+            </div>
+
+            <!-- Provider Options: Local / SMB / NFS -->
+            <div v-if="cloudProvider === 'local_path'" class="setting-row">
+              <div class="row-info">
+                <span class="row-label">{{ t.settings.cloudBackup.localPath }}</span>
+              </div>
+              <div style="display: flex; gap: 8px; width: 60%;">
+                <input
+                  v-model="cloudLocalPath"
+                  type="text"
+                  class="url-input"
+                  style="flex: 1;"
+                  placeholder="D:\Backups or \\nas\berry_backups"
+                />
+                <button type="button" class="btn-browse-mapping" @click="handleBrowseLocalBackupPath">
+                  {{ t.settings.cloudBackup.browse }}
+                </button>
+              </div>
+            </div>
+
+            <!-- Provider Options: WebDAV -->
+            <template v-if="cloudProvider === 'webdav'">
+              <div class="setting-row">
+                <div class="row-info">
+                  <span class="row-label">{{ t.settings.cloudBackup.webdavEndpoint }}</span>
+                </div>
+                <input
+                  v-model="cloudWebdavEndpoint"
+                  type="text"
+                  class="url-input"
+                  placeholder="https://nextcloud.example.com/remote.php/dav/files/user/backups/"
+                />
+              </div>
+              <div class="setting-row">
+                <div class="row-info">
+                  <span class="row-label">{{ t.settings.cloudBackup.webdavUser }}</span>
+                </div>
+                <input
+                  v-model="cloudWebdavUsername"
+                  type="text"
+                  class="url-input"
+                  placeholder="admin"
+                />
+              </div>
+              <div class="setting-row">
+                <div class="row-info">
+                  <span class="row-label">{{ t.settings.cloudBackup.webdavPassword }}</span>
+                </div>
+                <input
+                  v-model="cloudWebdavPassword"
+                  type="password"
+                  class="url-input"
+                  placeholder="••••••••"
+                />
+              </div>
+            </template>
+
+            <!-- Provider Options: S3 Compatible -->
+            <template v-if="cloudProvider === 's3'">
+              <div class="setting-row">
+                <div class="row-info">
+                  <span class="row-label">{{ t.settings.cloudBackup.s3Endpoint }}</span>
+                </div>
+                <input
+                  v-model="cloudS3Endpoint"
+                  type="text"
+                  class="url-input"
+                  placeholder="https://<account-id>.r2.cloudflarestorage.com or s3.amazonaws.com"
+                />
+              </div>
+              <div class="setting-row">
+                <div class="row-info">
+                  <span class="row-label">{{ t.settings.cloudBackup.s3Bucket }}</span>
+                </div>
+                <input
+                  v-model="cloudS3Bucket"
+                  type="text"
+                  class="url-input"
+                  placeholder="my-berry-backups"
+                />
+              </div>
+              <div class="setting-row">
+                <div class="row-info">
+                  <span class="row-label">{{ t.settings.cloudBackup.s3Region }}</span>
+                </div>
+                <input
+                  v-model="cloudS3Region"
+                  type="text"
+                  class="url-input"
+                  placeholder="auto or us-east-1"
+                />
+              </div>
+              <div class="setting-row">
+                <div class="row-info">
+                  <span class="row-label">{{ t.settings.cloudBackup.s3AccessKey }}</span>
+                </div>
+                <input
+                  v-model="cloudS3AccessKey"
+                  type="text"
+                  class="url-input"
+                  placeholder="Access Key ID"
+                />
+              </div>
+              <div class="setting-row">
+                <div class="row-info">
+                  <span class="row-label">{{ t.settings.cloudBackup.s3SecretKey }}</span>
+                </div>
+                <input
+                  v-model="cloudS3SecretKey"
+                  type="password"
+                  class="url-input"
+                  placeholder="Secret Access Key"
+                />
+              </div>
+              <div class="setting-row">
+                <div class="row-info">
+                  <span class="row-label">{{ t.settings.cloudBackup.s3Prefix }}</span>
+                </div>
+                <input
+                  v-model="cloudS3Prefix"
+                  type="text"
+                  class="url-input"
+                  placeholder="backups/"
+                />
+              </div>
+            </template>
+
+            <!-- Test Connection & Feedback -->
+            <div class="setting-row" style="align-items: center;">
+              <div class="row-info">
+                <button
+                  type="button"
+                  class="btn-browse-mapping"
+                  :disabled="cloudPingStatus === 'testing'"
+                  @click="handleTestCloudConnection"
+                >
+                  <span v-if="cloudPingStatus === 'testing'">⏳ Testing...</span>
+                  <span v-else>📡 {{ t.settings.cloudBackup.testConnection }}</span>
+                </button>
+              </div>
+              <div>
+                <span
+                  v-if="cloudPingStatus === 'success'"
+                  style="color: #4ade80; font-size: 0.85rem; font-weight: 500;"
+                >
+                  ✓ {{ cloudPingMessage }} ({{ cloudPingLatency }} ms)
+                </span>
+                <span
+                  v-else-if="cloudPingStatus === 'error'"
+                  style="color: #f87171; font-size: 0.85rem;"
+                >
+                  ✕ {{ cloudPingMessage }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Snapshot Creation Card -->
+            <div class="settings-subsection" style="margin-top: 20px; padding: 16px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+              <h5 class="subsection-title" style="margin-bottom: 8px; font-size: 0.95rem; color: #f1f5f9;">
+                📦 {{ t.settings.cloudBackup.createSnapshot }}
+              </h5>
+              <div style="display: flex; gap: 8px; margin-top: 8px;">
+                <input
+                  v-model="newSnapshotDescription"
+                  type="text"
+                  class="url-input"
+                  style="flex: 1;"
+                  :placeholder="t.settings.cloudBackup.snapshotDescription"
+                />
+                <button
+                  type="button"
+                  class="btn-add-mapping"
+                  :disabled="cloudCreatingSnapshot"
+                  @click="handleCreateSnapshot"
+                >
+                  <span v-if="cloudCreatingSnapshot">⏳ {{ t.settings.cloudBackup.creating }}</span>
+                  <span v-else>🚀 {{ t.settings.cloudBackup.createSnapshot }}</span>
+                </button>
+              </div>
+              <div v-if="cloudActionMessage" style="margin-top: 8px; color: #4ade80; font-size: 0.85rem;">
+                {{ cloudActionMessage }}
+              </div>
+              <div v-if="cloudActionError" style="margin-top: 8px; color: #f87171; font-size: 0.85rem;">
+                ✕ {{ cloudActionError }}
+              </div>
+            </div>
+
+            <!-- Remote Snapshots List -->
+            <div class="settings-subsection" style="margin-top: 20px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h5 class="subsection-title" style="margin: 0; font-size: 0.95rem; color: #f1f5f9;">
+                  ☁️ {{ t.settings.cloudBackup.snapshotsTitle }}
+                </h5>
+                <button
+                  type="button"
+                  class="btn-browse-mapping"
+                  :disabled="cloudSnapshotsLoading"
+                  @click="handleListSnapshots"
+                >
+                  {{ cloudSnapshotsLoading ? '...' : '↻ ' + t.settings.cloudBackup.refreshSnapshots }}
+                </button>
+              </div>
+
+              <div v-if="cloudSnapshotsLoading" style="padding: 20px; text-align: center; color: #94a3b8; font-size: 0.85rem;">
+                Loading snapshots...
+              </div>
+              <div v-else-if="cloudSnapshots.length === 0" style="padding: 20px; text-align: center; color: #94a3b8; font-size: 0.85rem;">
+                {{ t.settings.cloudBackup.noSnapshots }}
+              </div>
+              <div v-else class="mapping-table-wrapper" style="max-height: 220px; overflow-y: auto;">
+                <table class="root-mapping-table">
+                  <thead>
+                    <tr>
+                      <th>{{ t.settings.cloudBackup.colName }}</th>
+                      <th>{{ t.settings.cloudBackup.colDate }}</th>
+                      <th>{{ t.settings.cloudBackup.colSize }}</th>
+                      <th>{{ t.settings.cloudBackup.colFiles }}</th>
+                      <th style="text-align: right;">{{ t.settings.cloudBackup.colActions }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="item in cloudSnapshots" :key="item.filename">
+                      <td style="font-family: monospace; font-size: 0.8rem;" :title="item.description || item.filename">
+                        {{ item.filename }}
+                        <span v-if="item.description" style="display: block; color: #94a3b8; font-size: 0.72rem;">{{ item.description }}</span>
+                      </td>
+                      <td style="font-size: 0.78rem; white-space: nowrap;">
+                        {{ new Date(item.created_at * 1000).toLocaleString() }}
+                      </td>
+                      <td style="font-size: 0.78rem;">
+                        {{ (item.size_bytes / (1024 * 1024)).toFixed(2) }} MB
+                      </td>
+                      <td style="font-size: 0.78rem;">
+                        {{ item.file_count }}
+                      </td>
+                      <td style="text-align: right;">
+                        <button
+                          type="button"
+                          class="btn-browse-mapping"
+                          style="padding: 4px 10px; font-size: 0.75rem; border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;"
+                          :disabled="cloudRestoringSnapshot"
+                          @click="handleRestoreSnapshot(item)"
+                        >
+                          {{ cloudRestoringSnapshot ? t.settings.cloudBackup.restoring : t.settings.cloudBackup.restore }}
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>

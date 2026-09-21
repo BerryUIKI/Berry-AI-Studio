@@ -2434,6 +2434,8 @@ pub struct AppConfig {
     pub client_identifier: String,
     #[serde(default)]
     pub root_mappings: HashMap<String, String>,
+    #[serde(default)]
+    pub cloud_backup: berry_domain::CloudBackupConfig,
 }
 
 fn default_comfyui_url() -> String {
@@ -2503,6 +2505,7 @@ impl Default for AppConfig {
             remote_connection_url: String::new(),
             client_identifier: default_client_identifier(),
             root_mappings: HashMap::new(),
+            cloud_backup: berry_domain::CloudBackupConfig::default(),
         }
     }
 }
@@ -3434,6 +3437,71 @@ pub fn send_to_webui(
         .map_err(|e| format!("Failed to parse SD WebUI response: {e}"))?;
 
     Ok(json)
+}
+
+/// Test connectivity and latency to the configured cloud backup provider.
+#[tauri::command]
+pub fn cloud_backup_test_connection(
+    config: berry_domain::CloudBackupConfig,
+) -> Result<berry_domain::CloudPingResult, String> {
+    Ok(crate::cloud_backup::test_cloud_connection(&config))
+}
+
+/// Create a full point-in-time library snapshot archive and upload to cloud storage.
+#[tauri::command]
+pub async fn cloud_backup_create_snapshot(
+    config: berry_domain::CloudBackupConfig,
+    description: Option<String>,
+    app_handle: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<berry_domain::CloudBackupResult, String> {
+    let data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {e}"))?;
+    let db_guard = db(&state)?;
+    crate::cloud_backup::create_cloud_snapshot(&db_guard, &config, &data_dir, description)
+}
+
+/// List all available snapshot archives from the cloud storage backend.
+#[tauri::command]
+pub fn cloud_backup_list_snapshots(
+    config: berry_domain::CloudBackupConfig,
+) -> Result<Vec<berry_domain::CloudSnapshotMeta>, String> {
+    crate::cloud_backup::list_cloud_snapshots(&config)
+}
+
+/// Restore a cloud snapshot into the active SQLite database.
+#[tauri::command]
+pub async fn cloud_backup_restore_snapshot(
+    config: berry_domain::CloudBackupConfig,
+    snapshot_filename: String,
+    app_handle: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<berry_domain::CloudRestoreResult, String> {
+    let data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {e}"))?;
+    let active_db_path = data_dir.join("berry.db");
+
+    // Release database lock during file operations
+    drop(db(&state)?);
+
+    let res = crate::cloud_backup::restore_cloud_snapshot(&active_db_path, &config, &snapshot_filename)?;
+
+    // Reconnect database in state
+    match berry_storage::Database::connect(&active_db_path) {
+        Ok(new_db) => {
+            let mut state_db = state.db.lock().map_err(|e| format!("Lock error: {e}"))?;
+            *state_db = new_db;
+        }
+        Err(e) => {
+            return Err(format!("Restored but failed to reconnect database: {e}"));
+        }
+    }
+
+    Ok(res)
 }
 
 #[cfg(test)]
