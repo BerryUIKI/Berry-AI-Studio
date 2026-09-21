@@ -37,6 +37,9 @@ const filenameTemplate = ref<string>("{name}");
 const asZip = ref<boolean>(true);
 const destinationPath = ref<string>("");
 
+const exportHtmlShowcase = ref<boolean>(false);
+const htmlTitle = ref<string>("");
+
 const exporting = ref<boolean>(false);
 const progress = ref<ExportProgressEvent | null>(null);
 const summary = ref<ExportSummary | null>(null);
@@ -158,6 +161,8 @@ async function handleStartExport() {
     destination_path: destinationPath.value.trim(),
     as_zip: asZip.value,
     max_edge,
+    export_html_showcase: exportHtmlShowcase.value,
+    html_title: htmlTitle.value.trim() || undefined,
   };
 
   try {
@@ -377,6 +382,31 @@ async function handleOpenOutputFolder() {
                 {{ t.exportModal.browseDestination }}
               </button>
             </div>
+          </div>
+        </div>
+
+        <!-- 5. Standalone HTML Showcase Album -->
+        <div class="section-card">
+          <h4 class="section-title">🌐 {{ t.exportModal.htmlShowcaseSection }}</h4>
+          <div class="form-group">
+            <label class="checkbox-label">
+              <input v-model="exportHtmlShowcase" type="checkbox" :disabled="exporting" />
+              <span>{{ t.exportModal.generateHtmlShowcase }}</span>
+            </label>
+            <p class="section-desc" style="margin-top: 6px; font-size: 0.8rem; color: #94a3b8; line-height: 1.4;">
+              {{ t.exportModal.htmlShowcaseDesc }}
+            </p>
+          </div>
+
+          <div v-if="exportHtmlShowcase" class="form-group" style="margin-top: 10px;">
+            <label class="form-label">{{ t.exportModal.htmlShowcaseTitle }}</label>
+            <input
+              v-model="htmlTitle"
+              type="text"
+              class="form-input"
+              :placeholder="t.exportModal.defaultAlbumTitle"
+              :disabled="exporting"
+            />
           </div>
         </div>
 

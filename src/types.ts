@@ -164,6 +164,8 @@ export interface ExportOptions {
   destination_path: string;
   as_zip: boolean;
   max_edge?: number | null;
+  export_html_showcase?: boolean;
+  html_title?: string;
 }
 
 export interface ExportProgressEvent {
