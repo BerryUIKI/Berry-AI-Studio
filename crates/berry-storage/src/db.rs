@@ -224,6 +224,14 @@ impl Database {
         Ok(())
     }
 
+    /// Export current SQLite library into a standalone SQL migration script for central MySQL or PostgreSQL databases.
+    pub fn export_central_migration_sql(
+        &self,
+        options: &berry_domain::MigrationOptions,
+    ) -> Result<berry_domain::MigrationSummary, DatabaseError> {
+        crate::migration_export::export_migration_sql(&self.conn, options)
+    }
+
     /// Retrieve database storage and table statistics.
     pub fn get_database_stats(&self) -> Result<DatabaseStats, DatabaseError> {
         let file_count: i64 = self
