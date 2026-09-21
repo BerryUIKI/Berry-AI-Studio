@@ -1,5 +1,6 @@
 mod commands;
 pub mod cloud_backup;
+pub mod cloud_sync;
 mod watcher;
 
 use std::sync::atomic::AtomicU64;
@@ -21,6 +22,8 @@ pub struct AppState {
     pub watcher: Mutex<Option<watcher::LibraryWatcher>>,
     /// Monotonic generation used to cancel stale visible and look-ahead work.
     pub thumbnail_generation: Arc<AtomicU64>,
+    /// Incremental remote asset mirroring and delta sync state.
+    pub cloud_sync: Arc<Mutex<cloud_sync::CloudSyncState>>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -59,6 +62,7 @@ pub fn run() {
                 clip: Mutex::new(None),
                 watcher: Mutex::new(filesystem_watcher),
                 thumbnail_generation: Arc::new(AtomicU64::new(0)),
+                cloud_sync: Arc::new(Mutex::new(cloud_sync::CloudSyncState::default())),
             });
             let thumbnail_data_dir = data_dir.clone();
             let thumbnail_database_path = database_path.clone();
@@ -213,6 +217,10 @@ pub fn run() {
             commands::cloud_backup_create_snapshot,
             commands::cloud_backup_list_snapshots,
             commands::cloud_backup_restore_snapshot,
+            commands::cloud_sync_start,
+            commands::cloud_sync_cancel,
+            commands::cloud_sync_get_progress,
+            commands::cloud_sync_get_summary,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

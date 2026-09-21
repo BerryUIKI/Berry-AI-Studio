@@ -235,6 +235,46 @@ export interface CloudRestoreResult {
   error?: string | null;
 }
 
+export type CloudSyncDirection = 'upload_to_remote' | 'download_from_remote';
+export type CloudSyncStrategy = 'fast_fingerprint' | 'sha256_checksum';
+export type CloudSyncPhase = 'idle' | 'scanning' | 'syncing' | 'completed' | 'cancelled' | 'failed';
+
+export interface CloudSyncOptions {
+  direction?: CloudSyncDirection;
+  strategy?: CloudSyncStrategy;
+  concurrency?: number;
+  bandwidth_limit_kbs?: number | null;
+  dry_run?: boolean;
+  remote_prefix?: string;
+  folder_ids?: number[] | null;
+}
+
+export interface CloudSyncProgress {
+  phase: CloudSyncPhase;
+  total_files: number;
+  completed_files: number;
+  skipped_files: number;
+  failed_files: number;
+  total_bytes: number;
+  transferred_bytes: number;
+  current_file?: string | null;
+  speed_bytes_per_sec: number;
+  eta_seconds?: number | null;
+  error?: string | null;
+}
+
+export interface CloudSyncResult {
+  success: boolean;
+  total_files: number;
+  synced_files: number;
+  skipped_files: number;
+  failed_files: number;
+  transferred_bytes: number;
+  duration_ms: number;
+  dry_run: boolean;
+  errors: string[];
+}
+
 export interface FilePage {
   items: ImageFile[];
   total: number;

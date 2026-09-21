@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from "vue";
+import { onMounted, onUnmounted, ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
   AppInfo,
   CloudBackupConfig,
@@ -9,6 +10,9 @@ import type {
   CloudRestoreResult,
   CloudSnapshotMeta,
   CloudStorageProvider,
+  CloudSyncProgress,
+  CloudSyncResult,
+  CloudSyncStrategy,
 } from "../types";
 import {
   clearThumbnailCache,
@@ -302,6 +306,64 @@ async function handleRestoreSnapshot(snapshot: CloudSnapshotMeta) {
   }
 }
 
+// Cloud Media Delta Sync state
+const syncStrategy = ref<CloudSyncStrategy>("fast_fingerprint");
+const syncConcurrency = ref<number>(4);
+const syncBandwidthLimit = ref<number>(0);
+const syncDryRun = ref<boolean>(false);
+const syncRemotePrefix = ref<string>("media/");
+const syncProgress = ref<CloudSyncProgress | null>(null);
+const syncSummary = ref<CloudSyncResult | null>(null);
+const syncStarting = ref<boolean>(false);
+let unlistenSyncProgress: UnlistenFn | null = null;
+
+async function handleStartCloudSync() {
+  syncStarting.value = true;
+  syncSummary.value = null;
+  try {
+    await invoke("cloud_sync_start", {
+      config: getCurrentCloudConfig(),
+      options: {
+        strategy: syncStrategy.value,
+        concurrency: syncConcurrency.value,
+        bandwidth_limit_kbs: syncBandwidthLimit.value > 0 ? syncBandwidthLimit.value : null,
+        dry_run: syncDryRun.value,
+        remote_prefix: syncRemotePrefix.value,
+      },
+    });
+    await fetchSyncProgress();
+  } catch (err: any) {
+    window.alert(String(err));
+  } finally {
+    syncStarting.value = false;
+  }
+}
+
+async function handleCancelCloudSync() {
+  try {
+    await invoke("cloud_sync_cancel");
+    await fetchSyncProgress();
+  } catch (err: any) {
+    console.error("Failed to cancel cloud sync:", err);
+  }
+}
+
+async function fetchSyncProgress() {
+  try {
+    syncProgress.value = await invoke<CloudSyncProgress>("cloud_sync_get_progress");
+    if (
+      syncProgress.value &&
+      (syncProgress.value.phase === "completed" ||
+        syncProgress.value.phase === "cancelled" ||
+        syncProgress.value.phase === "failed")
+    ) {
+      syncSummary.value = await invoke<CloudSyncResult | null>("cloud_sync_get_summary");
+    }
+  } catch (err: any) {
+    console.error("Failed to fetch cloud sync progress:", err);
+  }
+}
+
 // Storage paths state
 const storagePaths = ref<StoragePaths | null>(null);
 
@@ -417,10 +479,32 @@ watch(
   },
 );
 
-onMounted(() => {
+onMounted(async () => {
   if (props.show) {
     void loadSettingsAndPaths();
     void loadCacheStats();
+    void fetchSyncProgress();
+  }
+  try {
+    unlistenSyncProgress = await listen<CloudSyncProgress>("cloud-sync://progress", (event) => {
+      syncProgress.value = event.payload;
+      if (
+        event.payload.phase === "completed" ||
+        event.payload.phase === "cancelled" ||
+        event.payload.phase === "failed"
+      ) {
+        void fetchSyncProgress();
+      }
+    });
+  } catch (e) {
+    console.error("Failed to register cloud-sync event listener:", e);
+  }
+});
+
+onUnmounted(() => {
+  if (unlistenSyncProgress) {
+    unlistenSyncProgress();
+    unlistenSyncProgress = null;
   }
 });
 
@@ -1292,6 +1376,173 @@ async function saveSettings() {
                     </tr>
                   </tbody>
                 </table>
+              </div>
+            </div>
+
+            <!-- Subsection: Incremental Media Mirroring & Delta Sync -->
+            <div class="settings-subsection" style="margin-top: 24px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.08);">
+              <div class="panel-heading" style="margin-bottom: 12px;">
+                <h5 class="subsection-title" style="font-size: 1rem; color: #f1f5f9; margin-bottom: 4px;">
+                  🔄 {{ t.settings.cloudBackup.mediaSyncTitle }}
+                </h5>
+                <p class="panel-subtitle" style="font-size: 0.8rem; color: #94a3b8; margin: 0;">
+                  {{ t.settings.cloudBackup.mediaSyncSubtitle }}
+                </p>
+              </div>
+
+              <!-- Strategy & Concurrency -->
+              <div class="setting-row">
+                <div class="row-info">
+                  <span class="row-label">{{ t.settings.cloudBackup.syncStrategy }}</span>
+                </div>
+                <select v-model="syncStrategy" class="select-input">
+                  <option value="fast_fingerprint">{{ t.settings.cloudBackup.strategyFast }}</option>
+                  <option value="sha256_checksum">{{ t.settings.cloudBackup.strategySha256 }}</option>
+                </select>
+              </div>
+
+              <div class="setting-row">
+                <div class="row-info">
+                  <span class="row-label">{{ t.settings.cloudBackup.concurrency }}</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <input
+                    v-model.number="syncConcurrency"
+                    type="range"
+                    min="1"
+                    max="16"
+                    step="1"
+                    style="width: 140px;"
+                  />
+                  <span style="font-size: 0.85rem; color: #cbd5e1; min-width: 32px;">{{ syncConcurrency }}</span>
+                </div>
+              </div>
+
+              <!-- Bandwidth limit & Remote Prefix -->
+              <div class="setting-row">
+                <div class="row-info">
+                  <span class="row-label">{{ t.settings.cloudBackup.bandwidthLimit }}</span>
+                  <span class="row-desc">{{ t.settings.cloudBackup.bandwidthLimitDesc }}</span>
+                </div>
+                <input
+                  v-model.number="syncBandwidthLimit"
+                  type="number"
+                  min="0"
+                  step="128"
+                  class="url-input"
+                  style="width: 120px;"
+                  placeholder="0"
+                />
+              </div>
+
+              <div class="setting-row">
+                <div class="row-info">
+                  <span class="row-label">{{ t.settings.cloudBackup.remoteMediaPrefix }}</span>
+                </div>
+                <input
+                  v-model="syncRemotePrefix"
+                  type="text"
+                  class="url-input"
+                  style="width: 200px;"
+                  placeholder="media/"
+                />
+              </div>
+
+              <div class="setting-row">
+                <div class="row-info">
+                  <span class="row-label">{{ t.settings.cloudBackup.dryRun }}</span>
+                </div>
+                <input
+                  v-model="syncDryRun"
+                  type="checkbox"
+                  style="width: 18px; height: 18px; accent-color: var(--accent-color, #0284c7);"
+                />
+              </div>
+
+              <!-- Sync Action & Live Progress -->
+              <div style="margin-top: 14px; padding: 14px; background: rgba(0,0,0,0.25); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <button
+                    v-if="!syncProgress || syncProgress.phase === 'idle' || syncProgress.phase === 'completed' || syncProgress.phase === 'cancelled' || syncProgress.phase === 'failed'"
+                    type="button"
+                    class="btn-add-mapping"
+                    :disabled="syncStarting"
+                    @click="handleStartCloudSync"
+                  >
+                    🚀 {{ syncStarting ? t.settings.cloudBackup.syncing : t.settings.cloudBackup.startSync }}
+                  </button>
+                  <button
+                    v-else
+                    type="button"
+                    class="btn-browse-mapping"
+                    style="border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;"
+                    @click="handleCancelCloudSync"
+                  >
+                    ⏹ {{ t.settings.cloudBackup.cancelSync }}
+                  </button>
+
+                  <div v-if="syncProgress && syncProgress.phase !== 'idle'">
+                    <span
+                      :style="{
+                        color:
+                          syncProgress.phase === 'completed'
+                            ? '#4ade80'
+                            : syncProgress.phase === 'syncing' || syncProgress.phase === 'scanning'
+                            ? '#38bdf8'
+                            : syncProgress.phase === 'cancelled'
+                            ? '#fbbf24'
+                            : '#f87171',
+                        fontSize: '0.85rem',
+                        fontWeight: '500',
+                      }"
+                    >
+                      ● {{ syncProgress.phase.toUpperCase() }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Progress Bar & Details -->
+                <div v-if="syncProgress && syncProgress.phase !== 'idle'" style="margin-top: 12px;">
+                  <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                    <div
+                      :style="{
+                        width: `${syncProgress.total_files > 0 ? Math.min(100, Math.round(((syncProgress.completed_files + syncProgress.skipped_files + syncProgress.failed_files) / syncProgress.total_files) * 100)) : 0}%`,
+                        height: '100%',
+                        background: 'var(--accent-color, #0284c7)',
+                        transition: 'width 0.2s ease',
+                      }"
+                    ></div>
+                  </div>
+
+                  <div style="display: flex; justify-content: space-between; font-size: 0.78rem; color: #94a3b8; margin-top: 8px;">
+                    <span>
+                      {{
+                        t.settings.cloudBackup.progressFiles
+                          .replace('{synced}', String(syncProgress.completed_files))
+                          .replace('{total}', String(syncProgress.total_files))
+                          .replace('{skipped}', String(syncProgress.skipped_files))
+                          .replace('{failed}', String(syncProgress.failed_files))
+                      }}
+                    </span>
+                    <span v-if="syncProgress.phase === 'syncing'">
+                      {{
+                        t.settings.cloudBackup.progressSpeed
+                          .replace('{speed}', `${(syncProgress.speed_bytes_per_sec / (1024 * 1024)).toFixed(2)} MB/s`)
+                          .replace('{eta}', syncProgress.eta_seconds != null ? `${syncProgress.eta_seconds}s` : '--')
+                      }}
+                    </span>
+                  </div>
+
+                  <div v-if="syncProgress.current_file" style="font-size: 0.75rem; color: #64748b; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    {{ t.settings.cloudBackup.progressCurrent.replace('{file}', syncProgress.current_file) }}
+                  </div>
+
+                  <!-- Summary Box -->
+                  <div v-if="syncSummary" style="margin-top: 10px; padding: 8px 12px; background: rgba(255,255,255,0.03); border-radius: 6px; font-size: 0.8rem; color: #e2e8f0;">
+                    ✓ {{ syncSummary.dry_run ? '[Dry Run] ' : '' }}{{ t.settings.cloudBackup.syncCompleted }}:
+                    {{ syncSummary.synced_files }} synced, {{ syncSummary.skipped_files }} skipped, {{ syncSummary.failed_files }} failed ({{ (syncSummary.transferred_bytes / (1024 * 1024)).toFixed(2) }} MB in {{ (syncSummary.duration_ms / 1000).toFixed(1) }}s).
+                  </div>
+                </div>
               </div>
             </div>
           </div>
