@@ -355,7 +355,7 @@ checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
 
 [[package]]
 name = "berry-ai-studio"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "base64 0.22.1",
  "berry-clip",
@@ -382,7 +382,7 @@ dependencies = [
 
 [[package]]
 name = "berry-clip"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "berry-domain",
  "image",
@@ -396,7 +396,7 @@ dependencies = [
 
 [[package]]
 name = "berry-domain"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -404,7 +404,7 @@ dependencies = [
 
 [[package]]
 name = "berry-metadata"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "berry-domain",
  "kamadak-exif",
@@ -413,7 +413,7 @@ dependencies = [
 
 [[package]]
 name = "berry-scan"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "berry-domain",
  "berry-metadata",
@@ -431,7 +431,7 @@ dependencies = [
 
 [[package]]
 name = "berry-storage"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "berry-domain",
  "rusqlite",
@@ -444,7 +444,7 @@ dependencies = [
 
 [[package]]
 name = "berry-tagger"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "berry-domain",
  "csv",

@@ -15,8 +15,8 @@ use berry_domain::{
     CleanupQueueItem, CursorFilePage, DatabasePingResult, DatabaseStats, DetectedLora,
     ExportOptions, ExportSummary, FilePage, FileSortField, Folder, ImageFile, LoraModel,
     MigrationOptions, MigrationSummary, ModelCacheEntry, MutationResult, NormalizedPath,
-    PageCursor, PathResolver, PipelineDetectedPath, PromptStackCandidate, PromptStat,
-    SearchCriteria, SimilarityMatch, SortDirection, StackSummary, StorageRoot, Tag,
+    PathResolver, PipelineDetectedPath, PromptStackCandidate, PromptStat, SearchCriteria,
+    SimilarityMatch, SortDirection, StackSummary, StorageRoot, Tag,
 };
 use berry_scan::{execute_batch_export, ScanStats, Scanner};
 use berry_storage::Database;
@@ -314,6 +314,7 @@ fn criteria_with_query_context(query: &str, context: SearchCriteria) -> SearchCr
 #[cfg(test)]
 mod search_context_tests {
     use super::*;
+    use berry_domain::PageCursor;
 
     #[test]
     fn query_context_preserves_navigation_scope_and_paging() {

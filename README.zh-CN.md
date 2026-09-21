@@ -4,9 +4,9 @@
 
 **[English](README.md)** | **[简体中文](README.zh-CN.md)** | **[繁體中文](README.zh-TW.md)** | **[日本語](README.ja.md)**
 
-[![Website](https://img.shields.io/badge/官网主页-GitHub%20Pages-12b5cb.svg)](https://berryuiki.github.io/Berry-AI-Studio/)
-[![Release](https://img.shields.io/badge/版本-v0.2.1-blue.svg)](https://github.com/BerryUIKI/Berry-AI-Studio/releases/tag/v0.2.1)
-[![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
+[![Website](https://img.shields.io/badge/网站-GitHub%20Pages-12b5cb.svg)](https://berryuiki.github.io/Berry-AI-Studio/)
+[![Release](https://img.shields.io/badge/版本-v0.3.0-blue.svg)](https://github.com/BerryUIKI/Berry-AI-Studio/releases/tag/v0.3.0)
+[![License](https://img.shields.io/badge/协议-AGPL--3.0-blue.svg)](LICENSE)
 [![Tauri](https://img.shields.io/badge/Tauri-2-24c8db)](https://tauri.app)
 [![Rust](https://img.shields.io/badge/Rust-1.7+-orange)](https://www.rust-lang.org)
 [![Vue](https://img.shields.io/badge/Vue-3-42b883)](https://vuejs.org)
