@@ -23,6 +23,7 @@ const emit = defineEmits<{
   (e: "copy"): void;
   (e: "trashSelected"): void;
   (e: "trash"): void;
+  (e: "exportSelected"): void;
   (e: "cullSelectedDrafts"): void;
   (e: "cullDrafts"): void;
   (e: "setRating", rating: number | null): void;
@@ -218,6 +219,16 @@ function onSetRating(rating: number | null) {
           @click="emit('copySelected')"
         >
           {{ t.batch.copy }}
+        </button>
+
+        <!-- Export Selected -->
+        <button
+          type="button"
+          class="action-btn export-btn"
+          title="Export, transcode and package selected files"
+          @click="emit('exportSelected')"
+        >
+          {{ t.batch.export }}
         </button>
 
         <!-- Cull Lower-Rated Drafts in Stacks -->

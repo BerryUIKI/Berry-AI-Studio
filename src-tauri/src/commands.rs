@@ -12,13 +12,13 @@ use std::sync::MutexGuard;
 use berry_clip::{ClipEngine, ClipModelInfo};
 use berry_domain::{
     plan_prompt_stacks, Album, ChangeLogEntry, ChangeLogSyncQuery, CheckpointModelStat,
-    CleanupQueueItem, CursorFilePage, DatabasePingResult, DatabaseStats, DetectedLora, FilePage,
-    FileSortField, Folder, ImageFile, LoraModel, MigrationOptions, MigrationSummary,
-    ModelCacheEntry, MutationResult, NormalizedPath, PathResolver, PipelineDetectedPath,
-    PromptStackCandidate, PromptStat, SearchCriteria, SimilarityMatch, SortDirection, StackSummary,
-    StorageRoot, Tag,
+    CleanupQueueItem, CursorFilePage, DatabasePingResult, DatabaseStats, DetectedLora,
+    ExportOptions, ExportSummary, FilePage, FileSortField, Folder, ImageFile, LoraModel,
+    MigrationOptions, MigrationSummary, ModelCacheEntry, MutationResult, NormalizedPath,
+    PathResolver, PipelineDetectedPath, PromptStackCandidate, PromptStat, SearchCriteria,
+    SimilarityMatch, SortDirection, StackSummary, StorageRoot, Tag,
 };
-use berry_scan::{ScanStats, Scanner};
+use berry_scan::{execute_batch_export, ScanStats, Scanner};
 use berry_storage::Database;
 use berry_tagger::{ModelInfo, TagPrediction, TaggerConfig, Wd14Tagger};
 use serde::{Deserialize, Serialize};
@@ -1356,6 +1356,20 @@ pub fn export_sqlite_to_central_migration(
     db(&state)?
         .export_central_migration_sql(&options)
         .map_err(|e| e.to_string())
+}
+
+/// Batch export, transcode, sanitize, and package selected media files.
+#[tauri::command]
+pub async fn export_files_batch(
+    options: ExportOptions,
+    app_handle: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<ExportSummary, String> {
+    let db_guard = db(&state)?;
+    let summary = execute_batch_export(&db_guard, &options, move |progress| {
+        let _ = app_handle.emit("berry://export-progress", progress);
+    });
+    Ok(summary)
 }
 
 /// Open an external URL in the system's default browser.
