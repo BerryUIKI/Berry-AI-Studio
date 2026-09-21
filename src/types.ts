@@ -144,6 +144,44 @@ export interface MigrationSummary {
   duration_ms: number;
 }
 
+export type ExportFormat = "original" | "webp" | "jpeg" | "png";
+
+export type MetadataPrivacyMode =
+  | "keep_all"
+  | "strip_prompt_only"
+  | "strip_all_ai_metadata"
+  | "strip_all";
+
+export type ExportSidecar = "none" | "text_prompt" | "json_metadata";
+
+export interface ExportOptions {
+  file_ids: number[];
+  format: ExportFormat;
+  quality: number;
+  privacy: MetadataPrivacyMode;
+  sidecar: ExportSidecar;
+  filename_template: string;
+  destination_path: string;
+  as_zip: boolean;
+  max_edge?: number | null;
+}
+
+export interface ExportProgressEvent {
+  current: number;
+  total: number;
+  current_filename: string;
+}
+
+export interface ExportSummary {
+  success: boolean;
+  total_exported: number;
+  total_failed: number;
+  total_bytes_written: number;
+  duration_ms: number;
+  output_path: string;
+  errors: string[];
+}
+
 export interface FilePage {
   items: ImageFile[];
   total: number;

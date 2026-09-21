@@ -6,9 +6,13 @@
 //! `berry-metadata`), persist rows through `berry-storage`, and drop rows for
 //! files that disappeared from disk. The Tauri shell only wires this up.
 
+pub mod export;
 pub mod scanner;
 pub mod thumbnail;
 
+pub use export::{
+    execute_batch_export, format_export_filename, sanitize_filename_part, ProcessedExportItem,
+};
 pub use scanner::{ScanError, ScanProgress, ScanStats, Scanner};
 pub use thumbnail::{
     batch_generate_thumbnails, clear_thumbnail_cache, ensure_thumbnail, get_thumbnail_cache_stats,

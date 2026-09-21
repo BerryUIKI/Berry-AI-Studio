@@ -20,6 +20,7 @@ import type {
   SortDirection,
   Tag,
   StackSummary,
+  ExportSummary,
 } from "./types";
 import { getFileName } from "./utils/image";
 import TitleBar from "./components/TitleBar.vue";
@@ -75,6 +76,7 @@ const StackMergeWarningModal = defineAsyncComponent(
 const CullDraftsModal = defineAsyncComponent(
   () => import("./components/CullDraftsModal.vue"),
 );
+const ExportModal = defineAsyncComponent(() => import("./components/ExportModal.vue"));
 
 const info = ref<AppInfo | null>(null);
 const folders = ref<Folder[]>([]);
@@ -137,6 +139,8 @@ const stackMergeWarningOpen = ref(false);
 const cullModalOpen = ref(false);
 const cullHeroes = ref<ImageFile[]>([]);
 const cullDrafts = ref<ImageFile[]>([]);
+const exportModalOpen = ref(false);
+const exportFilesList = ref<ImageFile[]>([]);
 
 interface StackMergePlan {
   targetStackId: string;
@@ -1194,6 +1198,27 @@ async function onConfirmCull(draftPaths: string[]) {
   }
 }
 
+function handleOpenExportModal(targetFiles?: ImageFile[]) {
+  if (targetFiles && targetFiles.length > 0) {
+    exportFilesList.value = targetFiles;
+  } else if (selectedFilesList.value.length > 0) {
+    exportFilesList.value = selectedFilesList.value;
+  } else if (selectedFile.value) {
+    exportFilesList.value = [selectedFile.value];
+  } else if (files.value.length > 0) {
+    exportFilesList.value = Array.from(files.value);
+  } else {
+    exportFilesList.value = [];
+  }
+  if (exportFilesList.value.length > 0) {
+    exportModalOpen.value = true;
+  }
+}
+
+function onExportCompleted(_summary: ExportSummary) {
+  // Export completed callback
+}
+
 async function onOnboardingComplete() {
   // Immediately prevent any re-opening — this is the critical guard
   onboardingDismissedThisSession = true;
@@ -1794,6 +1819,7 @@ function onResetZoom() {
           @open-settings="settingsModalOpen = true"
           @select-all="onSelectAll"
           @clear-selection="onClearSelection"
+          @batch-export="handleOpenExportModal()"
           @batch-album="onBatchAddToAlbum"
           @toggle-sidebar="sidebarOpen = !sidebarOpen"
           @toggle-inspector="inspectorOpen = !inspectorOpen"
@@ -2070,6 +2096,7 @@ function onResetZoom() {
             @copy="onBatchCopy"
             @trash="onBatchTrash"
             @cull-drafts="onBatchCullDrafts"
+            @export-selected="handleOpenExportModal()"
           />
         </div>
       </main>
@@ -2269,6 +2296,14 @@ function onResetZoom() {
       :drafts="cullDrafts"
       @close="cullModalOpen = false"
       @confirm="onConfirmCull"
+    />
+
+    <ExportModal
+      v-if="exportModalOpen"
+      :show="exportModalOpen"
+      :files="exportFilesList"
+      @close="exportModalOpen = false"
+      @exported="onExportCompleted"
     />
   </div>
 </template>

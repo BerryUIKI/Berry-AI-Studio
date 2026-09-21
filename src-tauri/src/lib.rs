@@ -152,6 +152,7 @@ pub fn run() {
             commands::set_file_rating_occ,
             commands::test_database_connection,
             commands::export_sqlite_to_central_migration,
+            commands::export_files_batch,
             commands::open_external_url,
             commands::get_or_create_thumbnail,
             commands::batch_generate_thumbnails,

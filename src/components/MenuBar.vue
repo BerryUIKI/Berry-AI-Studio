@@ -26,6 +26,7 @@ const emit = defineEmits<{
   batchTrash: [];
   batchMove: [];
   batchCopy: [];
+  batchExport: [];
   batchRate: [rating: number | null];
   setViewMode: [mode: "grid" | "table"];
   toggleSidebar: [];
@@ -192,6 +193,11 @@ onUnmounted(() => {
         <button type="button" class="dropdown-item" @click="handleAction(() => emit('batchCopy'))">
           <span class="item-icon">📋</span>
           <span class="item-title">{{ t.menu.batchCopy }}</span>
+        </button>
+        <button type="button" class="dropdown-item" @click="handleAction(() => emit('batchExport'))">
+          <span class="item-icon">📤</span>
+          <span class="item-title">{{ t.batch.export }}</span>
+          <span class="item-key">Ctrl+E</span>
         </button>
         <div class="menu-divider"></div>
         <button type="button" class="dropdown-item danger" @click="handleAction(() => emit('batchTrash'))">

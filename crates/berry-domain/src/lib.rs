@@ -8,6 +8,7 @@ mod album;
 mod checkpoint;
 mod collaboration;
 mod database_stats;
+mod export;
 mod extracted_metadata;
 mod filesystem_change;
 mod folder;
@@ -31,6 +32,10 @@ pub use collaboration::{
     MutationResult,
 };
 pub use database_stats::DatabaseStats;
+pub use export::{
+    ExportFormat, ExportOptions, ExportProgressEvent, ExportSidecar, ExportSummary,
+    MetadataPrivacyMode,
+};
 pub use extracted_metadata::ExtractedMetadata;
 pub use filesystem_change::FilesystemChange;
 pub use folder::Folder;
