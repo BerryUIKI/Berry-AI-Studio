@@ -70,6 +70,211 @@ export interface ImageFile {
   stack_order?: number;
 }
 
+export interface PageCursor {
+  sort_value: string;
+  id: number;
+}
+
+export interface CursorFilePage {
+  items: ImageFile[];
+  total: number;
+  next_cursor?: PageCursor | null;
+  prev_cursor?: PageCursor | null;
+  has_more: boolean;
+}
+
+export interface StorageRoot {
+  root_uuid: string;
+  display_name: string;
+  root_type: string;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface NormalizedPath {
+  root_uuid: string;
+  relative_path: string;
+}
+
+export interface ChangeLogEntry {
+  id: number;
+  event_type: string;
+  entity_id: number;
+  secondary_id?: string | null;
+  client_id: string;
+  payload?: string | null;
+  created_at: number;
+}
+
+export interface MutationResult {
+  success: boolean;
+  current_version: number;
+  rows_affected: number;
+  conflict_detected: boolean;
+}
+
+export interface ChangeLogSyncQuery {
+  after_id: number;
+  exclude_client_id?: string | null;
+  limit: number;
+}
+
+export interface DatabasePingResult {
+  success: boolean;
+  latency_ms: number;
+  backend: string;
+  message: string;
+}
+
+export interface MigrationOptions {
+  target_dialect: string;
+  target_root_uuid: string;
+  destination: string;
+}
+
+export interface MigrationSummary {
+  success: boolean;
+  target_dialect: string;
+  total_files: number;
+  total_albums: number;
+  total_tags: number;
+  total_tag_associations: number;
+  output_path?: string | null;
+  error_message?: string | null;
+  duration_ms: number;
+}
+
+export type ExportFormat = "original" | "webp" | "jpeg" | "png";
+
+export type MetadataPrivacyMode =
+  | "keep_all"
+  | "strip_prompt_only"
+  | "strip_all_ai_metadata"
+  | "strip_all";
+
+export type ExportSidecar = "none" | "text_prompt" | "json_metadata";
+
+export interface ExportOptions {
+  file_ids: number[];
+  format: ExportFormat;
+  quality: number;
+  privacy: MetadataPrivacyMode;
+  sidecar: ExportSidecar;
+  filename_template: string;
+  destination_path: string;
+  as_zip: boolean;
+  max_edge?: number | null;
+  export_html_showcase?: boolean;
+  html_title?: string;
+}
+
+export interface ExportProgressEvent {
+  current: number;
+  total: number;
+  current_filename: string;
+}
+
+export interface ExportSummary {
+  success: boolean;
+  total_exported: number;
+  total_failed: number;
+  total_bytes_written: number;
+  duration_ms: number;
+  output_path: string;
+  errors: string[];
+}
+
+export type CloudStorageProvider = "local_path" | "webdav" | "s3";
+
+export interface CloudBackupConfig {
+  provider: CloudStorageProvider;
+  local_path?: string | null;
+  webdav_endpoint?: string | null;
+  webdav_username?: string | null;
+  webdav_password?: string | null;
+  s3_endpoint?: string | null;
+  s3_bucket?: string | null;
+  s3_region?: string | null;
+  s3_access_key?: string | null;
+  s3_secret_key?: string | null;
+  s3_prefix?: string | null;
+  auto_backup_enabled?: boolean;
+  auto_backup_interval_days?: number;
+}
+
+export interface CloudSnapshotMeta {
+  snapshot_id: string;
+  filename: string;
+  size_bytes: number;
+  created_at: number;
+  file_count: number;
+  folder_count: number;
+  tag_count: number;
+  album_count: number;
+  description?: string | null;
+  berry_version: string;
+}
+
+export interface CloudPingResult {
+  success: boolean;
+  latency_ms: number;
+  message: string;
+}
+
+export interface CloudBackupResult {
+  success: boolean;
+  snapshot?: CloudSnapshotMeta | null;
+  duration_ms: number;
+  error?: string | null;
+}
+
+export interface CloudRestoreResult {
+  success: boolean;
+  restored_files_count: number;
+  duration_ms: number;
+  error?: string | null;
+}
+
+export type CloudSyncDirection = 'upload_to_remote' | 'download_from_remote';
+export type CloudSyncStrategy = 'fast_fingerprint' | 'sha256_checksum';
+export type CloudSyncPhase = 'idle' | 'scanning' | 'syncing' | 'completed' | 'cancelled' | 'failed';
+
+export interface CloudSyncOptions {
+  direction?: CloudSyncDirection;
+  strategy?: CloudSyncStrategy;
+  concurrency?: number;
+  bandwidth_limit_kbs?: number | null;
+  dry_run?: boolean;
+  remote_prefix?: string;
+  folder_ids?: number[] | null;
+}
+
+export interface CloudSyncProgress {
+  phase: CloudSyncPhase;
+  total_files: number;
+  completed_files: number;
+  skipped_files: number;
+  failed_files: number;
+  total_bytes: number;
+  transferred_bytes: number;
+  current_file?: string | null;
+  speed_bytes_per_sec: number;
+  eta_seconds?: number | null;
+  error?: string | null;
+}
+
+export interface CloudSyncResult {
+  success: boolean;
+  total_files: number;
+  synced_files: number;
+  skipped_files: number;
+  failed_files: number;
+  transferred_bytes: number;
+  duration_ms: number;
+  dry_run: boolean;
+  errors: string[];
+}
+
 export interface FilePage {
   items: ImageFile[];
   total: number;
@@ -183,6 +388,7 @@ export interface SearchCriteria {
   direction?: SortDirection | null;
   limit?: number | null;
   offset?: number | null;
+  cursor?: PageCursor | null;
 }
 
 export type NavTarget =

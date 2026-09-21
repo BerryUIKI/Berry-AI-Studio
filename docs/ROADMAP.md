@@ -83,16 +83,20 @@ This roadmap documents completed milestones and future engineering goals for **B
 
 ---
 
+### ✅ Milestone 11: Generation Interop & Workflows
+- [x] Drag-and-drop workflow transfer and send-to-WebUI / send-to-ComfyUI via local HTTP API backend proxy.
+- [x] One-click batch cull (automatically keep hero/top-rated images and move drafts to system Trash with review modal).
+- [x] Configurable ComfyUI and SD WebUI endpoints with real-time connectivity testing.
+
+---
+
 ## 🔮 Upcoming Milestones (v0.3.0+)
 
-### 🎯 Milestone 11: Generation Interop & Workflows
-- [ ] Drag-and-drop workflow send-to-WebUI / send-to-ComfyUI via WebSocket or Local HTTP API.
-- [ ] One-click batch cull (keep hero/top-rated images and trash remaining drafts).
-
 ### 🎯 Milestone 12: Cloud Sync & Export Utilities
-- [ ] Encrypted WebDAV / S3 / LAN database synchronization.
-- [ ] Batch format conversion (WebP lossless / JPG) and metadata stripping for publishing.
-- [ ] Export curated collections into HTML galleries and ZIP archives.
+- [x] **Milestone 12.1: Batch Transcoding, Privacy Stripping & Packaging**: Multi-threaded format conversion (WebP/JPEG/PNG), 4-tier privacy metadata stripping, downscaling constraints, customizable filename templates, sidecars (.txt/.json), and Directory / ZIP archive export.
+- [x] **Milestone 12.2: Standalone Interactive HTML Showcase Generator**: Self-contained zero-dependency HTML+CSS+JS photo album export with responsive gallery, lightbox preview, and prompt metadata viewer.
+- [x] **Milestone 12.3: S3 & WebDAV Snapshot Cloud Backup & Restore**: Automated and manual snapshots of SQLite database and configurations to AWS S3, Cloudflare R2, MinIO, or WebDAV servers.
+- [x] **Milestone 12.4: Incremental Remote Asset Mirroring & Delta Sync**: ETag / SHA-256 incremental media sync with background concurrency and bandwidth throttling.
 
 ### 🎯 Milestone 13: Large-Library Performance
 
@@ -101,18 +105,29 @@ This roadmap documents completed milestones and future engineering goals for **B
 - [x] Deduplicated, serialized thumbnail look-ahead scheduling.
 - [x] Startup scan cooldown with opt-in scanning for new installations.
 - [x] Bounded incremental gallery queries with exact totals and stale-response protection.
-- [ ] Replace offset traversal with keyset cursors if deep-page benchmarks require it.
-- [ ] Introduce lightweight gallery DTOs and load full metadata on selection.
+- [x] Replace offset traversal with keyset cursors if deep-page benchmarks require it.
 - [x] Persistent filesystem watcher journal with targeted path reconciliation and optional recovery scans.
 - [x] Persistent size-tiered thumbnail manifest with configurable LRU disk budget.
 - [x] Cancelable viewport generations with visible-first and directional look-ahead priority.
 - [x] Zoom-aware thumbnail tier selection for Gallery and Table surfaces.
 - [x] Reuse sufficient cached tiers and prune broken manifest paths during lookup.
-- [ ] Per-job thumbnail queue diagnostics.
+- [x] Per-job thumbnail queue diagnostics.
 - [x] Coalesce filesystem scan progress events by file count and elapsed time.
 - [x] Stream full-scan directory entries without retaining the complete tree.
-- [ ] Benchmark directory fingerprint strategies on local and network filesystems.
+- [x] Benchmark directory fingerprint strategies on local and network filesystems.
 - [x] Lazy-load infrequent modals and drawers through async component boundaries.
 - [x] Remove raw metadata blobs from paginated gallery IPC and fetch full details on selection.
 - [x] Keep navigation filters and stack grouping aligned across paginated text and semantic searches.
-- [ ] Benchmark a dedicated gallery DTO for the remaining structured metadata fields.
+- [x] Benchmark a dedicated gallery DTO for the remaining structured metadata fields.
+
+### 🎯 Milestone 14: Multi-Database Support & Team Studio (MySQL & PostgreSQL)
+*(See architectural design specification: [MULTI_DATABASE_COLLABORATION_RFC.md](./MULTI_DATABASE_COLLABORATION_RFC.md))*
+- [x] Storage Engine trait abstraction with database dialect support for SQLite, MySQL 8.0+, and PostgreSQL 14+.
+- [x] Keyset/cursor-based deep pagination for 500,000+ asset scale (`search_files_cursor_page`).
+- [x] Cross-platform storage root mapping (`storage_roots` table and client mount configurations).
+- [x] Optimistic concurrency control (`version` column) with Last-Write-Wins and set-union conflict resolution.
+- [x] Tiered real-time change synchronization: default zero-DevOps change log journal polling engine (`CollaborationSyncEngine`).
+- [x] Client-side on-demand local thumbnail caching preserving network storage bandwidth.
+- [x] Team & Database settings panel with live latency testing and storage root mount mapping.
+
+

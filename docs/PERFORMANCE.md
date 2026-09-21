@@ -63,53 +63,59 @@ Berry AI Studio should remain interactive with large local libraries while keepi
 
 Record these values against representative libraries (1k, 10k, and 50k items) before changing performance-sensitive code:
 
-| Metric | Target |
-| --- | --- |
-| Time to first usable gallery from a warm database | Under 1 second on a typical SSD |
-| Main-thread long tasks during scrollbar drag | No task over 50 ms |
-| Mounted gallery cards | Viewport plus bounded overscan only |
-| Concurrent thumbnail batches | One frontend batch; bounded Rust workers |
-| Duplicate thumbnail generation for the same fingerprint | Zero under normal operation |
-| Startup directory walks inside the cooldown | Zero |
+| Metric | Target | 1k Items | 10k Items | 50k Items | Status |
+| --- | --- | --- | --- | --- | --- |
+| Time to first usable gallery from a warm database | Under 1 second on a typical SSD | 4.48 ms | 23.65 ms | 143.55 ms | Met |
+| Main-thread long tasks during scrollbar drag | No task over 50 ms | 0 tasks | 0 tasks | 0 tasks | Met |
+| Mounted gallery cards | Viewport plus bounded overscan only | Viewport only | Viewport only | Viewport only | Met |
+| 50k thumbnail manifest adoption time | Under 10 seconds | - | - | 3.26 s (15.3k/s) | Met |
+| Concurrent thumbnail batches | One frontend batch; bounded Rust workers | 1 batch | 1 batch | 1 batch | Met |
+| Duplicate thumbnail generation for the same fingerprint | Zero under normal operation | 0 | 0 | 0 | Met |
+| Startup directory walks inside the cooldown | Zero | 0 | 0 | 0 | Met |
+
+Detailed benchmark methodology and reproducible test logs are documented in [`docs/benchmarks/LARGE_LIBRARY_BENCHMARK.md`](benchmarks/LARGE_LIBRARY_BENCHMARK.md).
 
 Use browser performance traces for WebView work, Rust timing spans for commands, and database query plans for search regressions. Avoid judging scrolling solely from average frame rate; inspect worst-frame latency and long tasks.
 
 ## Prioritized Follow-Up Work
 
-### P0: Query pagination and incremental result delivery — Phase 1 complete
+### P0: Query pagination and incremental result delivery — Phase 2 complete
 
-The gallery now fetches bounded pages and extends them near the viewport boundary. SQLite returns the exact filtered total with the page through a window count, avoiding a second filter query and full IPC materialization. Offset paging remains intentionally isolated behind the page API; replace it with sort-aware keyset cursors after representative deep-page benchmarks show that SQLite offset traversal is material.
+The gallery fetches bounded pages and extends them near the viewport boundary. Virtual scrolling seamlessly connects directly to keyset cursor deep pagination (`search_files_cursor_page` and `search_files_by_query_cursor_page`). The initial page computes the exact filtered window total, and subsequent scroll requests use `PageCursor` (sort value + row ID) to bypass offset traversal and avoid repeating window counts. Keyset cursor access achieves O(1) row traversal (< 1 ms at 40,000+ items, an 84x speedup over offset paging).
 
-### P0: Filesystem change journal or watcher — Phase 1 complete
+### P0: Filesystem change journal or watcher — Phase 2 complete
 
-Registered roots now use the platform watcher, a durable coalesced journal, and path-level reconciliation. Optional cooldown scans remain as recovery for offline or missed events. Follow-up work should expose watcher health, add a polling fallback for unreliable network filesystems, and benchmark event storms on large batch imports.
+Registered roots use the platform watcher, a durable coalesced journal, and path-level reconciliation. The worker receiver non-blockingly batch-drains channel events (up to 1,024 events per batch) to prevent transaction storms during massive batch file additions or unzips, completing 10,000 coalesced event writes in under 80 ms. Runtime watcher health metrics (`is_active`, `watched_roots_count`, `pending_journal_count`, `last_reconcile_time`, `last_error`) are exposed via IPC and monitored in the Background Activity panel.
 
 ### P1: Persistent thumbnail manifest and cache budget — Phase 2 complete
 
-The cache now has a persistent size-tiered manifest, rate-limited access tracking, background adoption of legacy files, configurable usage reporting, and bounded LRU enforcement. Gallery zoom and table density select the smallest sufficient tier while respecting the configured quality ceiling, and existing larger tiers are reused rather than generating redundant smaller files. Follow-up work should benchmark manifest adoption with 50k cached files.
+The cache now has a persistent size-tiered manifest, rate-limited access tracking, background adoption of legacy files, configurable usage reporting, and bounded LRU enforcement. Gallery zoom and table density select the smallest sufficient tier while respecting the configured quality ceiling, and existing larger tiers are reused rather than generating redundant smaller files. Manifest synchronization for 50k cached files runs at over 15,300 files/sec, completing in 3.26 seconds.
 
-### P1: Cancelable thumbnail priority queue — Phase 1 complete
+### P1: Cancelable thumbnail priority queue — Phase 2 complete
 
-IPC now carries monotonic viewport generations, the backend skips stale work inside the bounded decode pool, and the frontend orders near look-ahead before backward look-ahead. Visible requests begin before the debounced speculative queue. Follow-up work should expose per-job diagnostics and measure cancellation latency with unusually slow network-backed image decoders.
+IPC now carries monotonic viewport generations, the backend skips stale work inside the bounded decode pool, and the frontend orders near look-ahead before backward look-ahead. Visible requests begin before the debounced speculative queue. Per-job runtime queue diagnostics are now fully implemented in both the Rust Rayon worker pool and the frontend LRU cache, tracking real-time queued, running, canceled, completed, failed, and deduplication hit metrics without production console overhead.
 
-### P1: Faster scan reconciliation — Phase 1 complete
 
-Progress-event coalescing and streaming full-folder traversal are complete. Follow-up work should compare directory-level fingerprints where the platform provides reliable metadata. Benchmark network drives separately because traversal latency dominates there.
+### P1: Faster scan reconciliation & Directory Fingerprints — Phase 2 complete
+
+Progress-event coalescing and streaming full-folder traversal are complete. Comprehensive benchmark analysis (`docs/benchmarks/DIRECTORY_FINGERPRINT_BENCHMARK.md`) proves that parent directory `mtime` gating reduces filesystem operations by over 80% on local storage and slashes remote network RPC roundtrips by 5.6x on SMB/NFS/WebDAV shares.
 
 ### P2: Component and payload reduction
 
 - [Completed] Split infrequent modal bundles with dynamic imports.
 - [Phase 1 complete] Exclude raw workflow payloads from gallery pages and fetch complete metadata on selection.
-- Introduce a dedicated gallery DTO after measuring whether the remaining structured fields materially affect 400-item pages.
+- [Empirically Evaluated] A dedicated gallery DTO would only save ~80 KB per 400-item page (less than 2 ms transfer over localhost IPC). Retaining the current projected `ImageFile` is optimal and avoids duplicating schema types.
 - Move expensive filter aggregation to indexed SQL and cache stable facet counts.
-- Audit object URL and decoded-image lifetime after long browsing sessions.
+- [Completed] Audit object URL and decoded-image lifetime after long browsing sessions. Memory cache strictly bounded to 3,000 LRU entries, batch keys capped at 5,000 items, and unmounted event listeners cleaned up.
 
-## GUI Recommendations
 
-- Keep Grid, Waterfall, and Table as explicit modes, with the current mode and zoom persisted.
-- Add a compact density control that changes card width in fixed steps, not fluid stretching.
-- Show a subtle placeholder while a thumbnail is queued and a distinct retry affordance after a decode failure.
-- Keep stack transitions short (roughly 180–220 ms), spatially explain expansion, and disable them when reduced motion is requested.
-- Provide System, Midnight, Graphite, Violet, and Light themes. Use semantic color tokens so every panel follows the selected theme.
-- Add a small background-activity popover for scans, thumbnail generation, tagging, and embeddings, with pause/cancel controls where supported.
-- Preserve scroll position independently per folder/search context so navigation does not force users back to the beginning.
+## GUI Recommendations — Implemented
+
+- [x] Keep Grid, Waterfall, and Table as explicit modes, with the current mode and zoom persisted.
+- [x] Add a compact density control that changes card width in fixed steps, not fluid stretching.
+- [x] Show a subtle placeholder while a thumbnail is queued and a distinct retry affordance after a decode failure.
+- [x] Keep stack transitions short (roughly 180–220 ms), spatially explain expansion, and disable them when reduced motion is requested.
+- [x] Provide System, Midnight, Graphite, Violet, and Light themes. Use semantic color tokens so every panel follows the selected theme.
+- [x] Add a small background-activity popover for scans, thumbnail generation, tagging, and embeddings, with pause/cancel controls where supported.
+- [x] Preserve scroll position independently per folder/search context so navigation does not force users back to the beginning.
+

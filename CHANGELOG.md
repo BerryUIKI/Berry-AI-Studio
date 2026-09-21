@@ -5,6 +5,33 @@ All notable changes to the Berry AI Studio project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-09-21
+
+### Cloud Sync & Export Utilities, Keyset Deep Pagination & Multi-Database Team Studio (Milestones 12, 13, 14)
+
+Version 0.3.0 is a major milestone release delivering batch format conversion and privacy stripping, standalone HTML showcase export, S3 and WebDAV snapshot backup and incremental mirroring, keyset cursor deep pagination for 500,000+ assets, directory fingerprint benchmarking, and enterprise multi-database collaboration support:
+
+#### ☁️ Cloud Sync & Export Utilities (Milestone 12)
+- **Batch Transcoding & Packaging (12.1)**: Multi-threaded format conversion to WebP, JPEG, and PNG using Rayon; pure-Rust ZIP archive packaging and directory export.
+- **4-Tier Privacy Sanitization (12.1)**: Configurable metadata stripping (`KeepAll`, `StripPromptOnly`, `StripAllAiMetadata`, `StripAll` pixel-only sanitization) removing embedded prompts, generation parameters, and sensitive EXIF/ICC chunks.
+- **Filename Pattern Templating & Sidecars (12.1)**: Flexible export naming with tokens (`{name}`, `{date}`, `{model}`, `{id}`, `{rating}`) and optional `.txt` prompt or `.json` metadata sidecars.
+- **Standalone Interactive HTML Showcase (12.2)**: Zero-dependency, single `index.html` export containing responsive dark-theme gallery, fullscreen pan/zoom lightbox with keyboard navigation (`Esc`, `←`, `→`), prompt inspector with one-click copying, and instant keyword filter.
+- **S3 & WebDAV Snapshot Backup & Restore (12.3)**: Automated and manual snapshot creation targeting AWS S3 (SigV4), Cloudflare R2, MinIO, Backblaze B2, and WebDAV servers (Nextcloud/Synology). Includes hot SQLite `VACUUM INTO`, schema verification, pre-restore rollback backup, and live database connection hot-swapping.
+- **Incremental Remote Asset Mirroring & Delta Sync (12.4)**: ETag and streaming SHA-256 change detection for bidirectional asset sync, with a token-bucket `RateLimiter` aggregate bandwidth throttle, atomic cancellation, dry-run simulation, and live animated UI progress.
+
+#### ⚡ Keyset Cursor Deep Pagination & Scalability (Milestone 13)
+- **Keyset Cursor Deep Pagination**: Virtual gallery scrolling directly integrated with keyset cursors (`search_files_cursor_page` and `search_files_by_query_cursor_page`), eliminating SQLite `OFFSET N` scans and decoupling window counting for \(O(1)\) row traversal (< 1 ms at 40k+ assets, an 84x speedup over offset paging).
+- **Directory Fingerprint Benchmarks**: Automated benchmark suite (`crates/berry-scan/benches/directory_fingerprint.rs`) evaluating 4 directory traversal strategies, showing parent directory mtime gating delivers a 2.5x speedup locally and 5.6x speedup over network shares (SMB/NFS/WebDAV).
+
+#### 👥 Multi-Database Support & Team Studio (Milestone 14)
+- **Storage Engine Abstraction**: Abstract `StorageEngine` trait supporting SQLite, MySQL 8.0+, and PostgreSQL 14+ backends.
+- **Storage Root Mapping**: Cross-platform path normalization (`storage_roots` table and client mount configurations) for multi-user team collaboration across Windows, macOS, and Linux.
+- **Optimistic Concurrency Control**: Row-level version tracking (`version` column) detecting concurrent modifications with last-write-wins and set-union conflict resolution.
+- **Real-Time Collaboration Sync Engine**: Zero-DevOps change log journal polling engine (`CollaborationSyncEngine`) with automatic cadence adaptation and cross-client event dispatching.
+- **Team & Database Settings**: Dedicated configuration tab with live database connection testing, latency ping diagnostics, and storage root mount mapping.
+
+---
+
 ## [0.2.1] - 2026-09-19
 
 ### Large-Library Performance & Gallery Virtualization (Milestone 13)

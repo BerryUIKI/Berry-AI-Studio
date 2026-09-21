@@ -19,6 +19,7 @@ import {
 } from "../utils/thumbnail";
 import { t } from "../i18n";
 import { resolveStackHeroPaths } from "../utils/stack";
+import { calculateGalleryColumns } from "../utils/gallery-layout";
 
 const props = withDefaults(
   defineProps<{
@@ -36,6 +37,7 @@ const props = withDefaults(
     stackMap?: Record<string, { count: number; heroId: number | null }>;
     expandedStacks?: Set<string>;
     layout?: "grid" | "masonry";
+    contextKey?: string;
   }>(),
   {
     selectedFile: null,
@@ -58,13 +60,14 @@ const emit = defineEmits<{
   (e: "findSimilar", file: ImageFile): void;
   (e: "toggleStackExpand", stackId: string): void;
   (e: "compareStack", stackId: string): void;
+  (e: "cullStack", stackId: string): void;
   (e: "loadMore"): void;
 }>();
 
 const containerRef = ref<HTMLElement | null>(null);
 const scrollTop = ref(0);
-const containerWidth = ref(800);
-const containerHeight = ref(600);
+const containerWidth = ref(0);
+const containerHeight = ref(0);
 
 // Image loading error tracker
 const failedImages = ref<Set<string>>(new Set());
@@ -74,6 +77,32 @@ function onImageError(path: string) {
   failedImages.value.add(path);
 }
 
+function retryImage(file: ImageFile) {
+  failedImages.value.delete(file.path);
+  getThumbnailUrl(file, Math.max(itemWidth.value, rowHeight.value)).catch(() => {});
+}
+
+// Persist and restore gallery scroll position per folder/search context
+const contextScrollPositions = new Map<string, number>();
+
+watch(
+  () => props.contextKey,
+  (newKey, oldKey) => {
+    if (oldKey !== undefined && containerRef.value) {
+      contextScrollPositions.set(oldKey, containerRef.value.scrollTop);
+    }
+    if (newKey !== undefined && containerRef.value) {
+      const saved = contextScrollPositions.get(newKey) ?? 0;
+      requestAnimationFrame(() => {
+        if (containerRef.value) {
+          containerRef.value.scrollTop = saved;
+          scrollTop.value = saved;
+        }
+      });
+    }
+  },
+);
+
 function toggleNsfwReveal(path: string) {
   if (revealedNsfw.value.has(path)) {
     revealedNsfw.value.delete(path);
@@ -82,35 +111,56 @@ function toggleNsfwReveal(path: string) {
   }
 }
 
-// Update container dimensions
-function updateDimensions() {
-  if (!containerRef.value) return;
-  containerWidth.value = containerRef.value.clientWidth;
-  containerHeight.value = containerRef.value.clientHeight;
-}
-
 let resizeObserver: ResizeObserver | null = null;
-let resizeDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let resizeFrame: number | null = null;
+let pendingSize: { element: HTMLElement; width: number; height: number } | null = null;
 let scrollFrame: number | null = null;
 const stackClickTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const STACK_CLICK_DELAY_MS = 240;
 
-onMounted(() => {
-  if (containerRef.value) {
-    updateDimensions();
-    resizeObserver = new ResizeObserver(() => {
-      if (resizeDebounceTimer) clearTimeout(resizeDebounceTimer);
-      resizeDebounceTimer = setTimeout(() => {
-        updateDimensions();
-      }, 50);
+function scheduleDimensionUpdate(element: HTMLElement, width: number, height: number) {
+  pendingSize = { element, width, height };
+  if (resizeFrame !== null) return;
+  resizeFrame = requestAnimationFrame(() => {
+    resizeFrame = null;
+    const size = pendingSize;
+    pendingSize = null;
+    if (!size || containerRef.value !== size.element) return;
+    containerWidth.value = Math.max(0, size.width);
+    containerHeight.value = Math.max(0, size.height);
+  });
+}
+
+watch(
+  containerRef,
+  (element) => {
+    resizeObserver?.disconnect();
+    resizeObserver = null;
+    pendingSize = null;
+    if (resizeFrame !== null) {
+      cancelAnimationFrame(resizeFrame);
+      resizeFrame = null;
+    }
+    if (!element) return;
+
+    scheduleDimensionUpdate(element, element.clientWidth, element.clientHeight);
+    if (typeof ResizeObserver === "undefined") return;
+    resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries.find((candidate) => candidate.target === element);
+      if (!entry) return;
+      scheduleDimensionUpdate(element, entry.contentRect.width, entry.contentRect.height);
     });
-    resizeObserver.observe(containerRef.value);
-  }
+    resizeObserver.observe(element);
+  },
+  { immediate: true, flush: "post" },
+);
+
+onMounted(() => {
   window.addEventListener("keydown", handleKeyDown);
 });
 
 onUnmounted(() => {
-  if (resizeDebounceTimer) clearTimeout(resizeDebounceTimer);
+  if (resizeFrame !== null) cancelAnimationFrame(resizeFrame);
   if (prefetchDebounceTimer) clearTimeout(prefetchDebounceTimer);
   if (scrollFrame !== null) cancelAnimationFrame(scrollFrame);
   for (const timer of stackClickTimers.values()) clearTimeout(timer);
@@ -134,15 +184,13 @@ function onScroll(e: Event) {
 
 // Columns count based on container width
 const cols = computed(() => {
-  const available = containerWidth.value - 2; // small padding offset
-  const minWidth = props.itemMinWidth;
-  const count = Math.floor((available + props.gap) / (minWidth + props.gap));
-  return Math.max(1, count);
+  return calculateGalleryColumns(containerWidth.value, props.itemMinWidth, props.gap);
 });
 
 // Keep the user's chosen card width stable. Resizing the window changes the
 // number of columns, not the image size (matching Eagle's gallery behavior).
 const itemWidth = computed(() => {
+  if (containerWidth.value <= 0) return props.itemMinWidth;
   return Math.max(1, Math.min(props.itemMinWidth, containerWidth.value));
 });
 
@@ -621,6 +669,21 @@ function onDragStart(e: DragEvent, file: ImageFile) {
                 preload="metadata"
                 playsinline
               />
+              <div
+                v-else-if="failedImages.has(file.path)"
+                class="thumbnail-fallback thumbnail-failed"
+              >
+                <span class="fallback-text">{{ file.container.toUpperCase() }}</span>
+                <button
+                  type="button"
+                  class="retry-thumb-btn"
+                  :title="t.preview.retryThumbnail"
+                  :aria-label="t.preview.retryThumbnail"
+                  @click.stop="retryImage(file)"
+                >
+                  ↻
+                </button>
+              </div>
               <div v-else class="thumbnail-fallback">
                 <span class="fallback-text">{{ file.container.toUpperCase() }}</span>
               </div>
@@ -723,6 +786,17 @@ function onDragStart(e: DragEvent, file: ImageFile) {
                   @click.stop="emit('compareStack', file.stack_id)"
                 >
                   ⚖️
+                </button>
+
+                <!-- Stack cull drafts trigger button -->
+                <button
+                  v-if="file.stack_id && (stackMap?.[file.stack_id]?.count ?? 1) > 1"
+                  type="button"
+                  class="card-stack-cull-btn"
+                  :title="t.stack.cullDrafts || 'Cull Lower-Rated Drafts'"
+                  @click.stop="emit('cullStack', file.stack_id)"
+                >
+                  🧹
                 </button>
               </template>
             </div>
@@ -1029,6 +1103,39 @@ function onDragStart(e: DragEvent, file: ImageFile) {
   color: #888;
 }
 
+.thumbnail-fallback.thumbnail-failed {
+  flex-direction: column;
+  gap: 6px;
+}
+
+.retry-thumb-btn {
+  background: rgba(0, 0, 0, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #38bdf8;
+  border-radius: 4px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.15s ease;
+}
+
+.retry-thumb-btn:hover {
+  background: #0284c7;
+  color: #fff;
+  border-color: #38bdf8;
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .retry-thumb-btn:hover {
+    transform: none;
+  }
+}
+
 .fallback-text {
   font-size: 0.85em;
   font-weight: 600;
@@ -1193,12 +1300,43 @@ function onDragStart(e: DragEvent, file: ImageFile) {
   border-color: #818cf8;
 }
 
+.card-stack-cull-btn {
+  position: absolute;
+  top: 6px;
+  right: 90px;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #fbbf24;
+  font-size: 0.75em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  z-index: 2;
+  transition: all 0.15s ease;
+}
+
+.grid-card:hover .card-stack-cull-btn {
+  opacity: 1;
+}
+
+.card-stack-cull-btn:hover {
+  background: #d97706;
+  border-color: #f59e0b;
+  color: #fff;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .grid-card,
   .grid-card.is-collapsed-stack,
   .card-select-btn,
   .badge-stack,
   .card-stack-compare-btn,
+  .card-stack-cull-btn,
   .card-similar-btn {
     transition: none;
     animation: none;

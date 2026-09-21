@@ -1,6 +1,19 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from "vue";
-import type { AppInfo } from "../types";
+import { onMounted, onUnmounted, ref, watch } from "vue";
+import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type {
+  AppInfo,
+  CloudBackupConfig,
+  CloudBackupResult,
+  CloudPingResult,
+  CloudRestoreResult,
+  CloudSnapshotMeta,
+  CloudStorageProvider,
+  CloudSyncProgress,
+  CloudSyncResult,
+  CloudSyncStrategy,
+} from "../types";
 import {
   clearThumbnailCache,
   getThumbnailCacheBudgetMb,
@@ -27,6 +40,14 @@ import {
   type StoragePaths,
 } from "../utils/config";
 import { applyTheme, normalizeTheme, type AppTheme } from "../utils/theme";
+import ThumbnailDiagnosticsModal from "./ThumbnailDiagnosticsModal.vue";
+import MigrationWizardModal from "./MigrationWizardModal.vue";
+import { checkServiceStatus } from "../utils/generation";
+import { open } from "@tauri-apps/plugin-dialog";
+import { collaborationSync, pingDatabase } from "../utils/collaborationSync";
+
+const showDiagnosticsModal = ref(false);
+const showMigrationWizardModal = ref(false);
 
 const props = defineProps<{
   show: boolean;
@@ -50,7 +71,7 @@ const emit = defineEmits<{
   }): void;
 }>();
 
-const activeTab = ref<"general" | "display" | "stacking" | "parsers" | "about">("general");
+const activeTab = ref<"general" | "display" | "stacking" | "interop" | "collaboration" | "cloudBackup" | "parsers" | "about">("general");
 
 // Settings state (backed by persistent config.json)
 const selectedLocale = ref<LocaleSetting>(currentLocaleSetting.value);
@@ -70,6 +91,278 @@ const allowMultipleStacksOpen = ref(false);
 const suppressedWarningCount = ref(0);
 const resettingWarnings = ref(false);
 const warningResetMessage = ref("");
+const comfyuiUrl = ref("http://127.0.0.1:8188");
+const webuiUrl = ref("http://127.0.0.1:7860");
+const comfyStatus = ref<"unknown" | "checking" | "online" | "offline">("unknown");
+const webuiStatus = ref<"unknown" | "checking" | "online" | "offline">("unknown");
+
+// Collaboration & Database state
+const storageBackend = ref<"sqlite" | "mysql" | "postgres">("sqlite");
+const remoteConnectionUrl = ref("");
+const clientIdentifier = ref("local_client");
+const rootMappings = ref<Record<string, string>>({});
+const pingStatus = ref<"unknown" | "testing" | "success" | "error">("unknown");
+const pingLatency = ref<number | null>(null);
+const pingMessage = ref("");
+const newMappingUuid = ref("");
+const newMappingPath = ref("");
+const lastSyncDisplay = ref("never");
+
+async function handlePingDatabase() {
+  pingStatus.value = "testing";
+  pingMessage.value = "";
+  pingLatency.value = null;
+  try {
+    const res = await pingDatabase(storageBackend.value, remoteConnectionUrl.value);
+    if (res.success) {
+      pingStatus.value = "success";
+      pingLatency.value = res.latency_ms;
+      pingMessage.value = res.message;
+    } else {
+      pingStatus.value = "error";
+      pingMessage.value = res.message;
+    }
+  } catch (err: any) {
+    pingStatus.value = "error";
+    pingMessage.value = String(err);
+  }
+}
+
+async function handleBrowseMappingPath() {
+  const selected = await open({ directory: true, multiple: false });
+  if (typeof selected === "string") {
+    newMappingPath.value = selected;
+  }
+}
+
+function addRootMappingEntry() {
+  const uuid = newMappingUuid.value.trim();
+  const path = newMappingPath.value.trim();
+  if (uuid && path) {
+    rootMappings.value = {
+      ...rootMappings.value,
+      [uuid]: path,
+    };
+    newMappingUuid.value = "";
+    newMappingPath.value = "";
+  }
+}
+
+function removeRootMappingEntry(uuid: string) {
+  const next = { ...rootMappings.value };
+  delete next[uuid];
+  rootMappings.value = next;
+}
+
+async function checkComfyConnection() {
+  comfyStatus.value = "checking";
+  const ok = await checkServiceStatus(comfyuiUrl.value, "comfyui");
+  comfyStatus.value = ok ? "online" : "offline";
+}
+
+async function checkWebuiConnection() {
+  webuiStatus.value = "checking";
+  const ok = await checkServiceStatus(webuiUrl.value, "webui");
+  webuiStatus.value = ok ? "online" : "offline";
+}
+
+// Cloud Backup state
+const cloudProvider = ref<CloudStorageProvider>("local_path");
+const cloudLocalPath = ref("");
+const cloudWebdavEndpoint = ref("");
+const cloudWebdavUsername = ref("");
+const cloudWebdavPassword = ref("");
+const cloudS3Endpoint = ref("");
+const cloudS3Bucket = ref("");
+const cloudS3Region = ref("auto");
+const cloudS3AccessKey = ref("");
+const cloudS3SecretKey = ref("");
+const cloudS3Prefix = ref("backups/");
+const cloudAutoBackup = ref(false);
+const cloudAutoIntervalDays = ref(7);
+
+const cloudPingStatus = ref<"unknown" | "testing" | "success" | "error">("unknown");
+const cloudPingLatency = ref<number | null>(null);
+const cloudPingMessage = ref("");
+
+const cloudSnapshots = ref<CloudSnapshotMeta[]>([]);
+const cloudSnapshotsLoading = ref(false);
+const cloudCreatingSnapshot = ref(false);
+const cloudRestoringSnapshot = ref(false);
+const cloudActionMessage = ref("");
+const cloudActionError = ref("");
+const newSnapshotDescription = ref("");
+
+function getCurrentCloudConfig(): CloudBackupConfig {
+  return {
+    provider: cloudProvider.value,
+    local_path: cloudLocalPath.value.trim() || null,
+    webdav_endpoint: cloudWebdavEndpoint.value.trim() || null,
+    webdav_username: cloudWebdavUsername.value.trim() || null,
+    webdav_password: cloudWebdavPassword.value || null,
+    s3_endpoint: cloudS3Endpoint.value.trim() || null,
+    s3_bucket: cloudS3Bucket.value.trim() || null,
+    s3_region: cloudS3Region.value.trim() || "auto",
+    s3_access_key: cloudS3AccessKey.value.trim() || null,
+    s3_secret_key: cloudS3SecretKey.value.trim() || null,
+    s3_prefix: cloudS3Prefix.value.trim() || "backups/",
+    auto_backup_enabled: cloudAutoBackup.value,
+    auto_backup_interval_days: cloudAutoIntervalDays.value,
+  };
+}
+
+async function handleBrowseLocalBackupPath() {
+  const selected = await open({ directory: true, multiple: false });
+  if (typeof selected === "string") {
+    cloudLocalPath.value = selected;
+  }
+}
+
+async function handleTestCloudConnection() {
+  cloudPingStatus.value = "testing";
+  cloudPingMessage.value = "";
+  cloudPingLatency.value = null;
+  try {
+    const res = await invoke<CloudPingResult>("cloud_backup_test_connection", {
+      config: getCurrentCloudConfig(),
+    });
+    if (res.success) {
+      cloudPingStatus.value = "success";
+      cloudPingLatency.value = res.latency_ms;
+      cloudPingMessage.value = res.message;
+    } else {
+      cloudPingStatus.value = "error";
+      cloudPingMessage.value = res.message;
+    }
+  } catch (err: any) {
+    cloudPingStatus.value = "error";
+    cloudPingMessage.value = String(err);
+  }
+}
+
+async function handleCreateSnapshot() {
+  cloudCreatingSnapshot.value = true;
+  cloudActionMessage.value = "";
+  cloudActionError.value = "";
+  try {
+    const res = await invoke<CloudBackupResult>("cloud_backup_create_snapshot", {
+      config: getCurrentCloudConfig(),
+      description: newSnapshotDescription.value.trim() || null,
+    });
+    if (res.success && res.snapshot) {
+      cloudActionMessage.value = `✓ Snapshot created: ${res.snapshot.filename} (${(res.snapshot.size_bytes / 1024 / 1024).toFixed(2)} MB)`;
+      newSnapshotDescription.value = "";
+      await handleListSnapshots();
+    } else {
+      cloudActionError.value = res.error || "Failed to create snapshot";
+    }
+  } catch (err: any) {
+    cloudActionError.value = String(err);
+  } finally {
+    cloudCreatingSnapshot.value = false;
+  }
+}
+
+async function handleListSnapshots() {
+  cloudSnapshotsLoading.value = true;
+  cloudActionError.value = "";
+  try {
+    cloudSnapshots.value = await invoke<CloudSnapshotMeta[]>("cloud_backup_list_snapshots", {
+      config: getCurrentCloudConfig(),
+    });
+  } catch (err: any) {
+    cloudActionError.value = String(err);
+  } finally {
+    cloudSnapshotsLoading.value = false;
+  }
+}
+
+async function handleRestoreSnapshot(snapshot: CloudSnapshotMeta) {
+  const confirmed = window.confirm(
+    t.value.settings.cloudBackup.restoreConfirm.replace('{name}', snapshot.filename)
+  );
+  if (!confirmed) return;
+
+  cloudRestoringSnapshot.value = true;
+  cloudActionMessage.value = "";
+  cloudActionError.value = "";
+  try {
+    const res = await invoke<CloudRestoreResult>("cloud_backup_restore_snapshot", {
+      config: getCurrentCloudConfig(),
+      snapshotFilename: snapshot.filename,
+    });
+    if (res.success) {
+      cloudActionMessage.value = `✓ Successfully restored! (${res.restored_files_count} files in ${res.duration_ms} ms). Reloading...`;
+      setTimeout(() => {
+        window.location.reload();
+      }, 1200);
+    } else {
+      cloudActionError.value = res.error || "Restore failed";
+    }
+  } catch (err: any) {
+    cloudActionError.value = String(err);
+  } finally {
+    cloudRestoringSnapshot.value = false;
+  }
+}
+
+// Cloud Media Delta Sync state
+const syncStrategy = ref<CloudSyncStrategy>("fast_fingerprint");
+const syncConcurrency = ref<number>(4);
+const syncBandwidthLimit = ref<number>(0);
+const syncDryRun = ref<boolean>(false);
+const syncRemotePrefix = ref<string>("media/");
+const syncProgress = ref<CloudSyncProgress | null>(null);
+const syncSummary = ref<CloudSyncResult | null>(null);
+const syncStarting = ref<boolean>(false);
+let unlistenSyncProgress: UnlistenFn | null = null;
+
+async function handleStartCloudSync() {
+  syncStarting.value = true;
+  syncSummary.value = null;
+  try {
+    await invoke("cloud_sync_start", {
+      config: getCurrentCloudConfig(),
+      options: {
+        strategy: syncStrategy.value,
+        concurrency: syncConcurrency.value,
+        bandwidth_limit_kbs: syncBandwidthLimit.value > 0 ? syncBandwidthLimit.value : null,
+        dry_run: syncDryRun.value,
+        remote_prefix: syncRemotePrefix.value,
+      },
+    });
+    await fetchSyncProgress();
+  } catch (err: any) {
+    window.alert(String(err));
+  } finally {
+    syncStarting.value = false;
+  }
+}
+
+async function handleCancelCloudSync() {
+  try {
+    await invoke("cloud_sync_cancel");
+    await fetchSyncProgress();
+  } catch (err: any) {
+    console.error("Failed to cancel cloud sync:", err);
+  }
+}
+
+async function fetchSyncProgress() {
+  try {
+    syncProgress.value = await invoke<CloudSyncProgress>("cloud_sync_get_progress");
+    if (
+      syncProgress.value &&
+      (syncProgress.value.phase === "completed" ||
+        syncProgress.value.phase === "cancelled" ||
+        syncProgress.value.phase === "failed")
+    ) {
+      syncSummary.value = await invoke<CloudSyncResult | null>("cloud_sync_get_summary");
+    }
+  } catch (err: any) {
+    console.error("Failed to fetch cloud sync progress:", err);
+  }
+}
 
 // Storage paths state
 const storagePaths = ref<StoragePaths | null>(null);
@@ -107,6 +400,34 @@ async function loadSettingsAndPaths() {
     allowMultipleStacksOpen.value = config.allow_multiple_open_stacks ?? false;
     suppressedWarningCount.value = config.suppressed_warnings.length;
     warningResetMessage.value = "";
+    comfyuiUrl.value = config.comfyui_url || "http://127.0.0.1:8188";
+    webuiUrl.value = config.webui_url || "http://127.0.0.1:7860";
+    void checkComfyConnection();
+    void checkWebuiConnection();
+
+    storageBackend.value = config.storage_backend || "sqlite";
+    remoteConnectionUrl.value = config.remote_connection_url || "";
+    clientIdentifier.value = config.client_identifier || "local_client";
+    rootMappings.value = config.root_mappings ? { ...config.root_mappings } : {};
+    const lastSync = collaborationSync.getLastSyncTime();
+    lastSyncDisplay.value = lastSync > 0 ? new Date(lastSync).toLocaleTimeString() : "ready";
+
+    const cb = config.cloud_backup;
+    if (cb) {
+      cloudProvider.value = cb.provider || "local_path";
+      cloudLocalPath.value = cb.local_path || "";
+      cloudWebdavEndpoint.value = cb.webdav_endpoint || "";
+      cloudWebdavUsername.value = cb.webdav_username || "";
+      cloudWebdavPassword.value = cb.webdav_password || "";
+      cloudS3Endpoint.value = cb.s3_endpoint || "";
+      cloudS3Bucket.value = cb.s3_bucket || "";
+      cloudS3Region.value = cb.s3_region || "auto";
+      cloudS3AccessKey.value = cb.s3_access_key || "";
+      cloudS3SecretKey.value = cb.s3_secret_key || "";
+      cloudS3Prefix.value = cb.s3_prefix || "backups/";
+      cloudAutoBackup.value = cb.auto_backup_enabled ?? false;
+      cloudAutoIntervalDays.value = cb.auto_backup_interval_days ?? 7;
+    }
 
     storagePaths.value = await getStoragePaths();
   } catch (e) {
@@ -158,10 +479,32 @@ watch(
   },
 );
 
-onMounted(() => {
+onMounted(async () => {
   if (props.show) {
     void loadSettingsAndPaths();
     void loadCacheStats();
+    void fetchSyncProgress();
+  }
+  try {
+    unlistenSyncProgress = await listen<CloudSyncProgress>("cloud-sync://progress", (event) => {
+      syncProgress.value = event.payload;
+      if (
+        event.payload.phase === "completed" ||
+        event.payload.phase === "cancelled" ||
+        event.payload.phase === "failed"
+      ) {
+        void fetchSyncProgress();
+      }
+    });
+  } catch (e) {
+    console.error("Failed to register cloud-sync event listener:", e);
+  }
+});
+
+onUnmounted(() => {
+  if (unlistenSyncProgress) {
+    unlistenSyncProgress();
+    unlistenSyncProgress = null;
   }
 });
 
@@ -192,6 +535,13 @@ async function saveSettings() {
       stack_similarity_threshold: stackSimilarityThreshold.value,
       stack_time_window_minutes: stackTimeWindowMinutes.value,
       allow_multiple_open_stacks: allowMultipleStacksOpen.value,
+      comfyui_url: comfyuiUrl.value,
+      webui_url: webuiUrl.value,
+      storage_backend: storageBackend.value,
+      remote_connection_url: remoteConnectionUrl.value,
+      client_identifier: clientIdentifier.value,
+      root_mappings: rootMappings.value,
+      cloud_backup: getCurrentCloudConfig(),
     });
   } catch (e) {
     console.error("Failed to save config.json:", e);
@@ -259,6 +609,36 @@ async function saveSettings() {
             @click="activeTab = 'stacking'"
           >
             <span aria-hidden="true">▱</span><span>{{ t.settings.tabs.stacking || 'Stacks' }}</span>
+          </button>
+          <button
+            type="button"
+            class="tab-btn"
+            :class="{ active: activeTab === 'interop' }"
+            role="tab"
+            :aria-selected="activeTab === 'interop'"
+            @click="activeTab = 'interop'"
+          >
+            <span aria-hidden="true">🔌</span><span>{{ t.interop.title }}</span>
+          </button>
+          <button
+            type="button"
+            class="tab-btn"
+            :class="{ active: activeTab === 'collaboration' }"
+            role="tab"
+            :aria-selected="activeTab === 'collaboration'"
+            @click="activeTab = 'collaboration'"
+          >
+            <span aria-hidden="true">👥</span><span>{{ t.settings.tabs.collaboration || 'Team & Database' }}</span>
+          </button>
+          <button
+            type="button"
+            class="tab-btn"
+            :class="{ active: activeTab === 'cloudBackup' }"
+            role="tab"
+            :aria-selected="activeTab === 'cloudBackup'"
+            @click="activeTab = 'cloudBackup'; handleListSnapshots();"
+          >
+            <span aria-hidden="true">☁️</span><span>{{ t.settings.tabs.cloudBackup }}</span>
           </button>
           <button
             type="button"
@@ -443,14 +823,24 @@ async function saveSettings() {
                   <span v-if="cacheMessage" style="margin-left: 8px; color: #4ade80;">{{ cacheMessage }}</span>
                 </span>
               </div>
-              <button
-                type="button"
-                class="btn secondary"
-                :disabled="clearingCache"
-                @click="handleClearCache"
-              >
-                {{ clearingCache ? t.settings.clearing : t.settings.clearCache }}
-              </button>
+              <div class="cache-actions" style="display: flex; gap: 8px;">
+                <button
+                  type="button"
+                  class="btn secondary"
+                  :disabled="clearingCache"
+                  @click="handleClearCache"
+                >
+                  {{ clearingCache ? t.settings.clearing : t.settings.clearCache }}
+                </button>
+                <button
+                  type="button"
+                  class="btn secondary"
+                  @click="showDiagnosticsModal = true"
+                >
+                  ⚡ {{ t.settings.diagnostics || 'Diagnostics' }}
+                </button>
+              </div>
+
             </div>
           </div>
 
@@ -507,6 +897,653 @@ async function saveSettings() {
                 <option :value="360">6 hours</option>
                 <option :value="1440">24 hours</option>
               </select>
+            </div>
+          </div>
+
+          <!-- Tab: Generation Interop -->
+          <div v-if="activeTab === 'interop'" class="settings-panel">
+            <div class="panel-heading">
+              <h4 class="panel-title">{{ t.interop.title }}</h4>
+              <p class="panel-subtitle">Configure local WebUI and ComfyUI endpoints for generation interop and workflow execution.</p>
+            </div>
+
+            <!-- ComfyUI Base URL -->
+            <div class="setting-row">
+              <div class="row-info">
+                <span class="row-label">{{ t.interop.comfyUrl }}</span>
+                <span class="row-desc">Default: http://127.0.0.1:8188</span>
+              </div>
+              <div class="interop-row-control">
+                <input
+                  v-model="comfyuiUrl"
+                  type="text"
+                  class="url-input"
+                  placeholder="http://127.0.0.1:8188"
+                />
+                <button
+                  type="button"
+                  class="btn-test-conn"
+                  :disabled="comfyStatus === 'checking'"
+                  @click="checkComfyConnection"
+                >
+                  {{ comfyStatus === 'checking' ? t.interop.checking : t.interop.testConnection }}
+                </button>
+                <span
+                  v-if="comfyStatus !== 'unknown'"
+                  class="status-pill"
+                  :class="comfyStatus"
+                >
+                  {{ comfyStatus === 'online' ? '🟢 ' + t.interop.online : '🔴 ' + t.interop.offline }}
+                </span>
+              </div>
+            </div>
+
+            <!-- SD WebUI Base URL -->
+            <div class="setting-row">
+              <div class="row-info">
+                <span class="row-label">{{ t.interop.webuiUrl }}</span>
+                <span class="row-desc">Default: http://127.0.0.1:7860</span>
+              </div>
+              <div class="interop-row-control">
+                <input
+                  v-model="webuiUrl"
+                  type="text"
+                  class="url-input"
+                  placeholder="http://127.0.0.1:7860"
+                />
+                <button
+                  type="button"
+                  class="btn-test-conn"
+                  :disabled="webuiStatus === 'checking'"
+                  @click="checkWebuiConnection"
+                >
+                  {{ webuiStatus === 'checking' ? t.interop.checking : t.interop.testConnection }}
+                </button>
+                <span
+                  v-if="webuiStatus !== 'unknown'"
+                  class="status-pill"
+                  :class="webuiStatus"
+                >
+                  {{ webuiStatus === 'online' ? '🟢 ' + t.interop.online : '🔴 ' + t.interop.offline }}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab: Team Collaboration & Database -->
+          <div v-if="activeTab === 'collaboration'" class="settings-panel">
+            <div class="panel-heading">
+              <h4 class="panel-title">{{ t.settings.collaborationTitle }}</h4>
+              <p class="panel-subtitle">{{ t.settings.collaborationSubtitle }}</p>
+            </div>
+
+            <!-- Database Engine Backend -->
+            <div class="setting-row">
+              <div class="row-info">
+                <span class="row-label">{{ t.settings.storageBackend }}</span>
+                <span class="row-desc">{{ t.settings.storageBackendDesc }}</span>
+              </div>
+              <select v-model="storageBackend" class="select-input">
+                <option value="sqlite">{{ t.settings.backendSqlite }}</option>
+                <option value="mysql">{{ t.settings.backendMysql }}</option>
+                <option value="postgres">{{ t.settings.backendPostgres }}</option>
+              </select>
+            </div>
+
+            <!-- Client Identifier -->
+            <div class="setting-row">
+              <div class="row-info">
+                <span class="row-label">{{ t.settings.clientId }}</span>
+                <span class="row-desc">{{ t.settings.clientIdDesc }}</span>
+              </div>
+              <input
+                v-model="clientIdentifier"
+                type="text"
+                class="url-input"
+                :placeholder="t.settings.clientIdPlaceholder"
+              />
+            </div>
+
+            <!-- Remote Connection URL (when MySQL or Postgres selected) -->
+            <div v-if="storageBackend !== 'sqlite'" class="setting-row">
+              <div class="row-info">
+                <span class="row-label">{{ t.settings.remoteUrl }}</span>
+                <span class="row-desc">{{ t.settings.remoteUrlDesc }}</span>
+              </div>
+              <div class="interop-row-control">
+                <input
+                  v-model="remoteConnectionUrl"
+                  type="text"
+                  class="url-input"
+                  :placeholder="storageBackend === 'mysql' ? 'mysql://user:pass@192.168.1.100:3306/berry' : 'postgres://user:pass@192.168.1.100:5432/berry'"
+                />
+                <button
+                  type="button"
+                  class="btn-test-conn"
+                  :disabled="pingStatus === 'testing'"
+                  @click="handlePingDatabase"
+                >
+                  {{ pingStatus === 'testing' ? t.settings.testingConnection : t.settings.testConnection }}
+                </button>
+              </div>
+            </div>
+
+            <!-- Connection Ping Result Banner -->
+            <div v-if="storageBackend !== 'sqlite' && pingStatus !== 'unknown'" class="setting-row ping-result-row">
+              <span class="status-pill" :class="pingStatus === 'success' ? 'online' : 'offline'">
+                {{ pingStatus === 'success' ? '🟢 ' + t.settings.connectionSuccess + (pingLatency !== null ? ' (' + pingLatency + ' ms)' : '') : '🔴 ' + t.settings.connectionFailed }}
+              </span>
+              <span class="ping-message">{{ pingMessage }}</span>
+            </div>
+
+            <!-- Real-time Sync Status -->
+            <div class="setting-row">
+              <div class="row-info">
+                <span class="row-label">{{ t.settings.syncStatus }}</span>
+                <span class="row-desc">{{ t.settings.lastSynced }}: {{ lastSyncDisplay }}</span>
+              </div>
+              <span class="status-pill" :class="storageBackend === 'sqlite' ? 'offline' : 'online'">
+                {{ storageBackend === 'sqlite' ? t.settings.syncIdle : t.settings.syncActive }}
+              </span>
+            </div>
+
+            <!-- Storage Roots & Local Mount Mappings -->
+            <div class="settings-subsection">
+              <h5 class="subsection-title">{{ t.settings.rootMappingsTitle }}</h5>
+              <p class="panel-subtitle">{{ t.settings.rootMappingsDesc }}</p>
+
+              <div v-if="Object.keys(rootMappings).length > 0" class="mappings-list">
+                <div v-for="(path, uuid) in rootMappings" :key="uuid" class="mapping-item">
+                  <span class="mapping-uuid">{{ uuid }}</span>
+                  <span class="mapping-arrow">➔</span>
+                  <span class="mapping-path">{{ path }}</span>
+                  <button type="button" class="btn-remove-mapping" @click="removeRootMappingEntry(String(uuid))">
+                    {{ t.settings.removeRootMapping }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- Add Root Mapping Input Row -->
+              <div class="add-mapping-row">
+                <input
+                  v-model="newMappingUuid"
+                  type="text"
+                  class="mapping-input-uuid"
+                  :placeholder="t.settings.rootUuid"
+                />
+                <input
+                  v-model="newMappingPath"
+                  type="text"
+                  class="mapping-input-path"
+                  :placeholder="t.settings.localMountPath"
+                />
+                <button type="button" class="btn-browse-mapping" @click="handleBrowseMappingPath">
+                  {{ t.settings.browseMount }}
+                </button>
+                <button
+                  type="button"
+                  class="btn-add-mapping"
+                  :disabled="!newMappingUuid.trim() || !newMappingPath.trim()"
+                  @click="addRootMappingEntry"
+                >
+                  {{ t.settings.addRootMapping }}
+                </button>
+              </div>
+            </div>
+
+            <!-- Migration Wizard Card -->
+            <div class="settings-subsection migration-card-section">
+              <div class="migration-card-header">
+                <div>
+                  <h5 class="subsection-title">{{ t.settings.migrationCardTitle }}</h5>
+                  <p class="panel-subtitle">{{ t.settings.migrationCardDesc }}</p>
+                </div>
+                <button
+                  type="button"
+                  class="btn-open-wizard"
+                  @click="showMigrationWizardModal = true"
+                >
+                  🚀 {{ t.settings.openMigrationWizard }}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab: Cloud Snapshot Backup & Restore -->
+          <div v-if="activeTab === 'cloudBackup'" class="settings-panel">
+            <div class="panel-heading">
+              <h4 class="panel-title">{{ t.settings.cloudBackup.title }}</h4>
+              <p class="panel-subtitle">{{ t.settings.cloudBackup.subtitle }}</p>
+            </div>
+
+            <!-- Provider Selection -->
+            <div class="setting-row">
+              <div class="row-info">
+                <span class="row-label">{{ t.settings.cloudBackup.provider }}</span>
+              </div>
+              <select v-model="cloudProvider" class="select-input">
+                <option value="local_path">{{ t.settings.cloudBackup.providerLocal }}</option>
+                <option value="webdav">{{ t.settings.cloudBackup.providerWebdav }}</option>
+                <option value="s3">{{ t.settings.cloudBackup.providerS3 }}</option>
+              </select>
+            </div>
+
+            <!-- Provider Options: Local / SMB / NFS -->
+            <div v-if="cloudProvider === 'local_path'" class="setting-row">
+              <div class="row-info">
+                <span class="row-label">{{ t.settings.cloudBackup.localPath }}</span>
+              </div>
+              <div style="display: flex; gap: 8px; width: 60%;">
+                <input
+                  v-model="cloudLocalPath"
+                  type="text"
+                  class="url-input"
+                  style="flex: 1;"
+                  placeholder="D:\Backups or \\nas\berry_backups"
+                />
+                <button type="button" class="btn-browse-mapping" @click="handleBrowseLocalBackupPath">
+                  {{ t.settings.cloudBackup.browse }}
+                </button>
+              </div>
+            </div>
+
+            <!-- Provider Options: WebDAV -->
+            <template v-if="cloudProvider === 'webdav'">
+              <div class="setting-row">
+                <div class="row-info">
+                  <span class="row-label">{{ t.settings.cloudBackup.webdavEndpoint }}</span>
+                </div>
+                <input
+                  v-model="cloudWebdavEndpoint"
+                  type="text"
+                  class="url-input"
+                  placeholder="https://nextcloud.example.com/remote.php/dav/files/user/backups/"
+                />
+              </div>
+              <div class="setting-row">
+                <div class="row-info">
+                  <span class="row-label">{{ t.settings.cloudBackup.webdavUser }}</span>
+                </div>
+                <input
+                  v-model="cloudWebdavUsername"
+                  type="text"
+                  class="url-input"
+                  placeholder="admin"
+                />
+              </div>
+              <div class="setting-row">
+                <div class="row-info">
+                  <span class="row-label">{{ t.settings.cloudBackup.webdavPassword }}</span>
+                </div>
+                <input
+                  v-model="cloudWebdavPassword"
+                  type="password"
+                  class="url-input"
+                  placeholder="••••••••"
+                />
+              </div>
+            </template>
+
+            <!-- Provider Options: S3 Compatible -->
+            <template v-if="cloudProvider === 's3'">
+              <div class="setting-row">
+                <div class="row-info">
+                  <span class="row-label">{{ t.settings.cloudBackup.s3Endpoint }}</span>
+                </div>
+                <input
+                  v-model="cloudS3Endpoint"
+                  type="text"
+                  class="url-input"
+                  placeholder="https://<account-id>.r2.cloudflarestorage.com or s3.amazonaws.com"
+                />
+              </div>
+              <div class="setting-row">
+                <div class="row-info">
+                  <span class="row-label">{{ t.settings.cloudBackup.s3Bucket }}</span>
+                </div>
+                <input
+                  v-model="cloudS3Bucket"
+                  type="text"
+                  class="url-input"
+                  placeholder="my-berry-backups"
+                />
+              </div>
+              <div class="setting-row">
+                <div class="row-info">
+                  <span class="row-label">{{ t.settings.cloudBackup.s3Region }}</span>
+                </div>
+                <input
+                  v-model="cloudS3Region"
+                  type="text"
+                  class="url-input"
+                  placeholder="auto or us-east-1"
+                />
+              </div>
+              <div class="setting-row">
+                <div class="row-info">
+                  <span class="row-label">{{ t.settings.cloudBackup.s3AccessKey }}</span>
+                </div>
+                <input
+                  v-model="cloudS3AccessKey"
+                  type="text"
+                  class="url-input"
+                  placeholder="Access Key ID"
+                />
+              </div>
+              <div class="setting-row">
+                <div class="row-info">
+                  <span class="row-label">{{ t.settings.cloudBackup.s3SecretKey }}</span>
+                </div>
+                <input
+                  v-model="cloudS3SecretKey"
+                  type="password"
+                  class="url-input"
+                  placeholder="Secret Access Key"
+                />
+              </div>
+              <div class="setting-row">
+                <div class="row-info">
+                  <span class="row-label">{{ t.settings.cloudBackup.s3Prefix }}</span>
+                </div>
+                <input
+                  v-model="cloudS3Prefix"
+                  type="text"
+                  class="url-input"
+                  placeholder="backups/"
+                />
+              </div>
+            </template>
+
+            <!-- Test Connection & Feedback -->
+            <div class="setting-row" style="align-items: center;">
+              <div class="row-info">
+                <button
+                  type="button"
+                  class="btn-browse-mapping"
+                  :disabled="cloudPingStatus === 'testing'"
+                  @click="handleTestCloudConnection"
+                >
+                  <span v-if="cloudPingStatus === 'testing'">⏳ Testing...</span>
+                  <span v-else>📡 {{ t.settings.cloudBackup.testConnection }}</span>
+                </button>
+              </div>
+              <div>
+                <span
+                  v-if="cloudPingStatus === 'success'"
+                  style="color: #4ade80; font-size: 0.85rem; font-weight: 500;"
+                >
+                  ✓ {{ cloudPingMessage }} ({{ cloudPingLatency }} ms)
+                </span>
+                <span
+                  v-else-if="cloudPingStatus === 'error'"
+                  style="color: #f87171; font-size: 0.85rem;"
+                >
+                  ✕ {{ cloudPingMessage }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Snapshot Creation Card -->
+            <div class="settings-subsection" style="margin-top: 20px; padding: 16px; background: rgba(0,0,0,0.2); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+              <h5 class="subsection-title" style="margin-bottom: 8px; font-size: 0.95rem; color: #f1f5f9;">
+                📦 {{ t.settings.cloudBackup.createSnapshot }}
+              </h5>
+              <div style="display: flex; gap: 8px; margin-top: 8px;">
+                <input
+                  v-model="newSnapshotDescription"
+                  type="text"
+                  class="url-input"
+                  style="flex: 1;"
+                  :placeholder="t.settings.cloudBackup.snapshotDescription"
+                />
+                <button
+                  type="button"
+                  class="btn-add-mapping"
+                  :disabled="cloudCreatingSnapshot"
+                  @click="handleCreateSnapshot"
+                >
+                  <span v-if="cloudCreatingSnapshot">⏳ {{ t.settings.cloudBackup.creating }}</span>
+                  <span v-else>🚀 {{ t.settings.cloudBackup.createSnapshot }}</span>
+                </button>
+              </div>
+              <div v-if="cloudActionMessage" style="margin-top: 8px; color: #4ade80; font-size: 0.85rem;">
+                {{ cloudActionMessage }}
+              </div>
+              <div v-if="cloudActionError" style="margin-top: 8px; color: #f87171; font-size: 0.85rem;">
+                ✕ {{ cloudActionError }}
+              </div>
+            </div>
+
+            <!-- Remote Snapshots List -->
+            <div class="settings-subsection" style="margin-top: 20px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h5 class="subsection-title" style="margin: 0; font-size: 0.95rem; color: #f1f5f9;">
+                  ☁️ {{ t.settings.cloudBackup.snapshotsTitle }}
+                </h5>
+                <button
+                  type="button"
+                  class="btn-browse-mapping"
+                  :disabled="cloudSnapshotsLoading"
+                  @click="handleListSnapshots"
+                >
+                  {{ cloudSnapshotsLoading ? '...' : '↻ ' + t.settings.cloudBackup.refreshSnapshots }}
+                </button>
+              </div>
+
+              <div v-if="cloudSnapshotsLoading" style="padding: 20px; text-align: center; color: #94a3b8; font-size: 0.85rem;">
+                Loading snapshots...
+              </div>
+              <div v-else-if="cloudSnapshots.length === 0" style="padding: 20px; text-align: center; color: #94a3b8; font-size: 0.85rem;">
+                {{ t.settings.cloudBackup.noSnapshots }}
+              </div>
+              <div v-else class="mapping-table-wrapper" style="max-height: 220px; overflow-y: auto;">
+                <table class="root-mapping-table">
+                  <thead>
+                    <tr>
+                      <th>{{ t.settings.cloudBackup.colName }}</th>
+                      <th>{{ t.settings.cloudBackup.colDate }}</th>
+                      <th>{{ t.settings.cloudBackup.colSize }}</th>
+                      <th>{{ t.settings.cloudBackup.colFiles }}</th>
+                      <th style="text-align: right;">{{ t.settings.cloudBackup.colActions }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="item in cloudSnapshots" :key="item.filename">
+                      <td style="font-family: monospace; font-size: 0.8rem;" :title="item.description || item.filename">
+                        {{ item.filename }}
+                        <span v-if="item.description" style="display: block; color: #94a3b8; font-size: 0.72rem;">{{ item.description }}</span>
+                      </td>
+                      <td style="font-size: 0.78rem; white-space: nowrap;">
+                        {{ new Date(item.created_at * 1000).toLocaleString() }}
+                      </td>
+                      <td style="font-size: 0.78rem;">
+                        {{ (item.size_bytes / (1024 * 1024)).toFixed(2) }} MB
+                      </td>
+                      <td style="font-size: 0.78rem;">
+                        {{ item.file_count }}
+                      </td>
+                      <td style="text-align: right;">
+                        <button
+                          type="button"
+                          class="btn-browse-mapping"
+                          style="padding: 4px 10px; font-size: 0.75rem; border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;"
+                          :disabled="cloudRestoringSnapshot"
+                          @click="handleRestoreSnapshot(item)"
+                        >
+                          {{ cloudRestoringSnapshot ? t.settings.cloudBackup.restoring : t.settings.cloudBackup.restore }}
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Subsection: Incremental Media Mirroring & Delta Sync -->
+            <div class="settings-subsection" style="margin-top: 24px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.08);">
+              <div class="panel-heading" style="margin-bottom: 12px;">
+                <h5 class="subsection-title" style="font-size: 1rem; color: #f1f5f9; margin-bottom: 4px;">
+                  🔄 {{ t.settings.cloudBackup.mediaSyncTitle }}
+                </h5>
+                <p class="panel-subtitle" style="font-size: 0.8rem; color: #94a3b8; margin: 0;">
+                  {{ t.settings.cloudBackup.mediaSyncSubtitle }}
+                </p>
+              </div>
+
+              <!-- Strategy & Concurrency -->
+              <div class="setting-row">
+                <div class="row-info">
+                  <span class="row-label">{{ t.settings.cloudBackup.syncStrategy }}</span>
+                </div>
+                <select v-model="syncStrategy" class="select-input">
+                  <option value="fast_fingerprint">{{ t.settings.cloudBackup.strategyFast }}</option>
+                  <option value="sha256_checksum">{{ t.settings.cloudBackup.strategySha256 }}</option>
+                </select>
+              </div>
+
+              <div class="setting-row">
+                <div class="row-info">
+                  <span class="row-label">{{ t.settings.cloudBackup.concurrency }}</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <input
+                    v-model.number="syncConcurrency"
+                    type="range"
+                    min="1"
+                    max="16"
+                    step="1"
+                    style="width: 140px;"
+                  />
+                  <span style="font-size: 0.85rem; color: #cbd5e1; min-width: 32px;">{{ syncConcurrency }}</span>
+                </div>
+              </div>
+
+              <!-- Bandwidth limit & Remote Prefix -->
+              <div class="setting-row">
+                <div class="row-info">
+                  <span class="row-label">{{ t.settings.cloudBackup.bandwidthLimit }}</span>
+                  <span class="row-desc">{{ t.settings.cloudBackup.bandwidthLimitDesc }}</span>
+                </div>
+                <input
+                  v-model.number="syncBandwidthLimit"
+                  type="number"
+                  min="0"
+                  step="128"
+                  class="url-input"
+                  style="width: 120px;"
+                  placeholder="0"
+                />
+              </div>
+
+              <div class="setting-row">
+                <div class="row-info">
+                  <span class="row-label">{{ t.settings.cloudBackup.remoteMediaPrefix }}</span>
+                </div>
+                <input
+                  v-model="syncRemotePrefix"
+                  type="text"
+                  class="url-input"
+                  style="width: 200px;"
+                  placeholder="media/"
+                />
+              </div>
+
+              <div class="setting-row">
+                <div class="row-info">
+                  <span class="row-label">{{ t.settings.cloudBackup.dryRun }}</span>
+                </div>
+                <input
+                  v-model="syncDryRun"
+                  type="checkbox"
+                  style="width: 18px; height: 18px; accent-color: var(--accent-color, #0284c7);"
+                />
+              </div>
+
+              <!-- Sync Action & Live Progress -->
+              <div style="margin-top: 14px; padding: 14px; background: rgba(0,0,0,0.25); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <button
+                    v-if="!syncProgress || syncProgress.phase === 'idle' || syncProgress.phase === 'completed' || syncProgress.phase === 'cancelled' || syncProgress.phase === 'failed'"
+                    type="button"
+                    class="btn-add-mapping"
+                    :disabled="syncStarting"
+                    @click="handleStartCloudSync"
+                  >
+                    🚀 {{ syncStarting ? t.settings.cloudBackup.syncing : t.settings.cloudBackup.startSync }}
+                  </button>
+                  <button
+                    v-else
+                    type="button"
+                    class="btn-browse-mapping"
+                    style="border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;"
+                    @click="handleCancelCloudSync"
+                  >
+                    ⏹ {{ t.settings.cloudBackup.cancelSync }}
+                  </button>
+
+                  <div v-if="syncProgress && syncProgress.phase !== 'idle'">
+                    <span
+                      :style="{
+                        color:
+                          syncProgress.phase === 'completed'
+                            ? '#4ade80'
+                            : syncProgress.phase === 'syncing' || syncProgress.phase === 'scanning'
+                            ? '#38bdf8'
+                            : syncProgress.phase === 'cancelled'
+                            ? '#fbbf24'
+                            : '#f87171',
+                        fontSize: '0.85rem',
+                        fontWeight: '500',
+                      }"
+                    >
+                      ● {{ syncProgress.phase.toUpperCase() }}
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Progress Bar & Details -->
+                <div v-if="syncProgress && syncProgress.phase !== 'idle'" style="margin-top: 12px;">
+                  <div style="width: 100%; height: 8px; background: rgba(255,255,255,0.1); border-radius: 4px; overflow: hidden;">
+                    <div
+                      :style="{
+                        width: `${syncProgress.total_files > 0 ? Math.min(100, Math.round(((syncProgress.completed_files + syncProgress.skipped_files + syncProgress.failed_files) / syncProgress.total_files) * 100)) : 0}%`,
+                        height: '100%',
+                        background: 'var(--accent-color, #0284c7)',
+                        transition: 'width 0.2s ease',
+                      }"
+                    ></div>
+                  </div>
+
+                  <div style="display: flex; justify-content: space-between; font-size: 0.78rem; color: #94a3b8; margin-top: 8px;">
+                    <span>
+                      {{
+                        t.settings.cloudBackup.progressFiles
+                          .replace('{synced}', String(syncProgress.completed_files))
+                          .replace('{total}', String(syncProgress.total_files))
+                          .replace('{skipped}', String(syncProgress.skipped_files))
+                          .replace('{failed}', String(syncProgress.failed_files))
+                      }}
+                    </span>
+                    <span v-if="syncProgress.phase === 'syncing'">
+                      {{
+                        t.settings.cloudBackup.progressSpeed
+                          .replace('{speed}', `${(syncProgress.speed_bytes_per_sec / (1024 * 1024)).toFixed(2)} MB/s`)
+                          .replace('{eta}', syncProgress.eta_seconds != null ? `${syncProgress.eta_seconds}s` : '--')
+                      }}
+                    </span>
+                  </div>
+
+                  <div v-if="syncProgress.current_file" style="font-size: 0.75rem; color: #64748b; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    {{ t.settings.cloudBackup.progressCurrent.replace('{file}', syncProgress.current_file) }}
+                  </div>
+
+                  <!-- Summary Box -->
+                  <div v-if="syncSummary" style="margin-top: 10px; padding: 8px 12px; background: rgba(255,255,255,0.03); border-radius: 6px; font-size: 0.8rem; color: #e2e8f0;">
+                    ✓ {{ syncSummary.dry_run ? '[Dry Run] ' : '' }}{{ t.settings.cloudBackup.syncCompleted }}:
+                    {{ syncSummary.synced_files }} synced, {{ syncSummary.skipped_files }} skipped, {{ syncSummary.failed_files }} failed ({{ (syncSummary.transferred_bytes / (1024 * 1024)).toFixed(2) }} MB in {{ (syncSummary.duration_ms / 1000).toFixed(1) }}s).
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -614,8 +1651,11 @@ async function saveSettings() {
         <button type="button" class="btn primary" @click="saveSettings">{{ t.settings.save }}</button>
       </div>
     </div>
+    <ThumbnailDiagnosticsModal :show="showDiagnosticsModal" @close="showDiagnosticsModal = false" />
+    <MigrationWizardModal :show="showMigrationWizardModal" @close="showMigrationWizardModal = false" />
   </div>
 </template>
+
 
 <style scoped>
 .modal-overlay {
@@ -1133,6 +2173,249 @@ async function saveSettings() {
   .select-input {
     width: 100%;
   }
+}
+
+.interop-row-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.url-input {
+  background: var(--color-bg-primary);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+  border-radius: 5px;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  width: 220px;
+  outline: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.url-input:focus {
+  border-color: rgba(139, 92, 246, 0.5);
+}
+
+.btn-test-conn {
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  color: #f1f5f9;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-test-conn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.btn-test-conn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.status-pill {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-pill.online {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.status-pill.offline {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.status-pill.checking {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.ping-result-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.ping-message {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #94a3b8);
+}
+
+.settings-subsection {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.subsection-title {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--text-primary, #f1f5f9);
+  margin: 0 0 4px 0;
+}
+
+.mappings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.mapping-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 6px;
+  font-size: 0.82rem;
+}
+
+.mapping-uuid {
+  font-family: monospace;
+  font-weight: 600;
+  color: var(--accent-color, #38bdf8);
+}
+
+.mapping-arrow {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.mapping-path {
+  flex: 1;
+  font-family: monospace;
+  color: var(--text-secondary, #cbd5e1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-remove-mapping {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.btn-remove-mapping:hover {
+  background: rgba(239, 68, 68, 0.25);
+}
+
+.add-mapping-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.mapping-input-uuid {
+  width: 140px;
+  padding: 7px 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: var(--text-primary, #f1f5f9);
+  font-size: 0.82rem;
+}
+
+.mapping-input-path {
+  flex: 1;
+  padding: 7px 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  color: var(--text-primary, #f1f5f9);
+  font-size: 0.82rem;
+}
+
+.btn-browse-mapping {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: var(--text-primary, #f1f5f9);
+  padding: 7px 12px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-browse-mapping:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.btn-add-mapping {
+  background: var(--accent-color, #0284c7);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: #ffffff;
+  padding: 7px 14px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-add-mapping:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.migration-card-section {
+  background: rgba(99, 102, 241, 0.05);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 8px;
+  padding: 1.1rem;
+}
+
+.migration-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.btn-open-wizard {
+  background: #4f46e5;
+  border: 1px solid #6366f1;
+  border-radius: 6px;
+  color: #ffffff;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.btn-open-wizard:hover {
+  background: #4338ca;
+  transform: translateY(-1px);
 }
 
 @media (prefers-reduced-motion: reduce) {

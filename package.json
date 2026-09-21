@@ -1,12 +1,14 @@
 {
   "name": "berry-ai-studio",
   "private": true,
-  "version": "0.2.1",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
-    "test:stack": "node --experimental-strip-types --test tests/stack-collapse.test.mjs tests/thumbnail-tier.test.mjs tests/search-query.test.mjs",
+    "test:stack": "node --experimental-strip-types --test tests/stack-collapse.test.mjs tests/thumbnail-tier.test.mjs tests/search-query.test.mjs tests/gallery-layout.test.mjs tests/cull-drafts.test.mjs tests/generation-interop.test.mjs tests/collaboration-sync.test.mjs",
+    "test:memory": "node --test tests/memory-audit.test.mjs",
+    "bench:scroll": "node --experimental-strip-types --test tests/frontend-scroll-bench.mjs",
     "preview": "vite preview",
     "tauri": "tauri"
   },

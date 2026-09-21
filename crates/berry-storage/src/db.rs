@@ -4,13 +4,15 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use berry_domain::{
-    Album, CheckpointModelStat, CleanupQueueItem, Container, DatabaseStats, ExtractedMetadata,
-    FilePage, FileSortField, FilesystemChange, Folder, ImageFile, LoraModel, ModelCacheEntry,
-    PromptStat, SearchCriteria, SimilarityMatch, SortDirection, StackSummary, Tag,
+    Album, ChangeLogEntry, ChangeLogSyncQuery, CheckpointModelStat, CleanupQueueItem, Container,
+    CursorFilePage, DatabaseStats, ExtractedMetadata, FilePage, FileSortField, FilesystemChange,
+    Folder, ImageFile, LoraModel, ModelCacheEntry, MutationResult, PageCursor, PromptStat,
+    SearchCriteria, SimilarityMatch, SortDirection, StackSummary, StorageRoot, Tag,
 };
-use rusqlite::{params, Connection, OpenFlags};
+use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
 use uuid::Uuid;
 
+use crate::engine::{DatabaseDialect, StorageEngine};
 use crate::migrations::{LATEST_VERSION, MIGRATIONS};
 
 /// One persistent thumbnail cache entry keyed by source revision and size tier.
@@ -48,6 +50,8 @@ pub enum DatabaseError {
     LoraNotFound(i64),
     #[error("no image stack with id {0}")]
     StackNotFound(String),
+    #[error("no storage root with uuid {0}")]
+    StorageRootNotFound(String),
     #[error("file {file_id} already belongs to stack {stack_id}")]
     FileAlreadyStacked { file_id: i64, stack_id: String },
     #[error("rating must be between 1 and 10, got {0}")]
@@ -154,6 +158,11 @@ impl Database {
         self.path.as_deref()
     }
 
+    /// Access the underlying SQLite connection for diagnostics or benchmarks.
+    pub fn connection(&self) -> &Connection {
+        &self.conn
+    }
+
     /// Apply any pending migrations, advancing `PRAGMA user_version`.
     fn migrate(&mut self) -> Result<(), DatabaseError> {
         let current = self.user_version()?;
@@ -213,6 +222,14 @@ impl Database {
         }
         self.conn.execute("VACUUM INTO ?1", [destination_path])?;
         Ok(())
+    }
+
+    /// Export current SQLite library into a standalone SQL migration script for central MySQL or PostgreSQL databases.
+    pub fn export_central_migration_sql(
+        &self,
+        options: &berry_domain::MigrationOptions,
+    ) -> Result<berry_domain::MigrationSummary, DatabaseError> {
+        crate::migration_export::export_migration_sql(&self.conn, options)
     }
 
     /// Retrieve database storage and table statistics.
@@ -645,7 +662,29 @@ impl Database {
         )
     }
 
-    fn build_search_filter(criteria: &SearchCriteria) -> (String, Vec<rusqlite::types::Value>) {
+    /// Search a keyset cursor paginated page with full metadata.
+    pub fn search_files_cursor_page(
+        &self,
+        criteria: &SearchCriteria,
+    ) -> Result<CursorFilePage, DatabaseError> {
+        self.search_files_cursor_page_with_metadata(criteria, "metadata")
+    }
+
+    /// Search a keyset cursor paginated gallery page while excluding raw metadata
+    /// payloads that the list UI never renders.
+    pub fn search_gallery_files_cursor_page(
+        &self,
+        criteria: &SearchCriteria,
+    ) -> Result<CursorFilePage, DatabaseError> {
+        self.search_files_cursor_page_with_metadata(
+            criteria,
+            "CASE WHEN metadata IS NULL THEN NULL ELSE json_set(metadata, '$.parameters', NULL, '$.raw', NULL) END",
+        )
+    }
+
+    fn build_search_filter_conditions(
+        criteria: &SearchCriteria,
+    ) -> (Vec<String>, Vec<rusqlite::types::Value>) {
         let mut conditions = Vec::new();
         let mut params = Vec::new();
 
@@ -759,6 +798,11 @@ impl Database {
             params.push(rusqlite::types::Value::Integer(tid));
         }
 
+        (conditions, params)
+    }
+
+    fn build_search_filter(criteria: &SearchCriteria) -> (String, Vec<rusqlite::types::Value>) {
+        let (conditions, params) = Self::build_search_filter_conditions(criteria);
         let where_clause = if conditions.is_empty() {
             String::new()
         } else {
@@ -836,6 +880,192 @@ impl Database {
             total,
             offset,
             has_more,
+        })
+    }
+
+    fn search_files_cursor_page_with_metadata(
+        &self,
+        criteria: &SearchCriteria,
+        metadata_projection: &str,
+    ) -> Result<CursorFilePage, DatabaseError> {
+        let (mut conditions, mut params) = Self::build_search_filter_conditions(criteria);
+        let sort = criteria.sort.unwrap_or(FileSortField::ModifiedAt);
+        let direction = criteria.direction.unwrap_or(SortDirection::Desc);
+
+        if let Some(cursor) = &criteria.cursor {
+            let cursor_cond = match (sort, direction) {
+                (FileSortField::ModifiedAt, SortDirection::Desc) => {
+                    let cursor_mtime: i64 = cursor.sort_value.parse().unwrap_or(0);
+                    params.push(rusqlite::types::Value::Integer(cursor_mtime));
+                    params.push(rusqlite::types::Value::Integer(cursor_mtime));
+                    params.push(rusqlite::types::Value::Integer(cursor.id));
+                    "(modified_at < ? OR (modified_at = ? AND id < ?))".to_string()
+                }
+                (FileSortField::ModifiedAt, SortDirection::Asc) => {
+                    let cursor_mtime: i64 = cursor.sort_value.parse().unwrap_or(0);
+                    params.push(rusqlite::types::Value::Integer(cursor_mtime));
+                    params.push(rusqlite::types::Value::Integer(cursor_mtime));
+                    params.push(rusqlite::types::Value::Integer(cursor.id));
+                    "(modified_at > ? OR (modified_at = ? AND id > ?))".to_string()
+                }
+                (FileSortField::SizeBytes, SortDirection::Desc) => {
+                    let cursor_size: i64 = cursor.sort_value.parse().unwrap_or(0);
+                    params.push(rusqlite::types::Value::Integer(cursor_size));
+                    params.push(rusqlite::types::Value::Integer(cursor_size));
+                    params.push(rusqlite::types::Value::Integer(cursor.id));
+                    "(size_bytes < ? OR (size_bytes = ? AND id < ?))".to_string()
+                }
+                (FileSortField::SizeBytes, SortDirection::Asc) => {
+                    let cursor_size: i64 = cursor.sort_value.parse().unwrap_or(0);
+                    params.push(rusqlite::types::Value::Integer(cursor_size));
+                    params.push(rusqlite::types::Value::Integer(cursor_size));
+                    params.push(rusqlite::types::Value::Integer(cursor.id));
+                    "(size_bytes > ? OR (size_bytes = ? AND id > ?))".to_string()
+                }
+                (FileSortField::Path, SortDirection::Desc) => {
+                    params.push(rusqlite::types::Value::Text(cursor.sort_value.clone()));
+                    params.push(rusqlite::types::Value::Text(cursor.sort_value.clone()));
+                    params.push(rusqlite::types::Value::Integer(cursor.id));
+                    "(path < ? OR (path = ? AND id < ?))".to_string()
+                }
+                (FileSortField::Path, SortDirection::Asc) => {
+                    params.push(rusqlite::types::Value::Text(cursor.sort_value.clone()));
+                    params.push(rusqlite::types::Value::Text(cursor.sort_value.clone()));
+                    params.push(rusqlite::types::Value::Integer(cursor.id));
+                    "(path > ? OR (path = ? AND id > ?))".to_string()
+                }
+                (FileSortField::Rating, SortDirection::Desc) => {
+                    if let Ok(r) = cursor.sort_value.parse::<i64>() {
+                        params.push(rusqlite::types::Value::Integer(r));
+                        params.push(rusqlite::types::Value::Integer(r));
+                        params.push(rusqlite::types::Value::Integer(cursor.id));
+                        "((rating < ? AND rating IS NOT NULL) OR (rating = ? AND id < ?) OR rating IS NULL)".to_string()
+                    } else {
+                        params.push(rusqlite::types::Value::Integer(cursor.id));
+                        "(rating IS NULL AND id < ?)".to_string()
+                    }
+                }
+                (FileSortField::Rating, SortDirection::Asc) => {
+                    if let Ok(r) = cursor.sort_value.parse::<i64>() {
+                        params.push(rusqlite::types::Value::Integer(r));
+                        params.push(rusqlite::types::Value::Integer(r));
+                        params.push(rusqlite::types::Value::Integer(cursor.id));
+                        "((rating > ? AND rating IS NOT NULL) OR (rating = ? AND id > ?) OR rating IS NULL)".to_string()
+                    } else {
+                        params.push(rusqlite::types::Value::Integer(cursor.id));
+                        "(rating IS NULL AND id > ?)".to_string()
+                    }
+                }
+                (FileSortField::AestheticScore, SortDirection::Desc) => {
+                    if let Ok(s) = cursor.sort_value.parse::<f64>() {
+                        params.push(rusqlite::types::Value::Real(s));
+                        params.push(rusqlite::types::Value::Real(s));
+                        params.push(rusqlite::types::Value::Integer(cursor.id));
+                        "((aesthetic_score < ? AND aesthetic_score IS NOT NULL) OR (aesthetic_score = ? AND id < ?) OR aesthetic_score IS NULL)".to_string()
+                    } else {
+                        params.push(rusqlite::types::Value::Integer(cursor.id));
+                        "(aesthetic_score IS NULL AND id < ?)".to_string()
+                    }
+                }
+                (FileSortField::AestheticScore, SortDirection::Asc) => {
+                    if let Ok(s) = cursor.sort_value.parse::<f64>() {
+                        params.push(rusqlite::types::Value::Real(s));
+                        params.push(rusqlite::types::Value::Real(s));
+                        params.push(rusqlite::types::Value::Integer(cursor.id));
+                        "((aesthetic_score > ? AND aesthetic_score IS NOT NULL) OR (aesthetic_score = ? AND id > ?) OR aesthetic_score IS NULL)".to_string()
+                    } else {
+                        params.push(rusqlite::types::Value::Integer(cursor.id));
+                        "(aesthetic_score IS NULL AND id > ?)".to_string()
+                    }
+                }
+            };
+            conditions.push(cursor_cond);
+        }
+
+        let where_clause = if conditions.is_empty() {
+            String::new()
+        } else {
+            format!(" WHERE {}", conditions.join(" AND "))
+        };
+
+        let order_clause = match (sort, direction) {
+            (FileSortField::ModifiedAt, SortDirection::Asc) => "modified_at ASC, id ASC",
+            (FileSortField::ModifiedAt, SortDirection::Desc) => "modified_at DESC, id DESC",
+            (FileSortField::Path, SortDirection::Asc) => "path ASC, id ASC",
+            (FileSortField::Path, SortDirection::Desc) => "path DESC, id DESC",
+            (FileSortField::SizeBytes, SortDirection::Asc) => "size_bytes ASC, id ASC",
+            (FileSortField::SizeBytes, SortDirection::Desc) => "size_bytes DESC, id DESC",
+            (FileSortField::Rating, SortDirection::Asc) => "rating ASC NULLS LAST, id ASC",
+            (FileSortField::Rating, SortDirection::Desc) => "rating DESC NULLS LAST, id DESC",
+            (FileSortField::AestheticScore, SortDirection::Asc) => {
+                "aesthetic_score ASC NULLS LAST, id ASC"
+            }
+            (FileSortField::AestheticScore, SortDirection::Desc) => {
+                "aesthetic_score DESC NULLS LAST, id DESC"
+            }
+        };
+
+        let page_limit = criteria.limit.unwrap_or(50).max(1);
+        let fetch_limit = page_limit + 1;
+        params.push(rusqlite::types::Value::Integer(fetch_limit as i64));
+
+        let total_projection = if criteria.cursor.is_none() {
+            "COUNT(*) OVER()"
+        } else {
+            "0"
+        };
+
+        let sql = format!(
+            "SELECT id, folder_id, path, container, size_bytes, modified_at, {metadata_projection} AS metadata, rating, aesthetic_score, is_favorite, is_nsfw, stack_id, stack_order, {total_projection} AS total_count
+             FROM files{where_clause} ORDER BY {order_clause} LIMIT ?"
+        );
+
+        let mut stmt = self.conn.prepare(&sql)?;
+        let mut rows = stmt.query(rusqlite::params_from_iter(&params))?;
+        let mut files = Vec::new();
+        let mut total = None;
+
+        while let Some(row) = rows.next()? {
+            if files.is_empty() && criteria.cursor.is_none() {
+                total = Some(row.get::<_, i64>(13)? as usize);
+            }
+            files.push(Self::map_row(row)?);
+        }
+
+        if criteria.cursor.is_none() && files.is_empty() {
+            total = Some(0);
+        }
+
+        let has_more = files.len() > page_limit;
+        if has_more {
+            files.truncate(page_limit);
+        }
+
+        let next_cursor = if has_more {
+            files.last().map(|f| PageCursor {
+                sort_value: match sort {
+                    FileSortField::ModifiedAt => f.modified_at.to_string(),
+                    FileSortField::SizeBytes => f.size_bytes.to_string(),
+                    FileSortField::Path => f.path.clone(),
+                    FileSortField::Rating => f.rating.map(|r| r.to_string()).unwrap_or_default(),
+                    FileSortField::AestheticScore => {
+                        f.aesthetic_score.map(|s| s.to_string()).unwrap_or_default()
+                    }
+                },
+                id: f.id.unwrap_or(0),
+            })
+        } else {
+            None
+        };
+
+        let prev_cursor = criteria.cursor.clone();
+
+        Ok(CursorFilePage {
+            items: files,
+            next_cursor,
+            prev_cursor,
+            has_more,
+            total: total.unwrap_or(0),
         })
     }
 
@@ -919,6 +1149,86 @@ impl Database {
         }
         tx.commit()?;
         Ok(count)
+    }
+
+    /// Update user rating with Optimistic Concurrency Control (OCC) and automatic change log journaling.
+    pub fn set_file_rating_occ(
+        &self,
+        file_id: i64,
+        rating: Option<u8>,
+        expected_version: Option<i64>,
+        client_id: &str,
+    ) -> Result<MutationResult, DatabaseError> {
+        if let Some(r) = rating {
+            if !(1..=10).contains(&r) {
+                return Err(DatabaseError::InvalidRating(r));
+            }
+        }
+
+        // Check if file exists and get current version
+        let mut check_stmt = self
+            .conn
+            .prepare("SELECT version FROM files WHERE id = ?1")?;
+        let current_version: Option<i64> = check_stmt
+            .query_row([file_id], |row| row.get(0))
+            .optional()?;
+        let current_version = match current_version {
+            Some(v) => v,
+            None => return Err(DatabaseError::FileNotFound(file_id)),
+        };
+
+        // If expected_version is specified and differs, detect conflict immediately
+        if let Some(exp) = expected_version {
+            if exp != current_version {
+                return Ok(MutationResult {
+                    success: false,
+                    current_version,
+                    rows_affected: 0,
+                    conflict_detected: true,
+                });
+            }
+        }
+
+        let new_version = current_version + 1;
+        let affected = self.conn.execute(
+            "UPDATE files SET rating = ?1, version = ?2 WHERE id = ?3 AND version = ?4",
+            params![
+                rating.map(|r| r as i64),
+                new_version,
+                file_id,
+                current_version
+            ],
+        )?;
+
+        if affected == 0 {
+            // Mid-air collision right during execution
+            let latest_version: i64 = self
+                .conn
+                .query_row(
+                    "SELECT version FROM files WHERE id = ?1",
+                    [file_id],
+                    |row| row.get(0),
+                )
+                .unwrap_or(current_version);
+
+            return Ok(MutationResult {
+                success: false,
+                current_version: latest_version,
+                rows_affected: 0,
+                conflict_detected: true,
+            });
+        }
+
+        // Record to change_log
+        let payload = serde_json::json!({ "rating": rating, "version": new_version }).to_string();
+        let _ = self.record_change("file.rated", file_id, None, client_id, Some(&payload));
+
+        Ok(MutationResult {
+            success: true,
+            current_version: new_version,
+            rows_affected: 1,
+            conflict_detected: false,
+        })
     }
 
     /// Number of indexed files in a folder.
@@ -2650,11 +2960,249 @@ impl Database {
         rows.collect::<rusqlite::Result<Vec<_>>>()
             .map_err(Into::into)
     }
+
+    /// Insert a new storage root record.
+    pub fn create_storage_root(&self, root: &StorageRoot) -> Result<(), DatabaseError> {
+        self.conn.execute(
+            "INSERT INTO storage_roots (root_uuid, display_name, root_type, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                root.root_uuid,
+                root.display_name,
+                root.root_type,
+                root.created_at,
+                root.updated_at
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Retrieve a storage root by its unique UUID.
+    pub fn get_storage_root(&self, root_uuid: &str) -> Result<Option<StorageRoot>, DatabaseError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT root_uuid, display_name, root_type, created_at, updated_at
+             FROM storage_roots WHERE root_uuid = ?1",
+        )?;
+        let mut rows = stmt.query([root_uuid])?;
+        if let Some(row) = rows.next()? {
+            Ok(Some(StorageRoot {
+                root_uuid: row.get(0)?,
+                display_name: row.get(1)?,
+                root_type: row.get(2)?,
+                created_at: row.get(3)?,
+                updated_at: row.get(4)?,
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// List all registered storage roots ordered by creation time.
+    pub fn list_storage_roots(&self) -> Result<Vec<StorageRoot>, DatabaseError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT root_uuid, display_name, root_type, created_at, updated_at
+             FROM storage_roots ORDER BY created_at ASC, root_uuid ASC",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok(StorageRoot {
+                root_uuid: row.get(0)?,
+                display_name: row.get(1)?,
+                root_type: row.get(2)?,
+                created_at: row.get(3)?,
+                updated_at: row.get(4)?,
+            })
+        })?;
+        let mut roots = Vec::new();
+        for row in rows {
+            roots.push(row?);
+        }
+        Ok(roots)
+    }
+
+    /// Update display name, root type, and updated_at for an existing storage root.
+    pub fn update_storage_root(&self, root: &StorageRoot) -> Result<(), DatabaseError> {
+        let rows_affected = self.conn.execute(
+            "UPDATE storage_roots SET display_name = ?1, root_type = ?2, updated_at = ?3
+             WHERE root_uuid = ?4",
+            params![
+                root.display_name,
+                root.root_type,
+                root.updated_at,
+                root.root_uuid
+            ],
+        )?;
+        if rows_affected == 0 {
+            return Err(DatabaseError::StorageRootNotFound(root.root_uuid.clone()));
+        }
+        Ok(())
+    }
+
+    /// Delete a storage root by UUID.
+    pub fn delete_storage_root(&self, root_uuid: &str) -> Result<(), DatabaseError> {
+        let rows_affected = self.conn.execute(
+            "DELETE FROM storage_roots WHERE root_uuid = ?1",
+            params![root_uuid],
+        )?;
+        if rows_affected == 0 {
+            return Err(DatabaseError::StorageRootNotFound(root_uuid.to_string()));
+        }
+        Ok(())
+    }
+
+    /// Record an event into the shared change log journal.
+    pub fn record_change(
+        &self,
+        event_type: &str,
+        entity_id: i64,
+        secondary_id: Option<&str>,
+        client_id: &str,
+        payload: Option<&str>,
+    ) -> Result<i64, DatabaseError> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+
+        self.conn.execute(
+            "INSERT INTO change_log (event_type, entity_id, secondary_id, client_id, payload, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![event_type, entity_id, secondary_id, client_id, payload, now],
+        )?;
+
+        Ok(self.conn.last_insert_rowid())
+    }
+
+    /// Fetch change log journal entries strictly newer than `after_id`.
+    pub fn fetch_changes(
+        &self,
+        query: &ChangeLogSyncQuery,
+    ) -> Result<Vec<ChangeLogEntry>, DatabaseError> {
+        let limit = query.limit.clamp(1, 1000);
+        let mut entries = Vec::new();
+
+        if let Some(ref exclude_client) = query.exclude_client_id {
+            let mut stmt = self.conn.prepare(
+                "SELECT id, event_type, entity_id, secondary_id, client_id, payload, created_at
+                 FROM change_log
+                 WHERE id > ?1 AND client_id != ?2
+                 ORDER BY id ASC
+                 LIMIT ?3",
+            )?;
+            let rows = stmt.query_map(
+                params![query.after_id, exclude_client, limit as i64],
+                |row| {
+                    Ok(ChangeLogEntry {
+                        id: row.get(0)?,
+                        event_type: row.get(1)?,
+                        entity_id: row.get(2)?,
+                        secondary_id: row.get(3)?,
+                        client_id: row.get(4)?,
+                        payload: row.get(5)?,
+                        created_at: row.get(6)?,
+                    })
+                },
+            )?;
+            for row in rows {
+                entries.push(row?);
+            }
+        } else {
+            let mut stmt = self.conn.prepare(
+                "SELECT id, event_type, entity_id, secondary_id, client_id, payload, created_at
+                 FROM change_log
+                 WHERE id > ?1
+                 ORDER BY id ASC
+                 LIMIT ?2",
+            )?;
+            let rows = stmt.query_map(params![query.after_id, limit as i64], |row| {
+                Ok(ChangeLogEntry {
+                    id: row.get(0)?,
+                    event_type: row.get(1)?,
+                    entity_id: row.get(2)?,
+                    secondary_id: row.get(3)?,
+                    client_id: row.get(4)?,
+                    payload: row.get(5)?,
+                    created_at: row.get(6)?,
+                })
+            })?;
+            for row in rows {
+                entries.push(row?);
+            }
+        }
+
+        Ok(entries)
+    }
+
+    /// Returns the maximum change log sequence ID recorded in the journal.
+    pub fn get_latest_change_id(&self) -> Result<i64, DatabaseError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT COALESCE(MAX(id), 0) FROM change_log")?;
+        let max_id: i64 = stmt.query_row([], |row| row.get(0))?;
+        Ok(max_id)
+    }
+
+    /// Prune old change log entries to manage database size.
+    pub fn prune_change_log(
+        &self,
+        older_than_secs: i64,
+        max_keep: usize,
+    ) -> Result<usize, DatabaseError> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+
+        let min_id_to_keep: i64 = self
+            .conn
+            .query_row(
+                "SELECT COALESCE(MIN(id), 0) FROM (
+                    SELECT id FROM change_log ORDER BY id DESC LIMIT ?1
+                )",
+                [max_keep as i64],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
+
+        let deleted = if older_than_secs <= 0 {
+            self.conn.execute(
+                "DELETE FROM change_log WHERE id < ?1",
+                params![min_id_to_keep],
+            )?
+        } else {
+            let cutoff = now.saturating_sub(older_than_secs);
+            self.conn.execute(
+                "DELETE FROM change_log WHERE created_at <= ?1 AND id < ?2",
+                params![cutoff, min_id_to_keep],
+            )?
+        };
+
+        Ok(deleted)
+    }
 }
 
 impl Drop for Database {
     fn drop(&mut self) {
         let _ = self.conn.execute("PRAGMA optimize;", []);
+    }
+}
+
+impl StorageEngine for Database {
+    fn dialect(&self) -> DatabaseDialect {
+        DatabaseDialect::Sqlite
+    }
+
+    fn search_files_cursor_page(
+        &self,
+        criteria: &SearchCriteria,
+    ) -> Result<CursorFilePage, DatabaseError> {
+        self.search_files_cursor_page(criteria)
+    }
+
+    fn search_gallery_files_cursor_page(
+        &self,
+        criteria: &SearchCriteria,
+    ) -> Result<CursorFilePage, DatabaseError> {
+        self.search_gallery_files_cursor_page(criteria)
     }
 }
 
@@ -3647,10 +4195,280 @@ mod tests {
     // --- File Embeddings and Similarity Search Tests ---
 
     #[test]
-    fn migration_reaches_schema_version_11() {
+    fn migration_reaches_schema_version_14() {
         let db = Database::connect_in_memory().unwrap();
-        assert_eq!(db.user_version().unwrap(), 11);
-        assert_eq!(LATEST_VERSION, 11);
+        assert_eq!(db.user_version().unwrap(), 14);
+        assert_eq!(LATEST_VERSION, 14);
+    }
+
+    #[test]
+    fn test_set_file_rating_occ_and_collision_detection() {
+        let db = Database::connect_in_memory().unwrap();
+        let folder = db.add_folder("/occ_test").unwrap();
+        let file_id = db
+            .upsert_file(&image(folder.id, "/occ_test/img.png"))
+            .unwrap();
+
+        // User A performs initial rating at version 1
+        let res_a = db
+            .set_file_rating_occ(file_id, Some(5), Some(1), "client_a")
+            .unwrap();
+        assert!(res_a.success);
+        assert_eq!(res_a.current_version, 2);
+        assert_eq!(res_a.rows_affected, 1);
+        assert!(!res_a.conflict_detected);
+
+        // User B tries to update based on stale version 1
+        let res_b = db
+            .set_file_rating_occ(file_id, Some(8), Some(1), "client_b")
+            .unwrap();
+        assert!(!res_b.success);
+        assert_eq!(res_b.current_version, 2);
+        assert_eq!(res_b.rows_affected, 0);
+        assert!(res_b.conflict_detected);
+
+        // User B observes conflict, accepts new baseline (version 2), and sets rating
+        let res_b_retry = db
+            .set_file_rating_occ(file_id, Some(8), Some(2), "client_b")
+            .unwrap();
+        assert!(res_b_retry.success);
+        assert_eq!(res_b_retry.current_version, 3);
+        assert_eq!(res_b_retry.rows_affected, 1);
+        assert!(!res_b_retry.conflict_detected);
+
+        // Verify change_log has entries for both successful mutations
+        let changes = db
+            .fetch_changes(&ChangeLogSyncQuery {
+                after_id: 0,
+                exclude_client_id: None,
+                limit: 10,
+            })
+            .unwrap();
+        assert_eq!(changes.len(), 2);
+        assert_eq!(changes[0].client_id, "client_a");
+        assert_eq!(changes[0].event_type, "file.rated");
+        assert_eq!(changes[1].client_id, "client_b");
+    }
+
+    #[test]
+    fn test_change_log_journal_record_fetch_and_prune() {
+        let db = Database::connect_in_memory().unwrap();
+        let id1 = db
+            .record_change(
+                "tag.created",
+                101,
+                None,
+                "client_a",
+                Some(r#"{"name":"tag1"}"#),
+            )
+            .unwrap();
+        let id2 = db
+            .record_change(
+                "file.rated",
+                202,
+                None,
+                "client_b",
+                Some(r#"{"rating":10}"#),
+            )
+            .unwrap();
+        assert!(id2 > id1);
+
+        assert_eq!(db.get_latest_change_id().unwrap(), id2);
+
+        // Fetch excluding client_a -> only returns client_b
+        let changes = db
+            .fetch_changes(&ChangeLogSyncQuery {
+                after_id: 0,
+                exclude_client_id: Some("client_a".to_string()),
+                limit: 50,
+            })
+            .unwrap();
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0].entity_id, 202);
+        assert_eq!(changes[0].client_id, "client_b");
+
+        // Fetch after id1
+        let changes_after = db
+            .fetch_changes(&ChangeLogSyncQuery {
+                after_id: id1,
+                exclude_client_id: None,
+                limit: 50,
+            })
+            .unwrap();
+        assert_eq!(changes_after.len(), 1);
+        assert_eq!(changes_after[0].id, id2);
+
+        // Prune with max_keep=1
+        let pruned = db.prune_change_log(0, 1).unwrap();
+        assert_eq!(pruned, 1); // 1 deleted, 1 kept
+
+        let remaining = db
+            .fetch_changes(&ChangeLogSyncQuery {
+                after_id: 0,
+                exclude_client_id: None,
+                limit: 50,
+            })
+            .unwrap();
+        assert_eq!(remaining.len(), 1);
+        assert_eq!(remaining[0].id, id2);
+    }
+
+    #[test]
+    fn test_storage_root_crud_and_errors() {
+        let db = Database::connect_in_memory().unwrap();
+        assert_eq!(db.list_storage_roots().unwrap().len(), 0);
+
+        let root1 = StorageRoot {
+            root_uuid: "root-nas-01".to_string(),
+            display_name: "Team Studio NAS".to_string(),
+            root_type: "smb".to_string(),
+            created_at: 1000,
+            updated_at: 1000,
+        };
+        db.create_storage_root(&root1).unwrap();
+
+        // Get by UUID
+        let fetched = db
+            .get_storage_root("root-nas-01")
+            .unwrap()
+            .expect("should find root");
+        assert_eq!(fetched, root1);
+
+        // Duplicate UUID rejected
+        assert!(db.create_storage_root(&root1).is_err());
+
+        // List
+        let roots = db.list_storage_roots().unwrap();
+        assert_eq!(roots.len(), 1);
+        assert_eq!(roots[0].display_name, "Team Studio NAS");
+
+        // Update
+        let mut updated = root1.clone();
+        updated.display_name = "Team Studio NAS (Fast NVMe)".to_string();
+        updated.updated_at = 1200;
+        db.update_storage_root(&updated).unwrap();
+        let fetched_updated = db.get_storage_root("root-nas-01").unwrap().unwrap();
+        assert_eq!(fetched_updated.display_name, "Team Studio NAS (Fast NVMe)");
+        assert_eq!(fetched_updated.updated_at, 1200);
+
+        // Delete
+        db.delete_storage_root("root-nas-01").unwrap();
+        assert!(db.get_storage_root("root-nas-01").unwrap().is_none());
+        assert_eq!(db.list_storage_roots().unwrap().len(), 0);
+
+        // Deleting non-existent returns error
+        assert!(matches!(
+            db.delete_storage_root("root-missing"),
+            Err(DatabaseError::StorageRootNotFound(_))
+        ));
+    }
+
+    #[test]
+    fn test_keyset_cursor_pagination_modified_at_desc() {
+        let db = Database::connect_in_memory().unwrap();
+        let folder = db.add_folder("/test").unwrap();
+
+        for i in 1..=5 {
+            let mut img = image(folder.id, &format!("/test/{i}.png"));
+            img.modified_at = i * 10;
+            db.upsert_file(&img).unwrap();
+        }
+
+        // Complete set in descending modified_at
+        let all = db
+            .search_files(&SearchCriteria {
+                sort: Some(FileSortField::ModifiedAt),
+                direction: Some(SortDirection::Desc),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(all.len(), 5);
+        assert_eq!(all[0].path, "/test/5.png");
+
+        // Page 1: limit 2, cursor None
+        let page1 = db
+            .search_files_cursor_page(&SearchCriteria {
+                limit: Some(2),
+                sort: Some(FileSortField::ModifiedAt),
+                direction: Some(SortDirection::Desc),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(page1.items.len(), 2);
+        assert_eq!(page1.items[0].path, "/test/5.png");
+        assert_eq!(page1.items[1].path, "/test/4.png");
+        assert_eq!(page1.total, 5);
+        assert!(page1.has_more);
+        assert!(page1.prev_cursor.is_none());
+        let c1 = page1.next_cursor.expect("cursor after page 1");
+
+        // Page 2: limit 2, cursor c1
+        let page2 = db
+            .search_files_cursor_page(&SearchCriteria {
+                limit: Some(2),
+                cursor: Some(c1.clone()),
+                sort: Some(FileSortField::ModifiedAt),
+                direction: Some(SortDirection::Desc),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(page2.items.len(), 2);
+        assert_eq!(page2.items[0].path, "/test/3.png");
+        assert_eq!(page2.items[1].path, "/test/2.png");
+        assert_eq!(page2.total, 0);
+        assert!(page2.has_more);
+        assert_eq!(page2.prev_cursor, Some(c1));
+        let c2 = page2.next_cursor.expect("cursor after page 2");
+
+        // Page 3: limit 2, cursor c2
+        let page3 = db
+            .search_files_cursor_page(&SearchCriteria {
+                limit: Some(2),
+                cursor: Some(c2.clone()),
+                sort: Some(FileSortField::ModifiedAt),
+                direction: Some(SortDirection::Desc),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(page3.items.len(), 1);
+        assert_eq!(page3.items[0].path, "/test/1.png");
+        assert!(!page3.has_more);
+        assert!(page3.next_cursor.is_none());
+        assert_eq!(page3.prev_cursor, Some(c2));
+    }
+
+    #[test]
+    fn test_keyset_cursor_pagination_empty_database() {
+        let db = Database::connect_in_memory().unwrap();
+        let page = db
+            .search_files_cursor_page(&SearchCriteria {
+                limit: Some(10),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(page.items.len(), 0);
+        assert_eq!(page.total, 0);
+        assert!(!page.has_more);
+        assert!(page.next_cursor.is_none());
+        assert!(page.prev_cursor.is_none());
+    }
+
+    #[test]
+    fn test_keyset_cursor_storage_engine_trait() {
+        let db = Database::connect_in_memory().unwrap();
+        let engine: &dyn StorageEngine = &db;
+        assert_eq!(engine.dialect(), DatabaseDialect::Sqlite);
+
+        let folder = db.add_folder("/gallery").unwrap();
+        let mut img = image(folder.id, "/gallery/card.png");
+        img.modified_at = 100;
+        db.upsert_file(&img).unwrap();
+
+        let page = engine
+            .search_gallery_files_cursor_page(&SearchCriteria::default())
+            .unwrap();
+        assert_eq!(page.items.len(), 1);
+        assert_eq!(page.items[0].path, "/gallery/card.png");
     }
 
     #[test]

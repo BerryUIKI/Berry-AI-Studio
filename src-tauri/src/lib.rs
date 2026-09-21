@@ -1,3 +1,5 @@
+pub mod cloud_backup;
+pub mod cloud_sync;
 mod commands;
 mod watcher;
 
@@ -20,6 +22,8 @@ pub struct AppState {
     pub watcher: Mutex<Option<watcher::LibraryWatcher>>,
     /// Monotonic generation used to cancel stale visible and look-ahead work.
     pub thumbnail_generation: Arc<AtomicU64>,
+    /// Incremental remote asset mirroring and delta sync state.
+    pub cloud_sync: Arc<Mutex<cloud_sync::CloudSyncState>>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -58,6 +62,7 @@ pub fn run() {
                 clip: Mutex::new(None),
                 watcher: Mutex::new(filesystem_watcher),
                 thumbnail_generation: Arc::new(AtomicU64::new(0)),
+                cloud_sync: Arc::new(Mutex::new(cloud_sync::CloudSyncState::default())),
             });
             let thumbnail_data_dir = data_dir.clone();
             let thumbnail_database_path = database_path.clone();
@@ -95,9 +100,11 @@ pub fn run() {
             commands::rebuild_metadata,
             commands::search_files,
             commands::search_files_page,
+            commands::search_files_cursor_page,
             commands::get_file_details,
             commands::search_files_by_query,
             commands::search_files_by_query_page,
+            commands::search_files_by_query_cursor_page,
             commands::list_filtered_stacks,
             commands::get_filtered_stack_members,
             commands::list_distinct_models,
@@ -139,10 +146,26 @@ pub fn run() {
             commands::backup_database,
             commands::get_database_stats,
             commands::restore_database,
+            commands::list_storage_roots,
+            commands::get_storage_root,
+            commands::create_storage_root,
+            commands::update_storage_root,
+            commands::delete_storage_root,
+            commands::resolve_normalized_path,
+            commands::relativize_local_path,
+            commands::fetch_change_log,
+            commands::record_change_event,
+            commands::set_file_rating_occ,
+            commands::test_database_connection,
+            commands::export_sqlite_to_central_migration,
+            commands::export_files_batch,
             commands::open_external_url,
             commands::get_or_create_thumbnail,
             commands::batch_generate_thumbnails,
             commands::cancel_thumbnail_requests,
+            commands::get_thumbnail_queue_diagnostics,
+            commands::reset_thumbnail_queue_diagnostics,
+            commands::get_watcher_status,
             commands::get_thumbnail_cache_stats,
             commands::clear_thumbnail_cache,
             commands::upsert_file_embedding,
@@ -188,6 +211,17 @@ pub fn run() {
             commands::list_stacks,
             commands::cull_stack_drafts,
             commands::auto_stack_images,
+            commands::check_generation_service,
+            commands::send_to_comfyui,
+            commands::send_to_webui,
+            commands::cloud_backup_test_connection,
+            commands::cloud_backup_create_snapshot,
+            commands::cloud_backup_list_snapshots,
+            commands::cloud_backup_restore_snapshot,
+            commands::cloud_sync_start,
+            commands::cloud_sync_cancel,
+            commands::cloud_sync_get_progress,
+            commands::cloud_sync_get_summary,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

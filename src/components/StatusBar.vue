@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import type { AppInfo, ScanProgress } from "../types";
 import { t } from "../i18n";
+import ActivityPopover from "./ActivityPopover.vue";
+import ThumbnailDiagnosticsModal from "./ThumbnailDiagnosticsModal.vue";
 
 const props = defineProps<{
   totalCount: number;
@@ -12,6 +14,9 @@ const props = defineProps<{
   thumbProgress?: { current: number; total: number; active: boolean } | null;
   hasFilter?: boolean;
 }>();
+
+const showActivity = ref(false);
+const showDiagnosticsModal = ref(false);
 
 const progressPercent = computed(() => {
   if (!props.progress || props.progress.discovering || props.progress.found === 0) return 0;
@@ -80,7 +85,34 @@ const thumbPercent = computed(() => {
         </div>
       </div>
       <span v-else class="ready-badge">{{ t.statusbar.ready }}</span>
+
+      <!-- Activity Popover Toggle Button -->
+      <button
+        type="button"
+        class="activity-toggle-btn"
+        :class="{ active: showActivity }"
+        :title="t.statusbar.activity"
+        @click.stop="showActivity = !showActivity"
+      >
+        <span class="activity-dot"></span>
+        <span>⚡ {{ t.statusbar.activity }}</span>
+      </button>
     </div>
+
+    <!-- Background Activity Popover -->
+    <ActivityPopover
+      :open="showActivity"
+      :scan-progress="progress"
+      :thumb-progress="thumbProgress"
+      @close="showActivity = false"
+      @open-thumbnail-diagnostics="showDiagnosticsModal = true"
+    />
+
+    <!-- Full Thumbnail Diagnostics Modal -->
+    <ThumbnailDiagnosticsModal
+      :show="showDiagnosticsModal"
+      @close="showDiagnosticsModal = false"
+    />
   </footer>
 </template>
 
@@ -194,5 +226,34 @@ const thumbPercent = computed(() => {
 
 .ready-badge {
   color: #64748b;
+}
+
+.activity-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #94a3b8;
+  padding: 2px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.activity-toggle-btn:hover,
+.activity-toggle-btn.active {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+}
+
+.activity-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
 }
 </style>

@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { AppTheme } from "./theme";
+import type { CloudBackupConfig } from "../types";
 
 export interface AppConfig {
   locale: string;
@@ -20,6 +21,13 @@ export interface AppConfig {
   stack_time_window_minutes: number;
   allow_multiple_open_stacks: boolean;
   suppressed_warnings: string[];
+  comfyui_url: string;
+  webui_url: string;
+  storage_backend: "sqlite" | "mysql" | "postgres";
+  remote_connection_url: string;
+  client_identifier: string;
+  root_mappings: Record<string, string>;
+  cloud_backup: CloudBackupConfig;
 }
 
 export const STACK_MERGE_WARNING_ID = "stack_merge";
@@ -52,6 +60,27 @@ const DEFAULT_CONFIG: AppConfig = {
   stack_time_window_minutes: 180,
   allow_multiple_open_stacks: false,
   suppressed_warnings: [],
+  comfyui_url: "http://127.0.0.1:8188",
+  webui_url: "http://127.0.0.1:7860",
+  storage_backend: "sqlite",
+  remote_connection_url: "",
+  client_identifier: "local_client",
+  root_mappings: {},
+  cloud_backup: {
+    provider: "local_path",
+    local_path: null,
+    webdav_endpoint: null,
+    webdav_username: null,
+    webdav_password: null,
+    s3_endpoint: null,
+    s3_bucket: null,
+    s3_region: "auto",
+    s3_access_key: null,
+    s3_secret_key: null,
+    s3_prefix: "backups/",
+    auto_backup_enabled: false,
+    auto_backup_interval_days: 7,
+  },
 };
 
 /**
@@ -120,6 +149,20 @@ export async function loadAppConfig(): Promise<AppConfig> {
       if (!isNaN(parsed) && parsed > 0) {
         config.similarity_limit = parsed;
       }
+    }
+
+    const legacyComfy = localStorage.getItem("berry_comfyui_url");
+    if (legacyComfy) {
+      config.comfyui_url = legacyComfy;
+    } else if (!config.comfyui_url) {
+      config.comfyui_url = DEFAULT_CONFIG.comfyui_url;
+    }
+
+    const legacyWebui = localStorage.getItem("berry_webui_url");
+    if (legacyWebui) {
+      config.webui_url = legacyWebui;
+    } else if (!config.webui_url) {
+      config.webui_url = DEFAULT_CONFIG.webui_url;
     }
 
     if (modified) {
@@ -191,6 +234,8 @@ function syncConfigToLocalStorage(config: AppConfig): void {
     localStorage.setItem("berry_similarity_limit", String(config.similarity_limit));
     localStorage.setItem("berry_auto_check_update", String(config.auto_check_update));
     localStorage.setItem("berry_silent_install", String(config.silent_install));
+    localStorage.setItem("berry_comfyui_url", config.comfyui_url);
+    localStorage.setItem("berry_webui_url", config.webui_url);
   } catch {
     // Ignore localStorage failures
   }

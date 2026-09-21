@@ -7,6 +7,7 @@ import type {
   Album,
   AppInfo,
   AutoStackResult,
+  CursorFilePage,
   FileSortField,
   FilePage,
   Folder,
@@ -14,12 +15,14 @@ import type {
   LibraryFilesChanged,
   LibraryCounts,
   NavTarget,
+  PageCursor,
   ScanProgress,
   SearchCriteria,
   SimilarFileItem,
   SortDirection,
   Tag,
   StackSummary,
+  ExportSummary,
 } from "./types";
 import { getFileName } from "./utils/image";
 import TitleBar from "./components/TitleBar.vue";
@@ -29,6 +32,8 @@ import FileList from "./components/FileList.vue";
 import VirtualGrid from "./components/VirtualGrid.vue";
 import {
   collapseStackMembers,
+  identifyMultiStackDrafts,
+  identifyStackDrafts,
   resolveStackHeroPaths,
   summarizeResultStacks,
 } from "./utils/stack";
@@ -48,6 +53,7 @@ import {
 } from "./utils/config";
 import { checkForUpdates } from "./utils/updater";
 import { applyTheme, normalizeTheme, type AppTheme } from "./utils/theme";
+import { collaborationSync } from "./utils/collaborationSync";
 
 const LightboxModal = defineAsyncComponent(() => import("./components/LightboxModal.vue"));
 const FilterDrawer = defineAsyncComponent(() => import("./components/FilterDrawer.vue"));
@@ -69,6 +75,10 @@ const CompareModal = defineAsyncComponent(() => import("./components/CompareModa
 const StackMergeWarningModal = defineAsyncComponent(
   () => import("./components/StackMergeWarningModal.vue"),
 );
+const CullDraftsModal = defineAsyncComponent(
+  () => import("./components/CullDraftsModal.vue"),
+);
+const ExportModal = defineAsyncComponent(() => import("./components/ExportModal.vue"));
 
 const info = ref<AppInfo | null>(null);
 const folders = ref<Folder[]>([]);
@@ -83,6 +93,7 @@ const filesLoadingMore = ref(false);
 const galleryTotal = ref(0);
 const galleryHasMore = ref(false);
 const nextGalleryOffset = ref(0);
+const nextGalleryCursor = ref<PageCursor | null>(null);
 const GALLERY_PAGE_SIZE = 400;
 let libraryRequestVersion = 0;
 const searchQuery = ref("");
@@ -128,6 +139,11 @@ let onboardingDismissedThisSession = false;
 const compareModalOpen = ref(false);
 const compareImages = ref<ImageFile[]>([]);
 const stackMergeWarningOpen = ref(false);
+const cullModalOpen = ref(false);
+const cullHeroes = ref<ImageFile[]>([]);
+const cullDrafts = ref<ImageFile[]>([]);
+const exportModalOpen = ref(false);
+const exportFilesList = ref<ImageFile[]>([]);
 
 interface StackMergePlan {
   targetStackId: string;
@@ -296,7 +312,7 @@ let unlisten: UnlistenFn | null = null;
 let unlistenLibraryChanges: UnlistenFn | null = null;
 let libraryRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 
-function scheduleLibraryRefresh(_event: LibraryFilesChanged) {
+function scheduleLibraryRefresh(_event?: LibraryFilesChanged) {
   if (libraryRefreshTimer) clearTimeout(libraryRefreshTimer);
   libraryRefreshTimer = setTimeout(() => {
     libraryRefreshTimer = null;
@@ -564,6 +580,14 @@ onMounted(async () => {
         }
       });
     }
+
+    if (cfg.storage_backend && cfg.storage_backend !== "sqlite") {
+      collaborationSync.init(cfg.client_identifier || "local_client");
+      collaborationSync.onBatch(() => {
+        scheduleLibraryRefresh();
+      });
+      collaborationSync.start();
+    }
   } catch (e) {
     error.value = String(e);
   }
@@ -597,6 +621,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener("keydown", handleWindowKeyDown);
+  collaborationSync.stop();
   if (organizeLibraryNoticeTimer) clearTimeout(organizeLibraryNoticeTimer);
   if (libraryRefreshTimer) clearTimeout(libraryRefreshTimer);
   unlisten?.();
@@ -709,6 +734,30 @@ const targetTitle = computed(() => {
       return `📚 ${activeTarget.value.album.name}`;
     case "tag":
       return `🏷️ #${activeTarget.value.tag.name}`;
+  }
+});
+
+const galleryContextKey = computed(() => {
+  if (similaritySourceFile.value) {
+    return `similarity-${similaritySourceFile.value.id ?? similaritySourceFile.value.path}`;
+  }
+  if (searchQuery.value.trim()) {
+    return `search-${searchQuery.value.trim()}`;
+  }
+  switch (activeTarget.value.type) {
+    case "folder":
+      return `folder-${activeTarget.value.folder.id}`;
+    case "album":
+      return `album-${activeTarget.value.album.id}`;
+    case "tag":
+      return `tag-${activeTarget.value.tag.id}`;
+    case "favorites":
+      return "favorites";
+    case "nsfw":
+      return "nsfw";
+    case "all":
+    default:
+      return "all";
   }
 });
 
@@ -1108,6 +1157,71 @@ async function onCompareSetHero(img: ImageFile) {
   await setStackHero(img);
 }
 
+async function onCullStack(stackId: string) {
+  let stackFiles = files.value.filter((f) => f.stack_id === stackId);
+  if (stackFiles.length <= 1) {
+    try {
+      const members = await invoke<ImageFile[]>("get_stack_members", { stackId });
+      if (members.length > 1) {
+        stackFiles = members;
+      }
+    } catch (err) {
+      console.warn("Failed to load stack members for cull:", err);
+    }
+  }
+  const result = identifyStackDrafts(stackFiles, stackId);
+  if (!result || result.drafts.length === 0) return;
+  cullHeroes.value = result.hero ? [result.hero] : [];
+  cullDrafts.value = result.drafts;
+  cullModalOpen.value = true;
+}
+
+function onBatchCullDrafts() {
+  const result = identifyMultiStackDrafts(files.value, selectedFilePaths.value);
+  if (result.drafts.length === 0) return;
+  cullHeroes.value = result.heroes;
+  cullDrafts.value = result.drafts;
+  cullModalOpen.value = true;
+}
+
+async function onConfirmCull(draftPaths: string[]) {
+  cullModalOpen.value = false;
+  if (draftPaths.length === 0) return;
+  try {
+    await invoke("trash_files", { filePaths: draftPaths });
+    const nextSelection = new Set(selectedFilePaths.value);
+    for (const p of draftPaths) {
+      nextSelection.delete(p);
+    }
+    selectedFilePaths.value = nextSelection;
+    await refreshCounts();
+    await loadFiles();
+  } catch (err) {
+    console.error("Failed to cull drafts:", err);
+  }
+}
+
+function handleOpenExportModal(targetFiles?: ImageFile[]) {
+  if (targetFiles && targetFiles.length > 0) {
+    exportFilesList.value = targetFiles;
+  } else if (selectedFilesList.value.length > 0) {
+    exportFilesList.value = selectedFilesList.value;
+  } else if (selectedFile.value) {
+    exportFilesList.value = [selectedFile.value];
+  } else if (files.value.length > 0) {
+    exportFilesList.value = Array.from(files.value);
+  } else {
+    exportFilesList.value = [];
+  }
+  if (exportFilesList.value.length > 0) {
+    exportModalOpen.value = true;
+  }
+}
+
+function onExportCompleted(_summary: ExportSummary) {
+  // Export completed callback
+}
+
 async function onOnboardingComplete() {
   // Immediately prevent any re-opening — this is the critical guard
   onboardingDismissedThisSession = true;
@@ -1268,6 +1382,7 @@ async function loadFiles() {
   galleryHasMore.value = false;
   galleryTotal.value = 0;
   nextGalleryOffset.value = 0;
+  nextGalleryCursor.value = null;
   try {
     const q = searchQuery.value.trim();
     if (q) {
@@ -1293,7 +1408,7 @@ async function loadFiles() {
           galleryTotal.value = 0;
         }
       } else {
-        const page = await invoke<FilePage>("search_files_by_query_page", {
+        const page = await invoke<CursorFilePage>("search_files_by_query_cursor_page", {
           query: q,
           context: currentPagedCriteria(0),
         });
@@ -1301,16 +1416,18 @@ async function loadFiles() {
         files.value = page.items;
         galleryTotal.value = page.total;
         galleryHasMore.value = page.has_more;
-        nextGalleryOffset.value = page.offset + page.items.length;
+        nextGalleryCursor.value = page.next_cursor ?? null;
+        nextGalleryOffset.value = page.items.length;
       }
     } else {
       const criteria = currentPagedCriteria(0);
-      const page = await invoke<FilePage>("search_files_page", { criteria });
+      const page = await invoke<CursorFilePage>("search_files_cursor_page", { criteria });
       if (requestVersion !== libraryRequestVersion) return;
       files.value = page.items;
       galleryTotal.value = page.total;
       galleryHasMore.value = page.has_more;
-      nextGalleryOffset.value = page.offset + page.items.length;
+      nextGalleryCursor.value = page.next_cursor ?? null;
+      nextGalleryOffset.value = page.items.length;
     }
 
     // Refresh stack summaries for the exact current result context.
@@ -1347,12 +1464,13 @@ async function loadFiles() {
   }
 }
 
-function currentPagedCriteria(offset: number): SearchCriteria {
+function currentPagedCriteria(offset: number, cursor?: PageCursor | null): SearchCriteria {
   const criteria: SearchCriteria = {
     sort: sortField.value,
     direction: sortDirection.value,
     limit: GALLERY_PAGE_SIZE,
     offset,
+    cursor: cursor ?? null,
   };
   if (activeTarget.value.type === "folder") criteria.folder_id = activeTarget.value.folder.id;
   else if (activeTarget.value.type === "favorites") criteria.is_favorite = true;
@@ -1376,24 +1494,40 @@ async function loadMoreFiles() {
   ) return;
 
   const requestVersion = libraryRequestVersion;
+  const cursor = nextGalleryCursor.value;
   const offset = nextGalleryOffset.value;
   filesLoadingMore.value = true;
   try {
     const q = searchQuery.value.trim();
-    const page = q
-      ? await invoke<FilePage>("search_files_by_query_page", {
-          query: q,
-          context: currentPagedCriteria(offset),
-        })
-      : await invoke<FilePage>("search_files_page", { criteria: currentPagedCriteria(offset) });
+    const page: CursorFilePage | FilePage = cursor
+      ? q
+        ? await invoke<CursorFilePage>("search_files_by_query_cursor_page", {
+            query: q,
+            context: currentPagedCriteria(offset, cursor),
+          })
+        : await invoke<CursorFilePage>("search_files_cursor_page", {
+            criteria: currentPagedCriteria(offset, cursor),
+          })
+      : q
+        ? await invoke<FilePage>("search_files_by_query_page", {
+            query: q,
+            context: currentPagedCriteria(offset),
+          })
+        : await invoke<FilePage>("search_files_page", { criteria: currentPagedCriteria(offset) });
+
     if (requestVersion !== libraryRequestVersion || offset !== nextGalleryOffset.value) return;
 
     const seen = new Set(files.value.map((file) => file.id ?? file.path));
     const appended = page.items.filter((file) => !seen.has(file.id ?? file.path));
     files.value = collapseInactiveStacks([...files.value, ...appended]);
-    galleryTotal.value = page.total;
+    if ("next_cursor" in page) {
+      nextGalleryCursor.value = page.next_cursor ?? null;
+    }
+    if (page.total > 0) {
+      galleryTotal.value = page.total;
+    }
     galleryHasMore.value = page.has_more;
-    nextGalleryOffset.value = page.offset + page.items.length;
+    nextGalleryOffset.value = offset + page.items.length;
   } catch (e) {
     if (requestVersion === libraryRequestVersion) error.value = String(e);
   } finally {
@@ -1708,6 +1842,7 @@ function onResetZoom() {
           @open-settings="settingsModalOpen = true"
           @select-all="onSelectAll"
           @clear-selection="onClearSelection"
+          @batch-export="handleOpenExportModal()"
           @batch-album="onBatchAddToAlbum"
           @toggle-sidebar="sidebarOpen = !sidebarOpen"
           @toggle-inspector="inspectorOpen = !inspectorOpen"
@@ -1941,12 +2076,14 @@ function onResetZoom() {
             :stack-map="stackMap"
             :expanded-stacks="expandedStacks"
             :layout="viewMode"
+            :context-key="galleryContextKey"
             @select="onFileSelected"
             @activate="onActivateFile"
             @toggle-select="toggleSelectFile"
             @find-similar="handleFindSimilar"
             @toggle-stack-expand="onToggleStackExpand"
             @compare-stack="onTriggerCompare"
+            @cull-stack="onCullStack"
             @load-more="loadMoreFiles"
           />
 
@@ -1981,6 +2118,8 @@ function onResetZoom() {
             @move="onBatchMove"
             @copy="onBatchCopy"
             @trash="onBatchTrash"
+            @cull-drafts="onBatchCullDrafts"
+            @export-selected="handleOpenExportModal()"
           />
         </div>
       </main>
@@ -2171,6 +2310,23 @@ function onResetZoom() {
       :image-count="pendingStackMerge?.standaloneFileIds.length ?? 0"
       @cancel="cancelStackMerge"
       @confirm="confirmStackMerge"
+    />
+
+    <CullDraftsModal
+      v-if="cullModalOpen"
+      :open="cullModalOpen"
+      :heroes="cullHeroes"
+      :drafts="cullDrafts"
+      @close="cullModalOpen = false"
+      @confirm="onConfirmCull"
+    />
+
+    <ExportModal
+      v-if="exportModalOpen"
+      :show="exportModalOpen"
+      :files="exportFilesList"
+      @close="exportModalOpen = false"
+      @exported="onExportCompleted"
     />
   </div>
 </template>

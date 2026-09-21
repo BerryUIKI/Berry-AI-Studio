@@ -18,9 +18,21 @@ const emit = defineEmits<{
   (e: "toggleFavorite", isFavorite: boolean): void;
   (e: "toggleNsfw", isNsfw: boolean): void;
   (e: "moveSelected"): void;
+  (e: "move"): void;
   (e: "copySelected"): void;
+  (e: "copy"): void;
   (e: "trashSelected"): void;
+  (e: "trash"): void;
+  (e: "exportSelected"): void;
+  (e: "cullSelectedDrafts"): void;
+  (e: "cullDrafts"): void;
+  (e: "setRating", rating: number | null): void;
+  (e: "addTag"): void;
 }>();
+
+const hasStacks = computed(
+  () => props.selectedFiles.some((f) => !!f.stack_id),
+);
 
 const allFavorites = computed(
   () => props.selectedFiles.length > 0 && props.selectedFiles.every((f) => f.is_favorite),
@@ -56,6 +68,7 @@ async function copyPrompts() {
 
 function onSetRating(rating: number | null) {
   emit("rateSelected", rating);
+  emit("setRating", rating);
   ratingMenuOpen.value = false;
 }
 </script>
@@ -206,6 +219,27 @@ function onSetRating(rating: number | null) {
           @click="emit('copySelected')"
         >
           {{ t.batch.copy }}
+        </button>
+
+        <!-- Export Selected -->
+        <button
+          type="button"
+          class="action-btn export-btn"
+          title="Export, transcode and package selected files"
+          @click="emit('exportSelected')"
+        >
+          {{ t.batch.export }}
+        </button>
+
+        <!-- Cull Lower-Rated Drafts in Stacks -->
+        <button
+          v-if="hasStacks"
+          type="button"
+          class="action-btn cull-btn"
+          :title="t.stack.cullDrafts"
+          @click="emit('cullSelectedDrafts')"
+        >
+          🧹 {{ t.stack.cullDrafts }}
         </button>
 
         <!-- Trash Selected -->
@@ -398,5 +432,17 @@ function onSetRating(rating: number | null) {
 
 .clear-opt:hover {
   background: rgba(239, 68, 68, 0.15);
+}
+
+.action-btn.cull-btn {
+  background: rgba(245, 158, 11, 0.18);
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #fbbf24;
+}
+
+.action-btn.cull-btn:hover {
+  background: #d97706;
+  border-color: #f59e0b;
+  color: #fff;
 }
 </style>

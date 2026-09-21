@@ -73,6 +73,38 @@ class LruThumbnailCache {
 // In-memory runtime LRU map of file revision + size tier -> asset URL.
 const memoryCache = new LruThumbnailCache(3000);
 
+const frontendQueueCounters = {
+  memoryCacheHits: 0,
+  dedupeHits: 0,
+  requestsDispatched: 0,
+};
+
+export interface BackendThumbnailDiagnostics {
+  queued: number;
+  running: number;
+  completed: number;
+  canceled: number;
+  failed: number;
+  reused_tier_hits: number;
+  manifest_hits: number;
+  active_generation: number;
+}
+
+export interface FrontendThumbnailDiagnostics {
+  inFlightCount: number;
+  queuedBatchCount: number;
+  memoryCacheSize: number;
+  memoryCacheHits: number;
+  dedupeHits: number;
+  activeGeneration: number;
+  requestsDispatched: number;
+}
+
+export interface ThumbnailDiagnosticsSummary {
+  backend: BackendThumbnailDiagnostics;
+  frontend: FrontendThumbnailDiagnostics;
+}
+
 // Active requests are generation-aware so a new viewport never inherits a
 // canceled promise from the previous scroll position.
 const inFlightRequests = new Map<
@@ -100,6 +132,7 @@ let sentCancellationGeneration = 0;
 let cancellationPromise: Promise<void> | null = null;
 const BATCH_CHUNK_SIZE = 48;
 const CANCELED_REQUEST_MESSAGE = "thumbnail request canceled";
+
 
 function scheduleThumbnailCancellation(generation: number): Promise<void> {
   pendingCancellationGeneration = Math.max(pendingCancellationGeneration, generation);
@@ -221,7 +254,9 @@ export function getThumbnailUrlSync(
 ): string | null {
   const fileId = file.id ?? 0;
   if (!fileId) return null;
-  return memoryCache.get(getThumbnailCacheKey(file, maxEdge)) ?? null;
+  const cached = memoryCache.get(getThumbnailCacheKey(file, maxEdge)) ?? null;
+  if (cached) frontendQueueCounters.memoryCacheHits++;
+  return cached;
 }
 
 /**
@@ -238,7 +273,10 @@ export async function getThumbnailUrl(
 
   // Check memory cache first
   const cached = memoryCache.get(cacheKey);
-  if (cached) return cached;
+  if (cached) {
+    frontendQueueCounters.memoryCacheHits++;
+    return cached;
+  }
 
   // Deduplicate in-flight requests
   const existingRequest = inFlightRequests.get(cacheKey);
@@ -246,10 +284,13 @@ export async function getThumbnailUrl(
     existingRequest &&
     (existingRequest.generation === undefined || existingRequest.generation === generation)
   ) {
+    frontendQueueCounters.dedupeHits++;
     return existingRequest.promise;
   }
 
+  frontendQueueCounters.requestsDispatched++;
   let promise!: Promise<string>;
+
   promise = (async () => {
     try {
       const diskPath = await invoke<string>("get_or_create_thumbnail", {
@@ -356,6 +397,15 @@ export async function requestBatchThumbnails(
         generated += result.generated;
         if (result.canceled === 0) {
           for (const item of items) batchReadyKeys.add(item.cache_key);
+          if (batchReadyKeys.size > 5000) {
+            const excess = batchReadyKeys.size - 4000;
+            let pruned = 0;
+            for (const key of batchReadyKeys) {
+              batchReadyKeys.delete(key);
+              pruned++;
+              if (pruned >= excess) break;
+            }
+          }
         }
       } catch {
         // Visible items can still recover through the single-thumbnail path.
@@ -390,3 +440,47 @@ export async function clearThumbnailCache(): Promise<number> {
   batchReadyKeys.clear();
   return await invoke<number>("clear_thumbnail_cache");
 }
+
+/**
+ * Fetch snapshot of runtime thumbnail queue diagnostics (both backend and frontend).
+ */
+export async function getThumbnailDiagnostics(): Promise<ThumbnailDiagnosticsSummary> {
+  const backend = await invoke<BackendThumbnailDiagnostics>("get_thumbnail_queue_diagnostics");
+  const frontend: FrontendThumbnailDiagnostics = {
+    inFlightCount: inFlightRequests.size,
+    queuedBatchCount: queuedBatchItems.size,
+    memoryCacheSize: memoryCache.size,
+    memoryCacheHits: frontendQueueCounters.memoryCacheHits,
+    dedupeHits: frontendQueueCounters.dedupeHits,
+    activeGeneration: activeThumbnailGeneration,
+    requestsDispatched: frontendQueueCounters.requestsDispatched,
+  };
+  return { backend, frontend };
+}
+
+export function getThumbnailMemoryCacheSize(): number {
+  return memoryCache.size;
+}
+
+export function getBatchReadyKeysSize(): number {
+  return batchReadyKeys.size;
+}
+
+/**
+ * Reset runtime thumbnail queue diagnostics counters.
+ */
+export async function resetThumbnailDiagnostics(): Promise<void> {
+  frontendQueueCounters.memoryCacheHits = 0;
+  frontendQueueCounters.dedupeHits = 0;
+  frontendQueueCounters.requestsDispatched = 0;
+  await invoke("reset_thumbnail_queue_diagnostics");
+}
+
+// In development mode, attach diagnostics to window for manual inspections without console noise.
+if (typeof window !== "undefined" && import.meta.env?.DEV) {
+  (window as unknown as { __BERRY_THUMBNAIL_DIAGNOSTICS__?: unknown }).__BERRY_THUMBNAIL_DIAGNOSTICS__ = {
+    get: getThumbnailDiagnostics,
+    reset: resetThumbnailDiagnostics,
+  };
+}
+

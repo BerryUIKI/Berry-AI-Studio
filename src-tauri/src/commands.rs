@@ -7,16 +7,18 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
-use std::sync::MutexGuard;
+use std::sync::{Arc, MutexGuard};
 
 use berry_clip::{ClipEngine, ClipModelInfo};
 use berry_domain::{
-    plan_prompt_stacks, Album, CheckpointModelStat, CleanupQueueItem, DatabaseStats, DetectedLora,
-    FilePage, FileSortField, Folder, ImageFile, LoraModel, ModelCacheEntry, PipelineDetectedPath,
-    PromptStackCandidate, PromptStat, SearchCriteria, SimilarityMatch, SortDirection, StackSummary,
-    Tag,
+    plan_prompt_stacks, Album, ChangeLogEntry, ChangeLogSyncQuery, CheckpointModelStat,
+    CleanupQueueItem, CursorFilePage, DatabasePingResult, DatabaseStats, DetectedLora,
+    ExportOptions, ExportSummary, FilePage, FileSortField, Folder, ImageFile, LoraModel,
+    MigrationOptions, MigrationSummary, ModelCacheEntry, MutationResult, NormalizedPath,
+    PathResolver, PipelineDetectedPath, PromptStackCandidate, PromptStat, SearchCriteria,
+    SimilarityMatch, SortDirection, StackSummary, StorageRoot, Tag,
 };
-use berry_scan::{ScanStats, Scanner};
+use berry_scan::{execute_batch_export, ScanStats, Scanner};
 use berry_storage::Database;
 use berry_tagger::{ModelInfo, TagPrediction, TaggerConfig, Wd14Tagger};
 use serde::{Deserialize, Serialize};
@@ -237,6 +239,17 @@ pub async fn search_files_page(
         .map_err(|e| e.to_string())
 }
 
+/// Search a keyset cursor paginated result page for ultra-low latency scrolling.
+#[tauri::command]
+pub async fn search_files_cursor_page(
+    criteria: SearchCriteria,
+    state: State<'_, AppState>,
+) -> Result<CursorFilePage, String> {
+    db(&state)?
+        .search_gallery_files_cursor_page(&criteria)
+        .map_err(|e| e.to_string())
+}
+
 /// Fetch one complete file record after a gallery summary is selected.
 #[tauri::command]
 pub fn get_file_details(file_id: i64, state: State<'_, AppState>) -> Result<ImageFile, String> {
@@ -294,12 +307,14 @@ fn criteria_with_query_context(query: &str, context: SearchCriteria) -> SearchCr
     criteria.direction = context.direction;
     criteria.limit = context.limit;
     criteria.offset = context.offset;
+    criteria.cursor = context.cursor;
     criteria
 }
 
 #[cfg(test)]
 mod search_context_tests {
     use super::*;
+    use berry_domain::PageCursor;
 
     #[test]
     fn query_context_preserves_navigation_scope_and_paging() {
@@ -310,6 +325,10 @@ mod search_context_tests {
             direction: Some(SortDirection::Desc),
             limit: Some(400),
             offset: Some(800),
+            cursor: Some(PageCursor {
+                sort_value: "1700000000".to_string(),
+                id: 42,
+            }),
             ..Default::default()
         };
         let criteria = criteria_with_query_context("model:dreamshaper fav:false", context);
@@ -321,6 +340,13 @@ mod search_context_tests {
         assert_eq!(criteria.direction, Some(SortDirection::Desc));
         assert_eq!(criteria.limit, Some(400));
         assert_eq!(criteria.offset, Some(800));
+        assert_eq!(
+            criteria.cursor,
+            Some(PageCursor {
+                sort_value: "1700000000".to_string(),
+                id: 42,
+            })
+        );
     }
 }
 
@@ -334,6 +360,19 @@ pub async fn search_files_by_query_page(
     let criteria = criteria_with_query_context(&query, context);
     db(&state)?
         .search_gallery_files_page(&criteria)
+        .map_err(|e| e.to_string())
+}
+
+/// Parse a free-form query and return one bounded page of matching files using keyset cursor pagination.
+#[tauri::command]
+pub async fn search_files_by_query_cursor_page(
+    query: String,
+    context: SearchCriteria,
+    state: State<'_, AppState>,
+) -> Result<CursorFilePage, String> {
+    let criteria = criteria_with_query_context(&query, context);
+    db(&state)?
+        .search_gallery_files_cursor_page(&criteria)
         .map_err(|e| e.to_string())
 }
 
@@ -1128,6 +1167,237 @@ pub fn restore_database(
     Ok(())
 }
 
+// --- Storage Roots & Path Resolution Commands ---
+
+#[tauri::command]
+pub fn list_storage_roots(state: State<'_, AppState>) -> Result<Vec<StorageRoot>, String> {
+    db(&state)?.list_storage_roots().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn get_storage_root(
+    root_uuid: String,
+    state: State<'_, AppState>,
+) -> Result<Option<StorageRoot>, String> {
+    db(&state)?
+        .get_storage_root(&root_uuid)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn create_storage_root(root: StorageRoot, state: State<'_, AppState>) -> Result<(), String> {
+    db(&state)?
+        .create_storage_root(&root)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn update_storage_root(root: StorageRoot, state: State<'_, AppState>) -> Result<(), String> {
+    db(&state)?
+        .update_storage_root(&root)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn delete_storage_root(root_uuid: String, state: State<'_, AppState>) -> Result<(), String> {
+    db(&state)?
+        .delete_storage_root(&root_uuid)
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn resolve_normalized_path(
+    root_uuid: String,
+    relative_path: String,
+    app: AppHandle,
+) -> Result<Option<String>, String> {
+    let cfg = get_app_config(app)?;
+    let resolver = PathResolver::from_mappings(cfg.root_mappings);
+    Ok(resolver
+        .resolve_absolute(&root_uuid, &relative_path)
+        .map(|p| p.to_string_lossy().to_string()))
+}
+
+#[tauri::command]
+pub fn relativize_local_path(
+    absolute_path: String,
+    app: AppHandle,
+) -> Result<Option<NormalizedPath>, String> {
+    let cfg = get_app_config(app)?;
+    let resolver = PathResolver::from_mappings(cfg.root_mappings);
+    Ok(resolver.relativize(Path::new(&absolute_path)))
+}
+
+// --- Real-time Change Log & OCC Commands ---
+
+#[tauri::command]
+pub fn fetch_change_log(
+    query: ChangeLogSyncQuery,
+    state: State<'_, AppState>,
+) -> Result<Vec<ChangeLogEntry>, String> {
+    db(&state)?.fetch_changes(&query).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn record_change_event(
+    event_type: String,
+    entity_id: i64,
+    secondary_id: Option<String>,
+    client_id: String,
+    payload: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<i64, String> {
+    db(&state)?
+        .record_change(
+            &event_type,
+            entity_id,
+            secondary_id.as_deref(),
+            &client_id,
+            payload.as_deref(),
+        )
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn set_file_rating_occ(
+    file_id: i64,
+    rating: Option<u8>,
+    expected_version: Option<i64>,
+    client_id: String,
+    state: State<'_, AppState>,
+) -> Result<MutationResult, String> {
+    db(&state)?
+        .set_file_rating_occ(file_id, rating, expected_version, &client_id)
+        .map_err(|e| e.to_string())
+}
+
+/// Test connection and measure ping latency for local SQLite or remote MySQL / PostgreSQL databases.
+#[tauri::command]
+pub fn test_database_connection(
+    backend: String,
+    connection_url: String,
+    state: State<'_, AppState>,
+) -> Result<DatabasePingResult, String> {
+    let backend_lower = backend.trim().to_lowercase();
+    let start = std::time::Instant::now();
+
+    match backend_lower.as_str() {
+        "sqlite" => {
+            let db = db(&state)?;
+            let stats = db.get_database_stats().map_err(|e| e.to_string())?;
+            let latency_ms = start.elapsed().as_millis() as u64;
+            Ok(DatabasePingResult {
+                success: true,
+                latency_ms,
+                backend: "sqlite".to_string(),
+                message: format!(
+                    "Local SQLite connected ({file_count} assets indexed).",
+                    file_count = stats.file_count
+                ),
+            })
+        }
+        "mysql" | "postgres" | "postgresql" => {
+            let default_port = if backend_lower == "mysql" { 3306 } else { 5432 };
+            let trimmed = connection_url.trim();
+            if trimmed.is_empty() {
+                return Ok(DatabasePingResult {
+                    success: false,
+                    latency_ms: 0,
+                    backend: backend_lower,
+                    message: "Connection URL is empty.".to_string(),
+                });
+            }
+
+            let without_scheme = trimmed
+                .strip_prefix("mysql://")
+                .or_else(|| trimmed.strip_prefix("postgres://"))
+                .or_else(|| trimmed.strip_prefix("postgresql://"))
+                .unwrap_or(trimmed);
+
+            let without_auth = without_scheme
+                .rsplit_once('@')
+                .map(|(_, host_part)| host_part)
+                .unwrap_or(without_scheme);
+
+            let host_port_part = without_auth
+                .split_once('/')
+                .map(|(host_part, _)| host_part)
+                .unwrap_or(without_auth);
+
+            let (host, port) = if let Some((h, p)) = host_port_part.split_once(':') {
+                (h, p.parse::<u16>().unwrap_or(default_port))
+            } else {
+                (host_port_part, default_port)
+            };
+
+            let socket_addr_str = format!("{host}:{port}");
+            use std::net::ToSocketAddrs;
+            let addrs = socket_addr_str
+                .to_socket_addrs()
+                .map_err(|e| format!("Failed to resolve hostname {host}: {e}"))?;
+
+            let mut connected = false;
+            let mut last_err = String::new();
+
+            for addr in addrs {
+                match std::net::TcpStream::connect_timeout(&addr, std::time::Duration::from_secs(3))
+                {
+                    Ok(_) => {
+                        connected = true;
+                        break;
+                    }
+                    Err(e) => {
+                        last_err = e.to_string();
+                    }
+                }
+            }
+
+            let latency_ms = start.elapsed().as_millis() as u64;
+            if connected {
+                Ok(DatabasePingResult {
+                    success: true,
+                    latency_ms,
+                    backend: backend_lower,
+                    message: format!("Host reachable at {host}:{port} ({latency_ms} ms ping)."),
+                })
+            } else {
+                Ok(DatabasePingResult {
+                    success: false,
+                    latency_ms,
+                    backend: backend_lower,
+                    message: format!("Connection failed to {host}:{port}: {last_err}"),
+                })
+            }
+        }
+        other => Err(format!("Unsupported database backend: {other}")),
+    }
+}
+
+/// Export current local SQLite database into a standalone SQL migration file for MySQL or PostgreSQL.
+#[tauri::command]
+pub fn export_sqlite_to_central_migration(
+    options: MigrationOptions,
+    state: State<'_, AppState>,
+) -> Result<MigrationSummary, String> {
+    db(&state)?
+        .export_central_migration_sql(&options)
+        .map_err(|e| e.to_string())
+}
+
+/// Batch export, transcode, sanitize, and package selected media files.
+#[tauri::command]
+pub async fn export_files_batch(
+    options: ExportOptions,
+    app_handle: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<ExportSummary, String> {
+    let db_guard = db(&state)?;
+    let summary = execute_batch_export(&db_guard, &options, move |progress| {
+        let _ = app_handle.emit("berry://export-progress", progress);
+    });
+    Ok(summary)
+}
+
 /// Open an external URL in the system's default browser.
 #[tauri::command]
 pub fn open_external_url(url: String, app_handle: AppHandle) -> Result<(), String> {
@@ -1274,6 +1544,39 @@ pub fn cancel_thumbnail_requests(generation: u64, state: State<'_, AppState>) {
     state
         .thumbnail_generation
         .fetch_max(generation, Ordering::AcqRel);
+}
+
+/// Get runtime per-job thumbnail queue diagnostics.
+#[tauri::command]
+pub fn get_thumbnail_queue_diagnostics(
+    state: State<'_, AppState>,
+) -> berry_scan::ThumbnailQueueDiagnostics {
+    let mut diag = berry_scan::get_thumbnail_queue_diagnostics();
+    diag.active_generation = state.thumbnail_generation.load(Ordering::Acquire);
+    diag
+}
+
+/// Reset runtime thumbnail queue diagnostics counters.
+#[tauri::command]
+pub fn reset_thumbnail_queue_diagnostics() {
+    berry_scan::reset_thumbnail_queue_diagnostics();
+}
+
+/// Get filesystem watcher status and health metrics.
+#[tauri::command]
+pub fn get_watcher_status(state: State<'_, AppState>) -> crate::watcher::WatcherStatus {
+    if let Ok(watcher) = state.watcher.lock() {
+        if let Some(watcher) = watcher.as_ref() {
+            return watcher.get_status();
+        }
+    }
+    crate::watcher::WatcherStatus {
+        is_active: false,
+        watched_roots_count: 0,
+        pending_journal_count: 0,
+        last_reconcile_time: None,
+        last_error: Some("Filesystem watcher is not active".into()),
+    }
 }
 
 /// Get stats for thumbnail cache on disk.
@@ -2145,6 +2448,36 @@ pub struct AppConfig {
     pub allow_multiple_open_stacks: bool,
     #[serde(default)]
     pub suppressed_warnings: Vec<String>,
+    #[serde(default = "default_comfyui_url")]
+    pub comfyui_url: String,
+    #[serde(default = "default_webui_url")]
+    pub webui_url: String,
+    #[serde(default = "default_storage_backend")]
+    pub storage_backend: String,
+    #[serde(default)]
+    pub remote_connection_url: String,
+    #[serde(default = "default_client_identifier")]
+    pub client_identifier: String,
+    #[serde(default)]
+    pub root_mappings: HashMap<String, String>,
+    #[serde(default)]
+    pub cloud_backup: berry_domain::CloudBackupConfig,
+}
+
+fn default_comfyui_url() -> String {
+    "http://127.0.0.1:8188".to_string()
+}
+
+fn default_webui_url() -> String {
+    "http://127.0.0.1:7860".to_string()
+}
+
+fn default_storage_backend() -> String {
+    "sqlite".to_string()
+}
+
+fn default_client_identifier() -> String {
+    "local_client".to_string()
 }
 
 fn default_auto_stack() -> bool {
@@ -2192,6 +2525,13 @@ impl Default for AppConfig {
             stack_time_window_minutes: 180,
             allow_multiple_open_stacks: false,
             suppressed_warnings: Vec::new(),
+            comfyui_url: default_comfyui_url(),
+            webui_url: default_webui_url(),
+            storage_backend: default_storage_backend(),
+            remote_connection_url: String::new(),
+            client_identifier: default_client_identifier(),
+            root_mappings: HashMap::new(),
+            cloud_backup: berry_domain::CloudBackupConfig::default(),
         }
     }
 }
@@ -2213,12 +2553,27 @@ mod app_config_tests {
             .as_object_mut()
             .unwrap()
             .remove("thumbnail_cache_budget_mb");
+        value.as_object_mut().unwrap().remove("comfyui_url");
+        value.as_object_mut().unwrap().remove("webui_url");
+        value.as_object_mut().unwrap().remove("storage_backend");
+        value
+            .as_object_mut()
+            .unwrap()
+            .remove("remote_connection_url");
+        value.as_object_mut().unwrap().remove("client_identifier");
+        value.as_object_mut().unwrap().remove("root_mappings");
 
         let config: AppConfig = serde_json::from_value(value).unwrap();
         assert!(config.suppressed_warnings.is_empty());
         assert_eq!(config.startup_scan_interval_minutes, 360);
         assert_eq!(config.theme, "system");
         assert_eq!(config.thumbnail_cache_budget_mb, 2048);
+        assert_eq!(config.comfyui_url, "http://127.0.0.1:8188");
+        assert_eq!(config.webui_url, "http://127.0.0.1:7860");
+        assert_eq!(config.storage_backend, "sqlite");
+        assert_eq!(config.remote_connection_url, "");
+        assert_eq!(config.client_identifier, "local_client");
+        assert!(config.root_mappings.is_empty());
     }
 }
 
@@ -3000,4 +3355,264 @@ pub fn auto_stack_images(
         eligible_images: plan.eligible_images,
         skipped_without_prompt: plan.skipped_without_prompt,
     })
+}
+
+// --- Generation Interoperability (ComfyUI & SD WebUI) ---
+
+#[tauri::command]
+pub fn check_generation_service(endpoint: String, service_type: String) -> Result<bool, String> {
+    let base = endpoint.trim_end_matches('/');
+    let agent = ureq::AgentBuilder::new()
+        .timeout_connect(std::time::Duration::from_secs(3))
+        .timeout_read(std::time::Duration::from_secs(3))
+        .build();
+
+    let primary_url = match service_type.as_str() {
+        "comfyui" => format!("{base}/system_stats"),
+        "webui" => format!("{base}/sdapi/v1/options"),
+        _ => format!("{base}/"),
+    };
+
+    if let Ok(res) = agent.get(&primary_url).call() {
+        if res.status() == 200 {
+            return Ok(true);
+        }
+    }
+
+    // Fallback URLs
+    let fallback_url = match service_type.as_str() {
+        "comfyui" => format!("{base}/prompt"),
+        "webui" => format!("{base}/docs"),
+        _ => return Ok(false),
+    };
+
+    if let Ok(res) = agent.get(&fallback_url).call() {
+        if res.status() == 200 {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}
+
+pub fn prepare_comfyui_prompt_payload(parsed: &serde_json::Value) -> serde_json::Value {
+    if parsed.get("prompt").is_some() {
+        parsed.clone()
+    } else {
+        serde_json::json!({
+            "prompt": parsed
+        })
+    }
+}
+
+#[tauri::command]
+pub fn send_to_comfyui(
+    endpoint: String,
+    workflow_json: String,
+) -> Result<serde_json::Value, String> {
+    let base = endpoint.trim_end_matches('/');
+    let target_url = format!("{base}/prompt");
+
+    let parsed: serde_json::Value =
+        serde_json::from_str(&workflow_json).map_err(|e| format!("Invalid workflow JSON: {e}"))?;
+
+    let payload = prepare_comfyui_prompt_payload(&parsed);
+    let body = serde_json::to_string(&payload)
+        .map_err(|e| format!("Failed to serialize ComfyUI payload: {e}"))?;
+
+    let agent = ureq::AgentBuilder::new()
+        .timeout_connect(std::time::Duration::from_secs(5))
+        .timeout_read(std::time::Duration::from_secs(10))
+        .build();
+
+    let res = agent
+        .post(&target_url)
+        .set("Content-Type", "application/json")
+        .send_string(&body)
+        .map_err(|e| format!("Failed to send to ComfyUI ({target_url}): {e}"))?;
+
+    let json: serde_json::Value = serde_json::from_reader(res.into_reader())
+        .map_err(|e| format!("Failed to parse ComfyUI response: {e}"))?;
+
+    Ok(json)
+}
+
+#[tauri::command]
+pub fn send_to_webui(
+    endpoint: String,
+    payload: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let base = endpoint.trim_end_matches('/');
+    let target_url = format!("{base}/sdapi/v1/txt2img");
+
+    let body = serde_json::to_string(&payload)
+        .map_err(|e| format!("Failed to serialize WebUI payload: {e}"))?;
+
+    let agent = ureq::AgentBuilder::new()
+        .timeout_connect(std::time::Duration::from_secs(5))
+        .timeout_read(std::time::Duration::from_secs(30))
+        .build();
+
+    let res = agent
+        .post(&target_url)
+        .set("Content-Type", "application/json")
+        .send_string(&body)
+        .map_err(|e| format!("Failed to send to SD WebUI ({target_url}): {e}"))?;
+
+    let json: serde_json::Value = serde_json::from_reader(res.into_reader())
+        .map_err(|e| format!("Failed to parse SD WebUI response: {e}"))?;
+
+    Ok(json)
+}
+
+/// Test connectivity and latency to the configured cloud backup provider.
+#[tauri::command]
+pub fn cloud_backup_test_connection(
+    config: berry_domain::CloudBackupConfig,
+) -> Result<berry_domain::CloudPingResult, String> {
+    Ok(crate::cloud_backup::test_cloud_connection(&config))
+}
+
+/// Create a full point-in-time library snapshot archive and upload to cloud storage.
+#[tauri::command]
+pub async fn cloud_backup_create_snapshot(
+    config: berry_domain::CloudBackupConfig,
+    description: Option<String>,
+    app_handle: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<berry_domain::CloudBackupResult, String> {
+    let data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {e}"))?;
+    let db_guard = db(&state)?;
+    crate::cloud_backup::create_cloud_snapshot(&db_guard, &config, &data_dir, description)
+}
+
+/// List all available snapshot archives from the cloud storage backend.
+#[tauri::command]
+pub fn cloud_backup_list_snapshots(
+    config: berry_domain::CloudBackupConfig,
+) -> Result<Vec<berry_domain::CloudSnapshotMeta>, String> {
+    crate::cloud_backup::list_cloud_snapshots(&config)
+}
+
+/// Restore a cloud snapshot into the active SQLite database.
+#[tauri::command]
+pub async fn cloud_backup_restore_snapshot(
+    config: berry_domain::CloudBackupConfig,
+    snapshot_filename: String,
+    app_handle: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<berry_domain::CloudRestoreResult, String> {
+    let data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to get app data dir: {e}"))?;
+    let active_db_path = data_dir.join("berry.db");
+
+    // Release database lock during file operations
+    drop(db(&state)?);
+
+    let res =
+        crate::cloud_backup::restore_cloud_snapshot(&active_db_path, &config, &snapshot_filename)?;
+
+    // Reconnect database in state
+    match berry_storage::Database::connect(&active_db_path) {
+        Ok(new_db) => {
+            let mut state_db = state.db.lock().map_err(|e| format!("Lock error: {e}"))?;
+            *state_db = new_db;
+        }
+        Err(e) => {
+            return Err(format!("Restored but failed to reconnect database: {e}"));
+        }
+    }
+
+    Ok(res)
+}
+
+#[tauri::command]
+pub async fn cloud_sync_start(
+    app_handle: AppHandle,
+    config: berry_domain::CloudBackupConfig,
+    options: berry_domain::CloudSyncOptions,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let sync_state = Arc::clone(&state.cloud_sync);
+    {
+        let st = sync_state.lock().map_err(|e| format!("Lock error: {e}"))?;
+        if st.is_running {
+            return Err("A media sync operation is already currently running".to_string());
+        }
+    }
+
+    let (items, total_bytes) = {
+        let db_guard = db(&state)?;
+        crate::cloud_sync::collect_sync_items(&db_guard, &options)?
+    };
+
+    crate::cloud_sync::start_cloud_sync(
+        app_handle,
+        config,
+        options,
+        sync_state,
+        items,
+        total_bytes,
+    );
+
+    Ok(())
+}
+
+#[tauri::command]
+pub fn cloud_sync_cancel(state: State<'_, AppState>) -> Result<(), String> {
+    crate::cloud_sync::cancel_cloud_sync(&state.cloud_sync);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn cloud_sync_get_progress(
+    state: State<'_, AppState>,
+) -> Result<berry_domain::CloudSyncProgress, String> {
+    let st = state
+        .cloud_sync
+        .lock()
+        .map_err(|e| format!("Lock error: {e}"))?;
+    Ok(st.progress.clone())
+}
+
+#[tauri::command]
+pub fn cloud_sync_get_summary(
+    state: State<'_, AppState>,
+) -> Result<Option<berry_domain::CloudSyncResult>, String> {
+    let st = state
+        .cloud_sync
+        .lock()
+        .map_err(|e| format!("Lock error: {e}"))?;
+    Ok(st.summary.clone())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_prepare_comfyui_prompt_payload() {
+        let direct_nodes = serde_json::json!({
+            "3": {
+                "class_type": "KSampler",
+                "inputs": { "seed": 12345 }
+            }
+        });
+        let payload = prepare_comfyui_prompt_payload(&direct_nodes);
+        assert!(payload.get("prompt").is_some());
+        assert_eq!(payload["prompt"]["3"]["class_type"], "KSampler");
+
+        let wrapped = serde_json::json!({
+            "prompt": {
+                "4": { "class_type": "VAEDecode" }
+            }
+        });
+        let payload2 = prepare_comfyui_prompt_payload(&wrapped);
+        assert_eq!(payload2["prompt"]["4"]["class_type"], "VAEDecode");
+    }
 }

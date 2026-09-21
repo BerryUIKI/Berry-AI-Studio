@@ -8,6 +8,9 @@
 #![allow(clippy::chunks_exact_to_as_chunks)]
 
 mod db;
+mod engine;
+mod migration_export;
 mod migrations;
 
 pub use db::{Database, DatabaseError, ThumbnailCacheEntry};
+pub use engine::{DatabaseDialect, StorageEngine};
