@@ -70,6 +70,19 @@ export interface ImageFile {
   stack_order?: number;
 }
 
+export interface PageCursor {
+  sort_value: string;
+  id: number;
+}
+
+export interface CursorFilePage {
+  items: ImageFile[];
+  total: number;
+  next_cursor?: PageCursor | null;
+  prev_cursor?: PageCursor | null;
+  has_more: boolean;
+}
+
 export interface FilePage {
   items: ImageFile[];
   total: number;
@@ -183,6 +196,7 @@ export interface SearchCriteria {
   direction?: SortDirection | null;
   limit?: number | null;
   offset?: number | null;
+  cursor?: PageCursor | null;
 }
 
 export type NavTarget =

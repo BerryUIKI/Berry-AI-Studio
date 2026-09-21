@@ -62,6 +62,28 @@ pub struct SearchCriteria {
     pub limit: Option<usize>,
     /// Number of records to skip (for pagination).
     pub offset: Option<usize>,
+    /// Optional keyset cursor for O(1) deep-page pagination.
+    #[serde(default)]
+    pub cursor: Option<PageCursor>,
+}
+
+/// Keyset cursor for O(1) deep-page pagination across 500k+ assets.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PageCursor {
+    /// Serialized sort column value (e.g. unix timestamp, rating, or byte size).
+    pub sort_value: String,
+    /// Tie-breaking file row ID.
+    pub id: i64,
+}
+
+/// A page of results retrieved via keyset cursor pagination.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CursorFilePage {
+    pub items: Vec<ImageFile>,
+    pub total: usize,
+    pub next_cursor: Option<PageCursor>,
+    pub prev_cursor: Option<PageCursor>,
+    pub has_more: bool,
 }
 
 #[cfg(test)]
@@ -95,6 +117,7 @@ mod tests {
             direction: Some(SortDirection::Desc),
             limit: Some(100),
             offset: Some(0),
+            cursor: None,
         };
 
         let json = serde_json::to_string(&criteria).unwrap();
@@ -121,5 +144,24 @@ mod tests {
         };
         let json = serde_json::to_string(&page).unwrap();
         assert_eq!(serde_json::from_str::<FilePage>(&json).unwrap(), page);
+    }
+
+    #[test]
+    fn cursor_file_page_serde_roundtrip() {
+        let cursor_page = CursorFilePage {
+            items: Vec::new(),
+            total: 500_000,
+            next_cursor: Some(PageCursor {
+                sort_value: "1726000000".to_string(),
+                id: 489123,
+            }),
+            prev_cursor: None,
+            has_more: true,
+        };
+        let json = serde_json::to_string(&cursor_page).unwrap();
+        assert_eq!(
+            serde_json::from_str::<CursorFilePage>(&json).unwrap(),
+            cursor_page
+        );
     }
 }

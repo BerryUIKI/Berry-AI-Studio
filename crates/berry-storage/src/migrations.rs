@@ -184,6 +184,12 @@ pub const MIGRATIONS: &[&str] = &[
     CREATE INDEX idx_thumbnail_cache_lru
         ON thumbnail_cache_entries(last_accessed_at, path);
     "#,
+    // v12: keyset cursor indexes for high-capacity pagination.
+    r#"
+    CREATE INDEX IF NOT EXISTS idx_files_cursor_mtime ON files(modified_at DESC, id DESC);
+    CREATE INDEX IF NOT EXISTS idx_files_cursor_size ON files(size_bytes DESC, id DESC);
+    CREATE INDEX IF NOT EXISTS idx_files_cursor_rating ON files(rating DESC, id DESC);
+    "#,
 ];
 
 /// The schema version the current code migrates databases to.
