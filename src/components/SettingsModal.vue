@@ -28,11 +28,13 @@ import {
 } from "../utils/config";
 import { applyTheme, normalizeTheme, type AppTheme } from "../utils/theme";
 import ThumbnailDiagnosticsModal from "./ThumbnailDiagnosticsModal.vue";
+import MigrationWizardModal from "./MigrationWizardModal.vue";
 import { checkServiceStatus } from "../utils/generation";
 import { open } from "@tauri-apps/plugin-dialog";
 import { collaborationSync, pingDatabase } from "../utils/collaborationSync";
 
 const showDiagnosticsModal = ref(false);
+const showMigrationWizardModal = ref(false);
 
 const props = defineProps<{
   show: boolean;
@@ -830,6 +832,23 @@ async function saveSettings() {
                 </button>
               </div>
             </div>
+
+            <!-- Migration Wizard Card -->
+            <div class="settings-subsection migration-card-section">
+              <div class="migration-card-header">
+                <div>
+                  <h5 class="subsection-title">{{ t.settings.migrationCardTitle }}</h5>
+                  <p class="panel-subtitle">{{ t.settings.migrationCardDesc }}</p>
+                </div>
+                <button
+                  type="button"
+                  class="btn-open-wizard"
+                  @click="showMigrationWizardModal = true"
+                >
+                  🚀 {{ t.settings.openMigrationWizard }}
+                </button>
+              </div>
+            </div>
           </div>
 
           <!-- Tab: Parsers -->
@@ -937,6 +956,7 @@ async function saveSettings() {
       </div>
     </div>
     <ThumbnailDiagnosticsModal :show="showDiagnosticsModal" @close="showDiagnosticsModal = false" />
+    <MigrationWizardModal :show="showMigrationWizardModal" @close="showMigrationWizardModal = false" />
   </div>
 </template>
 
@@ -1668,6 +1688,38 @@ async function saveSettings() {
 .btn-add-mapping:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.migration-card-section {
+  background: rgba(99, 102, 241, 0.05);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 8px;
+  padding: 1.1rem;
+}
+
+.migration-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.btn-open-wizard {
+  background: #4f46e5;
+  border: 1px solid #6366f1;
+  border-radius: 6px;
+  color: #ffffff;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.btn-open-wizard:hover {
+  background: #4338ca;
+  transform: translateY(-1px);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -13,9 +13,10 @@ use berry_clip::{ClipEngine, ClipModelInfo};
 use berry_domain::{
     plan_prompt_stacks, Album, ChangeLogEntry, ChangeLogSyncQuery, CheckpointModelStat,
     CleanupQueueItem, CursorFilePage, DatabasePingResult, DatabaseStats, DetectedLora, FilePage,
-    FileSortField, Folder, ImageFile, LoraModel, ModelCacheEntry, MutationResult, NormalizedPath,
-    PathResolver, PipelineDetectedPath, PromptStackCandidate, PromptStat, SearchCriteria,
-    SimilarityMatch, SortDirection, StackSummary, StorageRoot, Tag,
+    FileSortField, Folder, ImageFile, LoraModel, MigrationOptions, MigrationSummary,
+    ModelCacheEntry, MutationResult, NormalizedPath, PathResolver, PipelineDetectedPath,
+    PromptStackCandidate, PromptStat, SearchCriteria, SimilarityMatch, SortDirection, StackSummary,
+    StorageRoot, Tag,
 };
 use berry_scan::{ScanStats, Scanner};
 use berry_storage::Database;
@@ -1344,6 +1345,17 @@ pub fn test_database_connection(
         }
         other => Err(format!("Unsupported database backend: {other}")),
     }
+}
+
+/// Export current local SQLite database into a standalone SQL migration file for MySQL or PostgreSQL.
+#[tauri::command]
+pub fn export_sqlite_to_central_migration(
+    options: MigrationOptions,
+    state: State<'_, AppState>,
+) -> Result<MigrationSummary, String> {
+    db(&state)?
+        .export_central_migration_sql(&options)
+        .map_err(|e| e.to_string())
 }
 
 /// Open an external URL in the system's default browser.

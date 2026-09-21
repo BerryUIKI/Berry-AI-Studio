@@ -126,6 +126,24 @@ export interface DatabasePingResult {
   message: string;
 }
 
+export interface MigrationOptions {
+  target_dialect: string;
+  target_root_uuid: string;
+  destination: string;
+}
+
+export interface MigrationSummary {
+  success: boolean;
+  target_dialect: string;
+  total_files: number;
+  total_albums: number;
+  total_tags: number;
+  total_tag_associations: number;
+  output_path?: string | null;
+  error_message?: string | null;
+  duration_ms: number;
+}
+
 export interface FilePage {
   items: ImageFile[];
   total: number;

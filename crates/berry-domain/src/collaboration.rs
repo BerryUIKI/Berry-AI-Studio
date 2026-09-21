@@ -57,6 +57,31 @@ pub struct DatabasePingResult {
     pub message: String,
 }
 
+/// Parameters for migrating an existing SQLite library to a central database.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MigrationOptions {
+    /// Target database dialect ("mysql" or "postgres").
+    pub target_dialect: String,
+    /// Storage root UUID to map legacy file paths to.
+    pub target_root_uuid: String,
+    /// Output file destination for the migration SQL script.
+    pub destination: String,
+}
+
+/// Execution summary of a SQLite-to-central database migration export.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MigrationSummary {
+    pub success: bool,
+    pub target_dialect: String,
+    pub total_files: u64,
+    pub total_albums: u64,
+    pub total_tags: u64,
+    pub total_tag_associations: u64,
+    pub output_path: Option<String>,
+    pub error_message: Option<String>,
+    pub duration_ms: u64,
+}
+
 impl Default for ChangeLogSyncQuery {
     fn default() -> Self {
         Self {
