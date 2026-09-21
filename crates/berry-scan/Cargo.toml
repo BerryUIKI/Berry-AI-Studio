@@ -25,3 +25,7 @@ rusqlite = { version = "0.40.2", features = ["bundled"] }
 [[bench]]
 name = "large_library"
 harness = false
+
+[[bench]]
+name = "directory_fingerprint"
+harness = false

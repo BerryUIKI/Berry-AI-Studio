@@ -7,6 +7,7 @@ import type {
   Album,
   AppInfo,
   AutoStackResult,
+  CursorFilePage,
   FileSortField,
   FilePage,
   Folder,
@@ -14,6 +15,7 @@ import type {
   LibraryFilesChanged,
   LibraryCounts,
   NavTarget,
+  PageCursor,
   ScanProgress,
   SearchCriteria,
   SimilarFileItem,
@@ -91,6 +93,7 @@ const filesLoadingMore = ref(false);
 const galleryTotal = ref(0);
 const galleryHasMore = ref(false);
 const nextGalleryOffset = ref(0);
+const nextGalleryCursor = ref<PageCursor | null>(null);
 const GALLERY_PAGE_SIZE = 400;
 let libraryRequestVersion = 0;
 const searchQuery = ref("");
@@ -1379,6 +1382,7 @@ async function loadFiles() {
   galleryHasMore.value = false;
   galleryTotal.value = 0;
   nextGalleryOffset.value = 0;
+  nextGalleryCursor.value = null;
   try {
     const q = searchQuery.value.trim();
     if (q) {
@@ -1404,7 +1408,7 @@ async function loadFiles() {
           galleryTotal.value = 0;
         }
       } else {
-        const page = await invoke<FilePage>("search_files_by_query_page", {
+        const page = await invoke<CursorFilePage>("search_files_by_query_cursor_page", {
           query: q,
           context: currentPagedCriteria(0),
         });
@@ -1412,16 +1416,18 @@ async function loadFiles() {
         files.value = page.items;
         galleryTotal.value = page.total;
         galleryHasMore.value = page.has_more;
-        nextGalleryOffset.value = page.offset + page.items.length;
+        nextGalleryCursor.value = page.next_cursor ?? null;
+        nextGalleryOffset.value = page.items.length;
       }
     } else {
       const criteria = currentPagedCriteria(0);
-      const page = await invoke<FilePage>("search_files_page", { criteria });
+      const page = await invoke<CursorFilePage>("search_files_cursor_page", { criteria });
       if (requestVersion !== libraryRequestVersion) return;
       files.value = page.items;
       galleryTotal.value = page.total;
       galleryHasMore.value = page.has_more;
-      nextGalleryOffset.value = page.offset + page.items.length;
+      nextGalleryCursor.value = page.next_cursor ?? null;
+      nextGalleryOffset.value = page.items.length;
     }
 
     // Refresh stack summaries for the exact current result context.
@@ -1458,12 +1464,13 @@ async function loadFiles() {
   }
 }
 
-function currentPagedCriteria(offset: number): SearchCriteria {
+function currentPagedCriteria(offset: number, cursor?: PageCursor | null): SearchCriteria {
   const criteria: SearchCriteria = {
     sort: sortField.value,
     direction: sortDirection.value,
     limit: GALLERY_PAGE_SIZE,
     offset,
+    cursor: cursor ?? null,
   };
   if (activeTarget.value.type === "folder") criteria.folder_id = activeTarget.value.folder.id;
   else if (activeTarget.value.type === "favorites") criteria.is_favorite = true;
@@ -1487,24 +1494,40 @@ async function loadMoreFiles() {
   ) return;
 
   const requestVersion = libraryRequestVersion;
+  const cursor = nextGalleryCursor.value;
   const offset = nextGalleryOffset.value;
   filesLoadingMore.value = true;
   try {
     const q = searchQuery.value.trim();
-    const page = q
-      ? await invoke<FilePage>("search_files_by_query_page", {
-          query: q,
-          context: currentPagedCriteria(offset),
-        })
-      : await invoke<FilePage>("search_files_page", { criteria: currentPagedCriteria(offset) });
+    const page: CursorFilePage | FilePage = cursor
+      ? q
+        ? await invoke<CursorFilePage>("search_files_by_query_cursor_page", {
+            query: q,
+            context: currentPagedCriteria(offset, cursor),
+          })
+        : await invoke<CursorFilePage>("search_files_cursor_page", {
+            criteria: currentPagedCriteria(offset, cursor),
+          })
+      : q
+        ? await invoke<FilePage>("search_files_by_query_page", {
+            query: q,
+            context: currentPagedCriteria(offset),
+          })
+        : await invoke<FilePage>("search_files_page", { criteria: currentPagedCriteria(offset) });
+
     if (requestVersion !== libraryRequestVersion || offset !== nextGalleryOffset.value) return;
 
     const seen = new Set(files.value.map((file) => file.id ?? file.path));
     const appended = page.items.filter((file) => !seen.has(file.id ?? file.path));
     files.value = collapseInactiveStacks([...files.value, ...appended]);
-    galleryTotal.value = page.total;
+    if ("next_cursor" in page) {
+      nextGalleryCursor.value = page.next_cursor ?? null;
+    }
+    if (page.total > 0) {
+      galleryTotal.value = page.total;
+    }
     galleryHasMore.value = page.has_more;
-    nextGalleryOffset.value = page.offset + page.items.length;
+    nextGalleryOffset.value = offset + page.items.length;
   } catch (e) {
     if (requestVersion === libraryRequestVersion) error.value = String(e);
   } finally {

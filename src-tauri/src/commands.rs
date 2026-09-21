@@ -15,8 +15,8 @@ use berry_domain::{
     CleanupQueueItem, CursorFilePage, DatabasePingResult, DatabaseStats, DetectedLora,
     ExportOptions, ExportSummary, FilePage, FileSortField, Folder, ImageFile, LoraModel,
     MigrationOptions, MigrationSummary, ModelCacheEntry, MutationResult, NormalizedPath,
-    PathResolver, PipelineDetectedPath, PromptStackCandidate, PromptStat, SearchCriteria,
-    SimilarityMatch, SortDirection, StackSummary, StorageRoot, Tag,
+    PageCursor, PathResolver, PipelineDetectedPath, PromptStackCandidate, PromptStat,
+    SearchCriteria, SimilarityMatch, SortDirection, StackSummary, StorageRoot, Tag,
 };
 use berry_scan::{execute_batch_export, ScanStats, Scanner};
 use berry_storage::Database;
@@ -307,6 +307,7 @@ fn criteria_with_query_context(query: &str, context: SearchCriteria) -> SearchCr
     criteria.direction = context.direction;
     criteria.limit = context.limit;
     criteria.offset = context.offset;
+    criteria.cursor = context.cursor;
     criteria
 }
 
@@ -323,6 +324,10 @@ mod search_context_tests {
             direction: Some(SortDirection::Desc),
             limit: Some(400),
             offset: Some(800),
+            cursor: Some(PageCursor {
+                sort_value: "1700000000".to_string(),
+                id: 42,
+            }),
             ..Default::default()
         };
         let criteria = criteria_with_query_context("model:dreamshaper fav:false", context);
@@ -334,6 +339,13 @@ mod search_context_tests {
         assert_eq!(criteria.direction, Some(SortDirection::Desc));
         assert_eq!(criteria.limit, Some(400));
         assert_eq!(criteria.offset, Some(800));
+        assert_eq!(
+            criteria.cursor,
+            Some(PageCursor {
+                sort_value: "1700000000".to_string(),
+                id: 42,
+            })
+        );
     }
 }
 
@@ -347,6 +359,19 @@ pub async fn search_files_by_query_page(
     let criteria = criteria_with_query_context(&query, context);
     db(&state)?
         .search_gallery_files_page(&criteria)
+        .map_err(|e| e.to_string())
+}
+
+/// Parse a free-form query and return one bounded page of matching files using keyset cursor pagination.
+#[tauri::command]
+pub async fn search_files_by_query_cursor_page(
+    query: String,
+    context: SearchCriteria,
+    state: State<'_, AppState>,
+) -> Result<CursorFilePage, String> {
+    let criteria = criteria_with_query_context(&query, context);
+    db(&state)?
+        .search_gallery_files_cursor_page(&criteria)
         .map_err(|e| e.to_string())
 }
 

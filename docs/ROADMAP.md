@@ -105,7 +105,7 @@ This roadmap documents completed milestones and future engineering goals for **B
 - [x] Deduplicated, serialized thumbnail look-ahead scheduling.
 - [x] Startup scan cooldown with opt-in scanning for new installations.
 - [x] Bounded incremental gallery queries with exact totals and stale-response protection.
-- [ ] Replace offset traversal with keyset cursors if deep-page benchmarks require it.
+- [x] Replace offset traversal with keyset cursors if deep-page benchmarks require it.
 - [x] Persistent filesystem watcher journal with targeted path reconciliation and optional recovery scans.
 - [x] Persistent size-tiered thumbnail manifest with configurable LRU disk budget.
 - [x] Cancelable viewport generations with visible-first and directional look-ahead priority.
@@ -114,7 +114,7 @@ This roadmap documents completed milestones and future engineering goals for **B
 - [x] Per-job thumbnail queue diagnostics.
 - [x] Coalesce filesystem scan progress events by file count and elapsed time.
 - [x] Stream full-scan directory entries without retaining the complete tree.
-- [ ] Benchmark directory fingerprint strategies on local and network filesystems.
+- [x] Benchmark directory fingerprint strategies on local and network filesystems.
 - [x] Lazy-load infrequent modals and drawers through async component boundaries.
 - [x] Remove raw metadata blobs from paginated gallery IPC and fetch full details on selection.
 - [x] Keep navigation filters and stack grouping aligned across paginated text and semantic searches.
