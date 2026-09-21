@@ -6,6 +6,7 @@
 
 mod album;
 mod checkpoint;
+mod cloud_backup;
 mod collaboration;
 mod database_stats;
 mod export;
@@ -27,6 +28,10 @@ mod tag;
 
 pub use album::Album;
 pub use checkpoint::{CheckpointModelStat, ModelCacheEntry};
+pub use cloud_backup::{
+    CloudBackupConfig, CloudBackupResult, CloudPingResult, CloudRestoreResult, CloudSnapshotMeta,
+    CloudStorageProvider,
+};
 pub use collaboration::{
     ChangeLogEntry, ChangeLogSyncQuery, DatabasePingResult, MigrationOptions, MigrationSummary,
     MutationResult,

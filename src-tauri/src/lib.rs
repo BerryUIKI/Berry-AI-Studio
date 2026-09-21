@@ -1,4 +1,5 @@
 mod commands;
+pub mod cloud_backup;
 mod watcher;
 
 use std::sync::atomic::AtomicU64;
@@ -208,6 +209,10 @@ pub fn run() {
             commands::check_generation_service,
             commands::send_to_comfyui,
             commands::send_to_webui,
+            commands::cloud_backup_test_connection,
+            commands::cloud_backup_create_snapshot,
+            commands::cloud_backup_list_snapshots,
+            commands::cloud_backup_restore_snapshot,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

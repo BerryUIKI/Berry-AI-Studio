@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { AppTheme } from "./theme";
+import type { CloudBackupConfig } from "../types";
 
 export interface AppConfig {
   locale: string;
@@ -26,6 +27,7 @@ export interface AppConfig {
   remote_connection_url: string;
   client_identifier: string;
   root_mappings: Record<string, string>;
+  cloud_backup: CloudBackupConfig;
 }
 
 export const STACK_MERGE_WARNING_ID = "stack_merge";
@@ -64,6 +66,21 @@ const DEFAULT_CONFIG: AppConfig = {
   remote_connection_url: "",
   client_identifier: "local_client",
   root_mappings: {},
+  cloud_backup: {
+    provider: "local_path",
+    local_path: null,
+    webdav_endpoint: null,
+    webdav_username: null,
+    webdav_password: null,
+    s3_endpoint: null,
+    s3_bucket: null,
+    s3_region: "auto",
+    s3_access_key: null,
+    s3_secret_key: null,
+    s3_prefix: "backups/",
+    auto_backup_enabled: false,
+    auto_backup_interval_days: 7,
+  },
 };
 
 /**

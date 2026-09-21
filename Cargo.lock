@@ -357,16 +357,19 @@ checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
 name = "berry-ai-studio"
 version = "0.2.1"
 dependencies = [
+ "base64 0.22.1",
  "berry-clip",
  "berry-domain",
  "berry-metadata",
  "berry-scan",
  "berry-storage",
  "berry-tagger",
+ "hex",
  "image",
  "notify",
  "serde",
  "serde_json",
+ "sha2",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
@@ -374,6 +377,7 @@ dependencies = [
  "trash",
  "ureq 2.12.1",
  "uuid",
+ "zip",
 ]
 
 [[package]]
