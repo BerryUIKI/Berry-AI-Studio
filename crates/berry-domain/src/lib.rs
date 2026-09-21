@@ -6,6 +6,7 @@
 
 mod album;
 mod checkpoint;
+mod collaboration;
 mod database_stats;
 mod extracted_metadata;
 mod filesystem_change;
@@ -25,6 +26,7 @@ mod tag;
 
 pub use album::Album;
 pub use checkpoint::{CheckpointModelStat, ModelCacheEntry};
+pub use collaboration::{ChangeLogEntry, ChangeLogSyncQuery, MutationResult};
 pub use database_stats::DatabaseStats;
 pub use extracted_metadata::ExtractedMetadata;
 pub use filesystem_change::FilesystemChange;

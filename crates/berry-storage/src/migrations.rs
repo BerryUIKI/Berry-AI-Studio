@@ -200,6 +200,22 @@ pub const MIGRATIONS: &[&str] = &[
         updated_at   INTEGER NOT NULL
     ) STRICT;
     "#,
+    // v14: OCC versioning on files and change log journal for multi-user synchronization.
+    r#"
+    ALTER TABLE files ADD COLUMN version INTEGER NOT NULL DEFAULT 1;
+
+    CREATE TABLE change_log (
+        id           INTEGER PRIMARY KEY,
+        event_type   TEXT NOT NULL,
+        entity_id    INTEGER NOT NULL,
+        secondary_id TEXT,
+        client_id    TEXT NOT NULL,
+        payload      TEXT,
+        created_at   INTEGER NOT NULL
+    ) STRICT;
+
+    CREATE INDEX idx_change_log_sync ON change_log(id, client_id);
+    "#,
 ];
 
 /// The schema version the current code migrates databases to.

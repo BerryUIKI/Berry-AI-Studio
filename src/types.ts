@@ -96,6 +96,29 @@ export interface NormalizedPath {
   relative_path: string;
 }
 
+export interface ChangeLogEntry {
+  id: number;
+  event_type: string;
+  entity_id: number;
+  secondary_id?: string | null;
+  client_id: string;
+  payload?: string | null;
+  created_at: number;
+}
+
+export interface MutationResult {
+  success: boolean;
+  current_version: number;
+  rows_affected: number;
+  conflict_detected: boolean;
+}
+
+export interface ChangeLogSyncQuery {
+  after_id: number;
+  exclude_client_id?: string | null;
+  limit: number;
+}
+
 export interface FilePage {
   items: ImageFile[];
   total: number;
