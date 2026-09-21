@@ -28,6 +28,7 @@ import {
 } from "../utils/config";
 import { applyTheme, normalizeTheme, type AppTheme } from "../utils/theme";
 import ThumbnailDiagnosticsModal from "./ThumbnailDiagnosticsModal.vue";
+import { checkServiceStatus } from "../utils/generation";
 
 const showDiagnosticsModal = ref(false);
 
@@ -53,7 +54,7 @@ const emit = defineEmits<{
   }): void;
 }>();
 
-const activeTab = ref<"general" | "display" | "stacking" | "parsers" | "about">("general");
+const activeTab = ref<"general" | "display" | "stacking" | "interop" | "parsers" | "about">("general");
 
 // Settings state (backed by persistent config.json)
 const selectedLocale = ref<LocaleSetting>(currentLocaleSetting.value);
@@ -73,6 +74,22 @@ const allowMultipleStacksOpen = ref(false);
 const suppressedWarningCount = ref(0);
 const resettingWarnings = ref(false);
 const warningResetMessage = ref("");
+const comfyuiUrl = ref("http://127.0.0.1:8188");
+const webuiUrl = ref("http://127.0.0.1:7860");
+const comfyStatus = ref<"unknown" | "checking" | "online" | "offline">("unknown");
+const webuiStatus = ref<"unknown" | "checking" | "online" | "offline">("unknown");
+
+async function checkComfyConnection() {
+  comfyStatus.value = "checking";
+  const ok = await checkServiceStatus(comfyuiUrl.value, "comfyui");
+  comfyStatus.value = ok ? "online" : "offline";
+}
+
+async function checkWebuiConnection() {
+  webuiStatus.value = "checking";
+  const ok = await checkServiceStatus(webuiUrl.value, "webui");
+  webuiStatus.value = ok ? "online" : "offline";
+}
 
 // Storage paths state
 const storagePaths = ref<StoragePaths | null>(null);
@@ -110,6 +127,10 @@ async function loadSettingsAndPaths() {
     allowMultipleStacksOpen.value = config.allow_multiple_open_stacks ?? false;
     suppressedWarningCount.value = config.suppressed_warnings.length;
     warningResetMessage.value = "";
+    comfyuiUrl.value = config.comfyui_url || "http://127.0.0.1:8188";
+    webuiUrl.value = config.webui_url || "http://127.0.0.1:7860";
+    comfyStatus.value = "unknown";
+    webuiStatus.value = "unknown";
 
     storagePaths.value = await getStoragePaths();
   } catch (e) {
@@ -195,6 +216,8 @@ async function saveSettings() {
       stack_similarity_threshold: stackSimilarityThreshold.value,
       stack_time_window_minutes: stackTimeWindowMinutes.value,
       allow_multiple_open_stacks: allowMultipleStacksOpen.value,
+      comfyui_url: comfyuiUrl.value,
+      webui_url: webuiUrl.value,
     });
   } catch (e) {
     console.error("Failed to save config.json:", e);
@@ -262,6 +285,16 @@ async function saveSettings() {
             @click="activeTab = 'stacking'"
           >
             <span aria-hidden="true">▱</span><span>{{ t.settings.tabs.stacking || 'Stacks' }}</span>
+          </button>
+          <button
+            type="button"
+            class="tab-btn"
+            :class="{ active: activeTab === 'interop' }"
+            role="tab"
+            :aria-selected="activeTab === 'interop'"
+            @click="activeTab = 'interop'"
+          >
+            <span aria-hidden="true">🔌</span><span>{{ t.interop.title }}</span>
           </button>
           <button
             type="button"
@@ -520,6 +553,76 @@ async function saveSettings() {
                 <option :value="360">6 hours</option>
                 <option :value="1440">24 hours</option>
               </select>
+            </div>
+          </div>
+
+          <!-- Tab: Generation Interop -->
+          <div v-if="activeTab === 'interop'" class="settings-panel">
+            <div class="panel-heading">
+              <h4 class="panel-title">{{ t.interop.title }}</h4>
+              <p class="panel-subtitle">Configure local WebUI and ComfyUI endpoints for generation interop and workflow execution.</p>
+            </div>
+
+            <!-- ComfyUI Base URL -->
+            <div class="setting-row">
+              <div class="row-info">
+                <span class="row-label">{{ t.interop.comfyUrl }}</span>
+                <span class="row-desc">Default: http://127.0.0.1:8188</span>
+              </div>
+              <div class="interop-row-control">
+                <input
+                  v-model="comfyuiUrl"
+                  type="text"
+                  class="url-input"
+                  placeholder="http://127.0.0.1:8188"
+                />
+                <button
+                  type="button"
+                  class="btn-test-conn"
+                  :disabled="comfyStatus === 'checking'"
+                  @click="checkComfyConnection"
+                >
+                  {{ comfyStatus === 'checking' ? t.interop.checking : t.interop.testConnection }}
+                </button>
+                <span
+                  v-if="comfyStatus !== 'unknown'"
+                  class="status-pill"
+                  :class="comfyStatus"
+                >
+                  {{ comfyStatus === 'online' ? '🟢 ' + t.interop.online : '🔴 ' + t.interop.offline }}
+                </span>
+              </div>
+            </div>
+
+            <!-- SD WebUI Base URL -->
+            <div class="setting-row">
+              <div class="row-info">
+                <span class="row-label">{{ t.interop.webuiUrl }}</span>
+                <span class="row-desc">Default: http://127.0.0.1:7860</span>
+              </div>
+              <div class="interop-row-control">
+                <input
+                  v-model="webuiUrl"
+                  type="text"
+                  class="url-input"
+                  placeholder="http://127.0.0.1:7860"
+                />
+                <button
+                  type="button"
+                  class="btn-test-conn"
+                  :disabled="webuiStatus === 'checking'"
+                  @click="checkWebuiConnection"
+                >
+                  {{ webuiStatus === 'checking' ? t.interop.checking : t.interop.testConnection }}
+                </button>
+                <span
+                  v-if="webuiStatus !== 'unknown'"
+                  class="status-pill"
+                  :class="webuiStatus"
+                >
+                  {{ webuiStatus === 'online' ? '🟢 ' + t.interop.online : '🔴 ' + t.interop.offline }}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -1148,6 +1251,79 @@ async function saveSettings() {
   .select-input {
     width: 100%;
   }
+}
+
+.interop-row-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.url-input {
+  background: var(--color-bg-primary);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+  border-radius: 5px;
+  padding: 6px 10px;
+  font-size: 0.78rem;
+  width: 220px;
+  outline: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.url-input:focus {
+  border-color: rgba(139, 92, 246, 0.5);
+}
+
+.btn-test-conn {
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  color: #f1f5f9;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-test-conn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.btn-test-conn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.status-pill {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-pill.online {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.status-pill.offline {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.status-pill.checking {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -5,6 +5,14 @@ import type { DetectedLora, ImageFile, Tag } from "../types";
 import { assetUrl, formatBytes, formatPlatformName, getFileName, normalizePath } from "../utils/image";
 import { getThumbnailUrl } from "../utils/thumbnail";
 import { t } from "../i18n";
+import {
+  extractWorkflowJson,
+  hasComfyWorkflow,
+  hasPromptData,
+  sendPromptToWebUI,
+  sendWorkflowToComfyUI,
+} from "../utils/generation";
+import { loadAppConfig } from "../utils/config";
 
 const props = defineProps<{
   file: ImageFile | null;
@@ -40,6 +48,11 @@ const rawCopied = ref(false);
 const showRaw = ref(false);
 const revealedNsfw = ref(false);
 const thumbUrl = ref("");
+const sendingComfy = ref(false);
+const sendingWebui = ref(false);
+const comfyStatusMsg = ref<string | null>(null);
+const webuiStatusMsg = ref<string | null>(null);
+const workflowCopied = ref(false);
 
 watch(
   () => props.file,
@@ -170,6 +183,78 @@ const promptTokens = computed(() => {
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
 });
+
+async function handleSendToComfyUI() {
+  if (!props.file) return;
+  const json = extractWorkflowJson(props.file);
+  if (!json) {
+    comfyStatusMsg.value = t.value.interop.noWorkflow;
+    setTimeout(() => { comfyStatusMsg.value = null; }, 3000);
+    return;
+  }
+  sendingComfy.value = true;
+  comfyStatusMsg.value = null;
+  try {
+    const cfg = await loadAppConfig();
+    const endpoint = cfg.comfyui_url || "http://127.0.0.1:8188";
+    const res = await sendWorkflowToComfyUI(endpoint, json);
+    if (res.prompt_id) {
+      comfyStatusMsg.value = `${t.value.interop.queued} (#${res.prompt_id.slice(0, 8)})`;
+    } else {
+      comfyStatusMsg.value = t.value.interop.sentSuccess;
+    }
+  } catch (err) {
+    comfyStatusMsg.value = `${t.value.interop.failed}: ${String(err)}`;
+  } finally {
+    sendingComfy.value = false;
+    setTimeout(() => { comfyStatusMsg.value = null; }, 5000);
+  }
+}
+
+async function handleSendToWebUI() {
+  if (!props.file) return;
+  if (!hasPromptData(props.file)) {
+    webuiStatusMsg.value = t.value.interop.noPrompt;
+    setTimeout(() => { webuiStatusMsg.value = null; }, 3000);
+    return;
+  }
+  sendingWebui.value = true;
+  webuiStatusMsg.value = null;
+  try {
+    const cfg = await loadAppConfig();
+    const endpoint = cfg.webui_url || "http://127.0.0.1:7860";
+    await sendPromptToWebUI(endpoint, props.file);
+    webuiStatusMsg.value = t.value.interop.sentSuccess;
+  } catch (err) {
+    webuiStatusMsg.value = `${t.value.interop.failed}: ${String(err)}`;
+  } finally {
+    sendingWebui.value = false;
+    setTimeout(() => { webuiStatusMsg.value = null; }, 5000);
+  }
+}
+
+async function handleCopyWorkflowJson() {
+  if (!props.file) return;
+  const json = extractWorkflowJson(props.file);
+  if (!json) return;
+  try {
+    await navigator.clipboard.writeText(json);
+    workflowCopied.value = true;
+    setTimeout(() => { workflowCopied.value = false; }, 2000);
+  } catch (err) {
+    console.warn("Failed to copy workflow JSON:", err);
+  }
+}
+
+function onWorkflowDragStart(e: DragEvent) {
+  if (!props.file || !e.dataTransfer) return;
+  const json = extractWorkflowJson(props.file);
+  if (json) {
+    e.dataTransfer.setData("application/json", json);
+    e.dataTransfer.setData("text/plain", json);
+    e.dataTransfer.effectAllowed = "copy";
+  }
+}
 </script>
 
 <template>
@@ -343,6 +428,60 @@ const promptTokens = computed(() => {
               ×
             </button>
           </span>
+        </div>
+      </div>
+
+      <!-- Generation Interop Section -->
+      <div v-if="hasComfyWorkflow(file) || hasPromptData(file)" class="section interop-section">
+        <div class="section-header">
+          <span class="section-title">🔌 {{ t.interop.title }}</span>
+        </div>
+
+        <div class="interop-button-group">
+          <!-- Send to ComfyUI -->
+          <button
+            v-if="hasComfyWorkflow(file)"
+            type="button"
+            class="interop-action-btn comfy-style"
+            :disabled="sendingComfy"
+            :title="t.interop.sendToComfyUI"
+            @click="handleSendToComfyUI"
+          >
+            <span>⚡ {{ sendingComfy ? t.interop.checking : t.interop.sendToComfyUI }}</span>
+          </button>
+
+          <!-- Send to SD WebUI -->
+          <button
+            v-if="hasPromptData(file)"
+            type="button"
+            class="interop-action-btn webui-style"
+            :disabled="sendingWebui"
+            :title="t.interop.sendToWebUI"
+            @click="handleSendToWebUI"
+          >
+            <span>🎨 {{ sendingWebui ? t.interop.checking : t.interop.sendToWebUI }}</span>
+          </button>
+        </div>
+
+        <!-- Draggable Workflow Chip -->
+        <div
+          v-if="hasComfyWorkflow(file)"
+          class="workflow-drag-pill"
+          draggable="true"
+          :title="t.interop.dragWorkflow"
+          @dragstart="onWorkflowDragStart"
+          @click="handleCopyWorkflowJson"
+        >
+          <span>🧩 {{ workflowCopied ? t.preview.copied : t.interop.dragWorkflow }}</span>
+          <span class="drag-hint">⋮⋮</span>
+        </div>
+
+        <!-- Feedback message -->
+        <div v-if="comfyStatusMsg" class="interop-feedback" :class="{ error: comfyStatusMsg.includes('Failed') }">
+          {{ comfyStatusMsg }}
+        </div>
+        <div v-if="webuiStatusMsg" class="interop-feedback" :class="{ error: webuiStatusMsg.includes('Failed') }">
+          {{ webuiStatusMsg }}
         </div>
       </div>
 
@@ -1203,5 +1342,113 @@ const promptTokens = computed(() => {
 
 .quick-register-btn:hover {
   background: rgba(236, 72, 153, 0.25);
+}
+
+.interop-section {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.interop-button-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.interop-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 0.74rem;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+  user-select: none;
+}
+
+.interop-action-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.interop-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.comfy-style {
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  color: #93c5fd;
+}
+
+.comfy-style:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.25);
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+.webui-style {
+  background: rgba(168, 85, 247, 0.15);
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  color: #d8b4fe;
+}
+
+.webui-style:hover:not(:disabled) {
+  background: rgba(168, 85, 247, 0.25);
+  border-color: rgba(168, 85, 247, 0.5);
+}
+
+.workflow-drag-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  padding: 5px 8px;
+  font-size: 0.7rem;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  color: #cbd5e1;
+  cursor: grab;
+  user-select: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.workflow-drag-pill:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.workflow-drag-pill:active {
+  cursor: grabbing;
+}
+
+.drag-hint {
+  font-size: 0.8rem;
+  opacity: 0.5;
+  letter-spacing: -2px;
+}
+
+.interop-feedback {
+  margin-top: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #6ee7b7;
+}
+
+.interop-feedback.error {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
 }
 </style>

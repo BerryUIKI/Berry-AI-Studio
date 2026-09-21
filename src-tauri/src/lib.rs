@@ -191,6 +191,9 @@ pub fn run() {
             commands::list_stacks,
             commands::cull_stack_drafts,
             commands::auto_stack_images,
+            commands::check_generation_service,
+            commands::send_to_comfyui,
+            commands::send_to_webui,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
