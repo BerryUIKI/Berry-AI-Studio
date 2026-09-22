@@ -1,6 +1,5 @@
 # Deutsche Dokumentation (German)
 
-> [!NOTE]
-> **Mehrsprachige Dokumentation in Bearbeitung**  
-> Die deutsche Übersetzung dieses Wikis wird derzeit vorbereitet. Bitte nutzen Sie vorerst die offizielle englische Dokumentation:  
-> 👉 **[Zur englischen Dokumentation (English Documentation)](../en/Home.md)**
+Willkommen zur deutschen Dokumentation von **Berry AI Studio**.
+
+👉 **[Zum offiziellen deutschen Wiki (Startseite)](Home.md)**
