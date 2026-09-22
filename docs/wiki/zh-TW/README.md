@@ -1,12 +1,11 @@
-# 繁體中文文檔 (Traditional Chinese)
+# 繁體中文文件 (Traditional Chinese)
 
-> [!NOTE]
-> **多語言文檔正在建設中**  
-> 繁體中文本地化維基正在校對撰寫中。在翻譯完成前，請參閱權威的英文正版文檔：  
-> 👉 **[查看英文文檔 (English Documentation)](../en/Home.md)**
+歡迎查閱 Berry AI Studio 繁體中文維基與使用者指南。
+
+👉 **[前往繁體中文首頁 (Home.md)](Home.md)**
 
 ---
 
 ## 目錄索引
 
-請參閱 [英文版主頁](../en/Home.md) 獲取最完整的技術指引。
+請參閱 [繁體中文版首頁 (Home.md)](Home.md) 獲取完整的架構介紹與操作指引。
