@@ -11,12 +11,12 @@ Please select your preferred language below:
 | Language | Status | Link |
 | :--- | :--- | :--- |
 | **English** | Complete (Canonical) | [English Documentation](en/Home.md) |
-| **Simplified Chinese** | In Progress (Placeholder) | [简体中文文档](zh-CN/README.md) |
-| **Traditional Chinese** | In Progress (Placeholder) | [繁體中文文檔](zh-TW/README.md) |
-| **Japanese** | In Progress (Placeholder) | [日本語ドキュメント](ja/README.md) |
-| **German** | In Progress (Placeholder) | [Deutsche Dokumentation](de/README.md) |
-| **French** | In Progress (Placeholder) | [Documentation Française](fr/README.md) |
-| **Spanish** | In Progress (Placeholder) | [Documentación en Español](es/README.md) |
+| **Simplified Chinese** | Complete | [简体中文文档](zh-CN/Home.md) |
+| **Traditional Chinese** | Complete | [繁體中文文件](zh-TW/Home.md) |
+| **Japanese** | Complete | [日本語ドキュメント](ja/Home.md) |
+| **German** | Complete | [Deutsche Dokumentation](de/Home.md) |
+| **French** | Complete | [Documentation Française](fr/Home.md) |
+| **Spanish** | Complete | [Documentación en Español](es/Home.md) |
 
 ---
 
