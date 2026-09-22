@@ -90,16 +90,15 @@ This roadmap documents completed milestones and future engineering goals for **B
 
 ---
 
-## 🔮 Upcoming Milestones (v0.3.0+)
+## 🏆 Completed Milestones (v0.3.0)
 
-### 🎯 Milestone 12: Cloud Sync & Export Utilities
+### ✅ Milestone 12: Cloud Sync & Export Utilities
 - [x] **Milestone 12.1: Batch Transcoding, Privacy Stripping & Packaging**: Multi-threaded format conversion (WebP/JPEG/PNG), 4-tier privacy metadata stripping, downscaling constraints, customizable filename templates, sidecars (.txt/.json), and Directory / ZIP archive export.
 - [x] **Milestone 12.2: Standalone Interactive HTML Showcase Generator**: Self-contained zero-dependency HTML+CSS+JS photo album export with responsive gallery, lightbox preview, and prompt metadata viewer.
 - [x] **Milestone 12.3: S3 & WebDAV Snapshot Cloud Backup & Restore**: Automated and manual snapshots of SQLite database and configurations to AWS S3, Cloudflare R2, MinIO, or WebDAV servers.
 - [x] **Milestone 12.4: Incremental Remote Asset Mirroring & Delta Sync**: ETag / SHA-256 incremental media sync with background concurrency and bandwidth throttling.
 
-### 🎯 Milestone 13: Large-Library Performance
-
+### ✅ Milestone 13: Large-Library Performance
 - [x] Fixed-width responsive Grid and Waterfall columns.
 - [x] Animation-frame scroll coalescing and per-column Waterfall visibility search.
 - [x] Deduplicated, serialized thumbnail look-ahead scheduling.
@@ -120,7 +119,7 @@ This roadmap documents completed milestones and future engineering goals for **B
 - [x] Keep navigation filters and stack grouping aligned across paginated text and semantic searches.
 - [x] Benchmark a dedicated gallery DTO for the remaining structured metadata fields.
 
-### 🎯 Milestone 14: Multi-Database Support & Team Studio (MySQL & PostgreSQL)
+### ✅ Milestone 14: Multi-Database Support & Team Studio (MySQL & PostgreSQL)
 *(See architectural design specification: [MULTI_DATABASE_COLLABORATION_RFC.md](./MULTI_DATABASE_COLLABORATION_RFC.md))*
 - [x] Storage Engine trait abstraction with database dialect support for SQLite, MySQL 8.0+, and PostgreSQL 14+.
 - [x] Keyset/cursor-based deep pagination for 500,000+ asset scale (`search_files_cursor_page`).
@@ -129,5 +128,36 @@ This roadmap documents completed milestones and future engineering goals for **B
 - [x] Tiered real-time change synchronization: default zero-DevOps change log journal polling engine (`CollaborationSyncEngine`).
 - [x] Client-side on-demand local thumbnail caching preserving network storage bandwidth.
 - [x] Team & Database settings panel with live latency testing and storage root mount mapping.
+
+---
+
+## 🔮 Upcoming Milestones (v0.4.0+)
+
+### 🎯 Milestone 15: Video & Animation AIGC Ingestion & Playback
+- [ ] **AIGC Video Metadata Extraction**: Parse embedded generation workflows and prompts from MP4 and WebM video containers (ComfyUI AnimateDiff, Wan2.1, HunyuanVideo, CogVideoX, LTX-Video, and Stable Video Diffusion).
+- [ ] **Video Thumbnail Generation & Hover Scrubbing**: Extract initial frame thumbnails and implement dynamic hover scrubbing (scrub through video frames smoothly as cursor moves across card) in Grid and Waterfall gallery views.
+- [ ] **Fullscreen Lightbox Video Player**: Lightbox player with seamless loop toggle, playback speed selector (0.25x - 2x), frame-by-frame stepping controls (`.` / `,`), audio toggle, and sidecar prompt/workflow inspector.
+- [ ] **Video-Specific Search Facets**: Filter by duration range, resolution, frame rate (fps), container codec, and motion score.
+
+### 🎯 Milestone 16: Next-Gen Model Architectures & Ecosystem (Flux, SD3.5 & Civitai API)
+- [ ] **Flux.1 & SD3.5 Parameter Parsers**: Parse specialized generative parameters including Guidance Scale, Dual Text Encoder prompts (CLIP-L & T5-XXL), distilled sampling steps, and resolution bucket bins.
+- [ ] **Civitai Direct API Integration**: Remote model reverse lookups, automatic thumbnail preview card fetching, model version update notifications, and one-click trigger word copy/injection.
+- [ ] **ComfyUI Workflow Visualizer Enhancements**: Interactive workflow graph viewer highlighting prompt input nodes, KSamplers, ControlNet chains, and LoRA loaders.
+
+### 🎯 Milestone 17: Bi-Directional ComfyUI Studio, Live Queue & Prompt Diff
+- [ ] **Real-Time ComfyUI WebSocket Monitor**: Direct integration with ComfyUI `/ws` API, displaying live execution progress, queue position, active node execution, and GPU VRAM telemetry in the status bar and Activity popover.
+- [ ] **Zero-Latency Ingestion Pipeline**: Stream newly generated images directly into Berry AI Studio database and UI memory via IPC upon workflow completion, eliminating filesystem polling delay.
+- [ ] **Prompt Diff & Matrix Workbench**: Side-by-side visual diff tool highlighting changes in positive/negative prompt syntax, weights `(keyword:1.2)`, and negative keywords across seeds, model versions, and samplers.
+
+### 🎯 Milestone 18: Local LAN Web Companion (Berry Remote)
+- [ ] **Embedded Lightweight HTTP Web Server**: Built-in Axum/Tokio web server in Tauri backend for local network access with secure PIN/passcode authentication.
+- [ ] **Responsive Mobile/Tablet Web Companion**: Mobile-optimized touch UI allowing wireless browsing, rating, tagging, favoriting, and prompt copying on iPad, tablets, and smartphones on the same Wi-Fi network.
+- [ ] **Live Bi-Directional State Sync**: Rating, tag, and favorite mutations applied on mobile devices immediately synchronize back to the desktop application in real time.
+
+### 🎯 Milestone 19: Color Palette Indexing & Faceted SQL Analytics
+- [ ] **Dominant Color Extraction & Palette Indexing**: Multi-threaded extraction of 5-color palettes per asset using k-means/octree quantization, indexing hex colors and lightness into `file_colors` table.
+- [ ] **Color Palette Visual Filter Bar**: Interactive hue ribbon and tone picker in search drawer to filter images by dominant color family (Red, Amber, Emerald, Cyan, Violet, Monochrome, Warm, Cool).
+- [ ] **Pre-Computed SQL Facet Distribution**: Migrate expensive filter aggregations (models, samplers, ratings, aspect ratio buckets) to materialized views and cached facet counters for instant multi-facet filter rendering on 100k+ item libraries.
+
 
 

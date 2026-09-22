@@ -17,7 +17,7 @@ use serde::Serialize;
 use walkdir::WalkDir;
 
 /// Supported media file extensions, lowercased and without the leading dot.
-const MEDIA_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "webp", "mp4"];
+const MEDIA_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "webp", "mp4", "webm"];
 
 /// How many file upserts happen per transaction.
 const BATCH_SIZE: usize = 256;
@@ -558,6 +558,7 @@ fn container_from_extension(path: &Path) -> Option<Container> {
         Some("jpg") | Some("jpeg") => Some(Container::Jpeg),
         Some("webp") => Some(Container::WebP),
         Some("mp4") => Some(Container::Mp4),
+        Some("webm") => Some(Container::Webm),
         _ => None,
     }
 }
@@ -570,34 +571,37 @@ mod tests {
     use berry_domain::MetadataFormat;
 
     struct TestEnv {
+        _temp: tempfile::TempDir,
         dir: PathBuf,
         db: PathBuf,
         images: PathBuf,
     }
 
-    fn setup(name: &str) -> TestEnv {
-        let dir = std::env::temp_dir().join(format!("berry-scan-{name}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
+    fn setup(label: &str) -> TestEnv {
+        let temp = tempfile::tempdir().unwrap();
+        let dir = temp.path().to_path_buf();
+        let db = dir.join(format!("{label}.db"));
         let images = dir.join("images");
         std::fs::create_dir_all(&images).unwrap();
         TestEnv {
-            dir: dir.clone(),
-            db: dir.join("test.db"),
-            images: dir.join("images"),
+            _temp: temp,
+            dir,
+            db,
+            images,
         }
     }
 
-    fn write(path: &Path, content: &[u8]) {
-        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        std::fs::write(path, content).unwrap();
+    fn write(path: &Path, bytes: &[u8]) {
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).unwrap();
+        }
+        std::fs::write(path, bytes).unwrap();
     }
 
-    fn png(content: &[u8]) -> Vec<u8> {
-        [
-            &[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A][..],
-            content,
-        ]
-        .concat()
+    fn png(data: &[u8]) -> Vec<u8> {
+        let mut bytes = b"\x89PNG\r\n\x1a\n".to_vec();
+        bytes.extend_from_slice(data);
+        bytes
     }
 
     /// Build a PNG chunk (the walker does not validate CRC, so zeros are fine).
@@ -619,8 +623,10 @@ mod tests {
         png(&[ihdr, tex, iend].concat())
     }
 
-    fn jpg(content: &[u8]) -> Vec<u8> {
-        [&[0xFF, 0xD8, 0xFF, 0xE0, 0x00][..], content].concat()
+    fn jpg(data: &[u8]) -> Vec<u8> {
+        let mut bytes = b"\xFF\xD8\xFF".to_vec();
+        bytes.extend_from_slice(data);
+        bytes
     }
 
     fn webp() -> Vec<u8> {
@@ -629,6 +635,13 @@ mod tests {
 
     fn mp4() -> Vec<u8> {
         b"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00".to_vec()
+    }
+
+    fn webm() -> Vec<u8> {
+        vec![
+            0x1A, 0x45, 0xDF, 0xA3, 0x9F, 0x42, 0x86, 0x81, 0x01, 0x42, 0xF7, 0x81, 0x01, 0x42,
+            0xF2, 0x81, 0x04, 0x42, 0xF3, 0x81, 0x08, 0x42, 0x82, 0x84, b'w', b'e', b'b', b'm',
+        ]
     }
 
     fn scan(env: &TestEnv, folder_id: i64) -> ScanStats {
@@ -652,6 +665,7 @@ mod tests {
         write(&env.images.join("b.jpg"), &jpg(b"photo"));
         write(&env.images.join("sub/c.webp"), &webp());
         write(&env.images.join("sub/d.mp4"), &mp4());
+        write(&env.images.join("sub/e.webm"), &webm());
         write(&env.images.join("notes.txt"), b"sidecar");
         write(&env.images.join("data.bin"), b"\x00\x01\x02");
 
@@ -659,14 +673,14 @@ mod tests {
         let folder = db.add_folder(env.images.to_str().unwrap()).unwrap();
 
         let stats = scan(&env, folder.id);
-        assert_eq!(stats.found, 4);
-        assert_eq!(stats.added, 4);
+        assert_eq!(stats.found, 5);
+        assert_eq!(stats.added, 5);
         assert_eq!(stats.unchanged, 0);
         assert_eq!(stats.removed, 0);
         assert_eq!(stats.failed, 0);
 
         let files = db.list_files(folder.id).unwrap();
-        assert_eq!(files.len(), 4, "txt and bin files are not indexed");
+        assert_eq!(files.len(), 5, "txt and bin files are not indexed");
         let by_path: HashMap<&str, &ImageFile> =
             files.iter().map(|f| (f.path.as_str(), f)).collect();
 
@@ -685,6 +699,10 @@ mod tests {
         assert_eq!(
             by_path[paths(&env, "sub/d.mp4").as_str()].container,
             Container::Mp4
+        );
+        assert_eq!(
+            by_path[paths(&env, "sub/e.webm").as_str()].container,
+            Container::Webm
         );
         assert!(!by_path.contains_key(paths(&env, "notes.txt").as_str()));
 

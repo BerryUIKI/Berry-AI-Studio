@@ -7,6 +7,7 @@ import {
   formatDateTime,
   formatPlatformName,
   getFileName,
+  isVideoContainer,
   normalizePath,
 } from "../utils/image";
 import {
@@ -234,7 +235,7 @@ function size(meta: ImageFile["metadata"]): string {
             <td class="preview-cell">
               <img
                 v-if="
-                  file.container !== 'mp4' &&
+                  !isVideoContainer(file.container) &&
                   file.container !== 'txt' &&
                   getRowImageSrc(file)
                 "
@@ -245,12 +246,12 @@ function size(meta: ImageFile["metadata"]): string {
                 decoding="async"
               />
               <div
-                v-else-if="file.container !== 'mp4' && file.container !== 'txt'"
+                v-else-if="!isVideoContainer(file.container) && file.container !== 'txt'"
                 class="thumb-placeholder thumb-pending"
                 aria-hidden="true"
               />
               <video
-                v-else-if="file.container === 'mp4'"
+                v-else-if="isVideoContainer(file.container)"
                 :src="assetUrl(file.path)"
                 class="thumb thumb-video"
                 muted

@@ -54,6 +54,21 @@ pub struct SearchCriteria {
     pub folder_id: Option<i64>,
     /// Optional stack constraint used by filtered stack expansion.
     pub stack_id: Option<String>,
+    /// Media type constraint ("all" | "image" | "video").
+    #[serde(default)]
+    pub media_type: Option<String>,
+    /// Minimum video duration in seconds.
+    #[serde(default)]
+    pub min_duration: Option<f64>,
+    /// Maximum video duration in seconds.
+    #[serde(default)]
+    pub max_duration: Option<f64>,
+    /// Minimum video frame rate (fps).
+    #[serde(default)]
+    pub min_fps: Option<f64>,
+    /// Maximum video frame rate (fps).
+    #[serde(default)]
+    pub max_fps: Option<f64>,
     /// Field to sort results by. Defaults to `ModifiedAt`.
     pub sort: Option<FileSortField>,
     /// Sort direction. Defaults to `Desc`.
@@ -113,6 +128,11 @@ mod tests {
             tag_id: Some(5),
             folder_id: Some(42),
             stack_id: Some("stack-a".to_string()),
+            media_type: Some("video".to_string()),
+            min_duration: Some(5.0),
+            max_duration: Some(30.0),
+            min_fps: Some(24.0),
+            max_fps: Some(60.0),
             sort: Some(FileSortField::Rating),
             direction: Some(SortDirection::Desc),
             limit: Some(100),

@@ -36,16 +36,27 @@ pub fn parse_comfyui(json_str: &str) -> Option<ExtractedMetadata> {
             .and_then(|c| c.as_str())
             .unwrap_or_default();
 
-        if class_type.contains("KSampler") || class_type == "SamplerCustom" {
+        let is_sampler = class_type.contains("KSampler")
+            || class_type == "SamplerCustom"
+            || class_type.contains("Sampler")
+            || class_type.ends_with("Sample");
+
+        if is_sampler {
             if let Some(inputs) = node.get("inputs") {
                 if steps.is_none() {
                     steps = inputs
                         .get("steps")
+                        .or_else(|| inputs.get("num_inference_steps"))
+                        .or_else(|| inputs.get("sampling_steps"))
                         .and_then(|v| v.as_u64())
                         .map(|s| s as u32);
                 }
                 if cfg_scale.is_none() {
-                    cfg_scale = inputs.get("cfg").and_then(|v| v.as_f64());
+                    cfg_scale = inputs
+                        .get("cfg")
+                        .or_else(|| inputs.get("guidance_scale"))
+                        .or_else(|| inputs.get("cfg_scale"))
+                        .and_then(|v| v.as_f64());
                 }
                 if seed.is_none() {
                     seed =
@@ -59,7 +70,10 @@ pub fn parse_comfyui(json_str: &str) -> Option<ExtractedMetadata> {
                             });
                 }
                 if sampler.is_none() {
-                    let s_name = inputs.get("sampler_name").and_then(|v| v.as_str());
+                    let s_name = inputs
+                        .get("sampler_name")
+                        .or_else(|| inputs.get("sampler"))
+                        .and_then(|v| v.as_str());
                     let scheduler = inputs.get("scheduler").and_then(|v| v.as_str());
                     sampler = match (s_name, scheduler) {
                         (Some(s), Some(sch)) if !sch.is_empty() && sch != "normal" => {
@@ -72,7 +86,14 @@ pub fn parse_comfyui(json_str: &str) -> Option<ExtractedMetadata> {
 
                 // Resolve positive prompt link
                 if prompt.is_none() {
-                    if let Some(pos_link) = inputs.get("positive").and_then(|v| v.as_array()) {
+                    let pos_key = if inputs.get("positive").is_some() {
+                        "positive"
+                    } else if inputs.get("prompt").is_some() {
+                        "prompt"
+                    } else {
+                        "pos"
+                    };
+                    if let Some(pos_link) = inputs.get(pos_key).and_then(|v| v.as_array()) {
                         if let Some(target_id) = pos_link.first().and_then(|v| v.as_str()) {
                             prompt = extract_clip_text(nodes_map, target_id);
                         }
@@ -81,7 +102,12 @@ pub fn parse_comfyui(json_str: &str) -> Option<ExtractedMetadata> {
 
                 // Resolve negative prompt link
                 if negative_prompt.is_none() {
-                    if let Some(neg_link) = inputs.get("negative").and_then(|v| v.as_array()) {
+                    let neg_key = if inputs.get("negative").is_some() {
+                        "negative"
+                    } else {
+                        "neg"
+                    };
+                    if let Some(neg_link) = inputs.get(neg_key).and_then(|v| v.as_array()) {
                         if let Some(target_id) = neg_link.first().and_then(|v| v.as_str()) {
                             negative_prompt = extract_clip_text(nodes_map, target_id);
                         }
@@ -90,21 +116,35 @@ pub fn parse_comfyui(json_str: &str) -> Option<ExtractedMetadata> {
             }
         }
 
-        // Checkpoint loader
-        if model_name.is_none()
-            && (class_type.contains("CheckpointLoader") || class_type.contains("UNETLoader"))
-        {
+        // Model / Checkpoint loader (handles SD, Flux, Wan, Hunyuan, CogVideo, LTXV, SVD)
+        let is_loader = class_type.contains("CheckpointLoader")
+            || class_type.contains("UNETLoader")
+            || class_type.contains("ModelLoader")
+            || class_type.contains("WanVideo")
+            || class_type.contains("Hunyuan")
+            || class_type.contains("CogVideo")
+            || class_type.contains("LTXV");
+
+        if model_name.is_none() && is_loader {
             if let Some(inputs) = node.get("inputs") {
                 model_name = inputs
                     .get("ckpt_name")
                     .or_else(|| inputs.get("unet_name"))
+                    .or_else(|| inputs.get("model_name"))
+                    .or_else(|| inputs.get("transformer_name"))
+                    .or_else(|| inputs.get("diffusion_model"))
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string());
             }
         }
 
-        // Empty Latent Image
-        if (width.is_none() || height.is_none()) && class_type.contains("EmptyLatentImage") {
+        // Latent dimensions (EmptyLatentImage, WanVideoEmptyLatent, CogVideoXEmptyLatent, EmptyHunyuanLatentVideo, etc.)
+        let is_latent = class_type.contains("EmptyLatent")
+            || class_type.contains("LatentVideo")
+            || class_type.contains("EmptyHunyuan")
+            || class_type.contains("WanVideoEmpty");
+
+        if (width.is_none() || height.is_none()) && is_latent {
             if let Some(inputs) = node.get("inputs") {
                 if width.is_none() {
                     width = inputs
@@ -122,24 +162,33 @@ pub fn parse_comfyui(json_str: &str) -> Option<ExtractedMetadata> {
         }
     }
 
-    // Fallback: if positive / negative prompt were not linked via KSampler, search for CLIPTextEncode nodes
+    // Fallback: search for prompt / text encode nodes (CLIPTextEncode, WanVideoTextEncode, HyVideoTextEncode, CogVideoTextEncode, etc.)
     if prompt.is_none() || negative_prompt.is_none() {
         for (_node_id, node) in nodes_map {
             let class_type = node
                 .get("class_type")
                 .and_then(|c| c.as_str())
                 .unwrap_or_default();
-            if class_type.contains("CLIPTextEncode") {
+            let is_text_node = class_type.contains("CLIPTextEncode")
+                || class_type.contains("TextEncode")
+                || class_type.contains("Prompt");
+            if is_text_node {
                 if let Some(inputs) = node.get("inputs") {
                     let text = inputs
                         .get("text")
+                        .or_else(|| inputs.get("prompt"))
                         .or_else(|| inputs.get("astext"))
+                        .or_else(|| inputs.get("positive_prompt"))
                         .and_then(|v| v.as_str())
                         .map(|s| s.trim().to_string());
 
                     if let Some(t) = text {
                         if !t.is_empty() {
-                            if prompt.is_none() {
+                            let is_negative = class_type.to_lowercase().contains("negative")
+                                || inputs.get("negative").is_some();
+                            if is_negative && negative_prompt.is_none() {
+                                negative_prompt = Some(t);
+                            } else if prompt.is_none() {
                                 prompt = Some(t);
                             } else if negative_prompt.is_none() && prompt.as_deref() != Some(&t) {
                                 negative_prompt = Some(t);
@@ -169,6 +218,9 @@ pub fn parse_comfyui(json_str: &str) -> Option<ExtractedMetadata> {
         sampler,
         model_name,
         model_hash: None,
+        duration_seconds: None,
+        fps: None,
+        video_codec: None,
     })
 }
 
@@ -312,6 +364,9 @@ fn parse_comfyui_workflow(root: &Value, json_str: &str) -> Option<ExtractedMetad
         sampler,
         model_name,
         model_hash: None,
+        duration_seconds: None,
+        fps: None,
+        video_codec: None,
     })
 }
 

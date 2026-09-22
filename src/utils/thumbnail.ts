@@ -484,3 +484,52 @@ if (typeof window !== "undefined" && import.meta.env?.DEV) {
   };
 }
 
+/**
+ * Capture a frame from an HTMLVideoElement and persist as thumbnail via Tauri command.
+ */
+export async function captureAndSaveVideoThumbnail(
+  file: ImageFile,
+  video: HTMLVideoElement,
+  maxEdge: number = getThumbnailMaxEdge(),
+): Promise<string | null> {
+  if (!file.id || !video.videoWidth || !video.videoHeight) return null;
+  const cacheKey = getThumbnailCacheKey(file, maxEdge);
+  if (memoryCache.get(cacheKey)) return memoryCache.get(cacheKey)!;
+
+  try {
+    const canvas = document.createElement("canvas");
+    let w = video.videoWidth;
+    let h = video.videoHeight;
+    if (w > maxEdge || h > maxEdge) {
+      if (w >= h) {
+        h = Math.round((h * maxEdge) / w);
+        w = maxEdge;
+      } else {
+        w = Math.round((w * maxEdge) / h);
+        h = maxEdge;
+      }
+    }
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(video, 0, 0, w, h);
+    const dataUrl = canvas.toDataURL("image/webp", 0.85);
+    const base64Data = dataUrl.split(",")[1];
+    if (!base64Data) return null;
+
+    const diskPath = await invoke<string>("save_video_thumbnail", {
+      fileId: file.id,
+      modifiedAt: file.modified_at,
+      maxEdge,
+      base64Data,
+    });
+    const url = assetUrl(diskPath);
+    memoryCache.set(cacheKey, url);
+    return url;
+  } catch (err) {
+    console.debug("Failed to capture video thumbnail:", err);
+    return null;
+  }
+}
+

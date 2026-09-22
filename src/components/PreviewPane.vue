@@ -7,6 +7,7 @@ import {
   assetUrl,
   formatBytes,
   getFileName,
+  isVideoContainer,
   normalizePath,
 } from "../utils/image";
 
@@ -310,16 +311,16 @@ watch(
 
           <div class="image-container">
             <img
-              v-if="file.container !== 'mp4' && file.container !== 'txt'"
+              v-if="!isVideoContainer(file.container) && file.container !== 'txt'"
               :src="assetUrl(file.path)"
               :alt="getFileName(file.path)"
               class="main-image"
               :class="{ 'nsfw-blurred': file.is_nsfw && !revealedNsfw }"
             />
 
-            <!-- Native HTML5 video player for MP4 video files -->
+            <!-- Native HTML5 video player for video files -->
             <video
-              v-else-if="file.container === 'mp4'"
+              v-else-if="isVideoContainer(file.container)"
               :src="assetUrl(file.path)"
               class="main-image main-video"
               :class="{ 'nsfw-blurred': file.is_nsfw && !revealedNsfw }"

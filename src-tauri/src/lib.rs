@@ -161,6 +161,7 @@ pub fn run() {
             commands::export_files_batch,
             commands::open_external_url,
             commands::get_or_create_thumbnail,
+            commands::save_video_thumbnail,
             commands::batch_generate_thumbnails,
             commands::cancel_thumbnail_requests,
             commands::get_thumbnail_queue_diagnostics,

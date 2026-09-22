@@ -798,6 +798,42 @@ impl Database {
             params.push(rusqlite::types::Value::Integer(tid));
         }
 
+        if let Some(media_type) = &criteria.media_type {
+            match media_type.to_lowercase().as_str() {
+                "video" | "videos" => {
+                    conditions.push("container IN ('mp4', 'webm')".to_string());
+                }
+                "image" | "images" => {
+                    conditions.push("container IN ('png', 'jpg', 'webp')".to_string());
+                }
+                _ => {}
+            }
+        }
+
+        if let Some(min_dur) = criteria.min_duration {
+            conditions.push(
+                "CAST(json_extract(metadata, '$.duration_seconds') AS REAL) >= ?".to_string(),
+            );
+            params.push(rusqlite::types::Value::Real(min_dur));
+        }
+
+        if let Some(max_dur) = criteria.max_duration {
+            conditions.push(
+                "CAST(json_extract(metadata, '$.duration_seconds') AS REAL) <= ?".to_string(),
+            );
+            params.push(rusqlite::types::Value::Real(max_dur));
+        }
+
+        if let Some(min_fps) = criteria.min_fps {
+            conditions.push("CAST(json_extract(metadata, '$.fps') AS REAL) >= ?".to_string());
+            params.push(rusqlite::types::Value::Real(min_fps));
+        }
+
+        if let Some(max_fps) = criteria.max_fps {
+            conditions.push("CAST(json_extract(metadata, '$.fps') AS REAL) <= ?".to_string());
+            params.push(rusqlite::types::Value::Real(max_fps));
+        }
+
         (conditions, params)
     }
 
@@ -3417,6 +3453,9 @@ mod tests {
             sampler: Some("DPM++ 2M Karras".to_string()),
             model_name: Some("dreamshaper".to_string()),
             model_hash: Some("abc123".to_string()),
+            duration_seconds: None,
+            fps: None,
+            video_codec: None,
         };
 
         let mut file = image(folder.id, "/img/a.png");
@@ -3627,6 +3666,9 @@ mod tests {
             sampler: Some(sampler.to_string()),
             model_name: Some(model.to_string()),
             model_hash: Some("abc12345".to_string()),
+            duration_seconds: None,
+            fps: None,
+            video_codec: None,
         }
     }
 
@@ -3850,6 +3892,81 @@ mod tests {
 
         let samplers = db.list_distinct_samplers().unwrap();
         assert_eq!(samplers, vec!["DPM++ 2M Karras", "Euler a"]);
+    }
+
+    #[test]
+    fn search_files_video_facets() {
+        let db = Database::connect_in_memory().unwrap();
+        let folder = db.add_folder("/videos").unwrap();
+
+        let mut video_file = image(folder.id, "/videos/animation.mp4");
+        video_file.container = Container::Mp4;
+        let video_meta = ExtractedMetadata {
+            format: berry_domain::MetadataFormat::ComfyUI,
+            prompt: Some("AnimateDiff smooth motion".to_string()),
+            duration_seconds: Some(12.5),
+            fps: Some(30.0),
+            video_codec: Some("h264".to_string()),
+            ..Default::default()
+        };
+        video_file.metadata = Some(video_meta);
+        db.upsert_file(&video_file).unwrap();
+
+        let mut webm_file = image(folder.id, "/videos/clip.webm");
+        webm_file.container = Container::Webm;
+        let webm_meta = ExtractedMetadata {
+            format: berry_domain::MetadataFormat::ComfyUI,
+            prompt: Some("Wan2.1 video generation".to_string()),
+            duration_seconds: Some(4.0),
+            fps: Some(24.0),
+            video_codec: Some("vp9".to_string()),
+            ..Default::default()
+        };
+        webm_file.metadata = Some(webm_meta);
+        db.upsert_file(&webm_file).unwrap();
+
+        let image_file = image(folder.id, "/videos/poster.png");
+        db.upsert_file(&image_file).unwrap();
+
+        // 1. Filter by media_type: "video"
+        let videos = db
+            .search_files(&SearchCriteria {
+                media_type: Some("video".to_string()),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(videos.len(), 2);
+
+        // 2. Filter by media_type: "image"
+        let images = db
+            .search_files(&SearchCriteria {
+                media_type: Some("image".to_string()),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(images.len(), 1);
+        assert_eq!(images[0].path, "/videos/poster.png");
+
+        // 3. Filter by duration range (min 5.0s)
+        let long_videos = db
+            .search_files(&SearchCriteria {
+                media_type: Some("video".to_string()),
+                min_duration: Some(5.0),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(long_videos.len(), 1);
+        assert_eq!(long_videos[0].path, "/videos/animation.mp4");
+
+        // 4. Filter by fps (fps <= 25.0)
+        let film_fps_videos = db
+            .search_files(&SearchCriteria {
+                max_fps: Some(25.0),
+                ..Default::default()
+            })
+            .unwrap();
+        assert_eq!(film_fps_videos.len(), 1);
+        assert_eq!(film_fps_videos[0].path, "/videos/clip.webm");
     }
 
     #[test]

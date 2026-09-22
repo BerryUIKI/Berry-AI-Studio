@@ -10,7 +10,7 @@ use crate::MetadataFormat;
 /// Serialized to a JSON `metadata` column on the `files` row. `parameters`
 /// keeps the raw generator string (e.g. the A1111 "parameters" chunk) so the
 /// original text survives even as structured fields are added.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct ExtractedMetadata {
     /// The generator platform this metadata came from.
     pub format: MetadataFormat,
@@ -39,4 +39,13 @@ pub struct ExtractedMetadata {
     pub model_name: Option<String>,
     /// Checkpoint model hash.
     pub model_hash: Option<String>,
+    /// Video duration in seconds (for video media).
+    #[serde(default)]
+    pub duration_seconds: Option<f64>,
+    /// Video frame rate in frames per second (for video media).
+    #[serde(default)]
+    pub fps: Option<f64>,
+    /// Video codec identifier (e.g. h264, hevc, vp9, av1).
+    #[serde(default)]
+    pub video_codec: Option<String>,
 }

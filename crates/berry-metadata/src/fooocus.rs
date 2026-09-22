@@ -152,6 +152,9 @@ pub fn parse_fooocus(text: &str) -> Option<ExtractedMetadata> {
         sampler,
         model_name,
         model_hash: None,
+        duration_seconds: None,
+        fps: None,
+        video_codec: None,
     })
 }
 

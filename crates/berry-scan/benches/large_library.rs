@@ -65,6 +65,9 @@ fn generate_mock_files(folder_id: i64, start_index: usize, count: usize) -> Vec<
                 height: Some(height),
                 model_name: Some(model.to_string()),
                 model_hash: Some(format!("{:08x}", 0x12345678 + (i % 100))),
+                duration_seconds: None,
+                fps: None,
+                video_codec: None,
             };
 
             ImageFile {

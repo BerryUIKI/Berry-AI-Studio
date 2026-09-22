@@ -409,6 +409,7 @@ dependencies = [
  "berry-domain",
  "kamadak-exif",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]

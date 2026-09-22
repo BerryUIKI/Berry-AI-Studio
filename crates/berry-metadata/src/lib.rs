@@ -21,22 +21,21 @@ pub mod novelai;
 pub mod parameters;
 pub mod pnginfo;
 pub mod sidecar;
+pub mod video;
 
 pub use container::detect_container;
 
 /// Extract structured metadata from a media file, dispatching on its container.
 ///
-/// Returns `None` when the file carries no recognizable metadata. Only image
-/// containers are considered; videos and text are out of scope. Embedded
+/// Returns `None` when the file carries no recognizable metadata. Embedded
 /// metadata wins; a `.txt` sidecar is only consulted as a fallback.
 pub fn extract_metadata(container: Container, path: &Path) -> Option<ExtractedMetadata> {
-    if !container.is_image() {
-        return None;
-    }
     let embedded = match container {
         Container::Png => extract_png_metadata(path),
         Container::Jpeg | Container::WebP => extract_exif_metadata(path),
-        Container::Mp4 | Container::Txt => None,
+        Container::Mp4 => video::extract_mp4_metadata(path),
+        Container::Webm => video::extract_webm_metadata(path),
+        Container::Txt => None,
     };
     embedded.or_else(|| extract_sidecar_metadata(path))
 }
@@ -134,6 +133,9 @@ fn extract_png_metadata(path: &Path) -> Option<ExtractedMetadata> {
                 sampler: None,
                 model_name: None,
                 model_hash: None,
+                duration_seconds: None,
+                fps: None,
+                video_codec: None,
             });
         }
     }
@@ -160,12 +162,25 @@ fn extract_exif_metadata(path: &Path) -> Option<ExtractedMetadata> {
         sampler: None,
         model_name: None,
         model_hash: None,
+        duration_seconds: None,
+        fps: None,
+        video_codec: None,
     })
 }
 
-/// Read a sibling `<file>.txt` and parse it as Fooocus or A1111-style parameters.
-fn extract_sidecar_metadata(path: &Path) -> Option<ExtractedMetadata> {
-    let text = sidecar::read_sidecar(path)?;
+/// Read a sibling `<file>.txt` or `<file>.json` and parse it.
+pub fn extract_sidecar_metadata(path: &Path) -> Option<ExtractedMetadata> {
+    let text = sidecar::read_sidecar(path).or_else(|| {
+        let json_path = path.with_extension("json");
+        if json_path.is_file() {
+            std::fs::read_to_string(&json_path).ok()
+        } else {
+            None
+        }
+    })?;
+    if let Some(meta) = comfyui::parse_comfyui(&text) {
+        return Some(meta);
+    }
     if let Some(meta) = fooocus::parse_fooocus(&text) {
         return Some(meta);
     }
@@ -189,6 +204,9 @@ fn from_parameters(parameters: String) -> ExtractedMetadata {
         sampler: parsed.sampler,
         model_name: parsed.model_name,
         model_hash: parsed.model_hash,
+        duration_seconds: None,
+        fps: None,
+        video_codec: None,
     }
 }
 
@@ -385,11 +403,21 @@ mod tests {
     }
 
     #[test]
-    fn videos_are_ignored() {
-        assert_eq!(
-            extract_metadata(Container::Mp4, Path::new("x.mp4")),
-            None,
-            "mp4 metadata extraction is out of scope"
-        );
+    fn videos_can_extract_metadata() {
+        let dir = tempfile::tempdir().unwrap();
+        let mp4_path = dir.path().join("x.mp4");
+        let txt_path = dir.path().join("x.txt");
+
+        std::fs::write(&mp4_path, b"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00").unwrap();
+        std::fs::write(
+            &txt_path,
+            "AnimateDiff animation prompt\nSteps: 20, Sampler: Euler, Seed: 42",
+        )
+        .unwrap();
+
+        let meta = extract_metadata(Container::Mp4, &mp4_path).expect("video metadata extracted");
+        assert_eq!(meta.prompt.as_deref(), Some("AnimateDiff animation prompt"));
+        assert_eq!(meta.steps, Some(20));
+        assert_eq!(meta.seed.as_deref(), Some("42"));
     }
 }

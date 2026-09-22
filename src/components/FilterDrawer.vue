@@ -31,6 +31,16 @@ const maxRating = ref<number | "">("");
 const minAesthetic = ref<number | "">("");
 const isFavorite = ref<boolean | null>(null);
 const isNsfw = ref<boolean | null>(null);
+const mediaType = ref<string | null>(null);
+const minDuration = ref<number | "">("");
+const maxDuration = ref<number | "">("");
+const minFps = ref<number | "">("");
+const maxFps = ref<number | "">("");
+
+function setDurationPreset(min: number | "", max: number | "") {
+  minDuration.value = min;
+  maxDuration.value = max;
+}
 
 // Sync form state when drawer opens or initialCriteria changes
 watch(
@@ -51,6 +61,11 @@ watch(
       minAesthetic.value = c.min_aesthetic ?? "";
       isFavorite.value = c.is_favorite ?? null;
       isNsfw.value = c.is_nsfw ?? null;
+      mediaType.value = c.media_type ?? null;
+      minDuration.value = c.min_duration ?? "";
+      maxDuration.value = c.max_duration ?? "";
+      minFps.value = c.min_fps ?? "";
+      maxFps.value = c.max_fps ?? "";
     }
   },
   { immediate: true },
@@ -82,6 +97,11 @@ function apply() {
     min_aesthetic: minAesthetic.value !== "" ? Number(minAesthetic.value) : null,
     is_favorite: isFavorite.value,
     is_nsfw: isNsfw.value,
+    media_type: mediaType.value || null,
+    min_duration: minDuration.value !== "" ? Number(minDuration.value) : null,
+    max_duration: maxDuration.value !== "" ? Number(maxDuration.value) : null,
+    min_fps: minFps.value !== "" ? Number(minFps.value) : null,
+    max_fps: maxFps.value !== "" ? Number(maxFps.value) : null,
   };
   emit("apply", criteria);
   close();
@@ -101,6 +121,11 @@ function reset() {
   minAesthetic.value = "";
   isFavorite.value = null;
   isNsfw.value = null;
+  mediaType.value = null;
+  minDuration.value = "";
+  maxDuration.value = "";
+  minFps.value = "";
+  maxFps.value = "";
   emit("reset");
   close();
 }
@@ -284,6 +309,96 @@ function reset() {
             >
               🔞 NSFW
             </button>
+          </div>
+        </div>
+
+        <!-- Media Type (All / Images / Videos) -->
+        <div class="filter-group">
+          <label class="group-label">{{ t.filterDrawer.mediaTypeLabel }}</label>
+          <div class="segmented-control">
+            <button
+              type="button"
+              class="seg-btn"
+              :class="{ active: mediaType === null }"
+              @click="mediaType = null"
+            >
+              {{ t.filterDrawer.mediaTypeAll }}
+            </button>
+            <button
+              type="button"
+              class="seg-btn"
+              :class="{ active: mediaType === 'image' }"
+              @click="mediaType = 'image'"
+            >
+              🖼 {{ t.filterDrawer.mediaTypeImages }}
+            </button>
+            <button
+              type="button"
+              class="seg-btn"
+              :class="{ active: mediaType === 'video' }"
+              @click="mediaType = 'video'"
+            >
+              🎬 {{ t.filterDrawer.mediaTypeVideos }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Video Duration Range (seconds) -->
+        <div v-if="mediaType !== 'image'" class="filter-group">
+          <label class="group-label">{{ t.filterDrawer.durationLabel }}</label>
+          <div class="range-inputs">
+            <input
+              v-model.number="minDuration"
+              type="number"
+              min="0"
+              max="3600"
+              placeholder="Min (s)"
+              class="form-input range-field"
+            />
+            <span class="range-sep">—</span>
+            <input
+              v-model.number="maxDuration"
+              type="number"
+              min="0"
+              max="3600"
+              placeholder="Max (s)"
+              class="form-input range-field"
+            />
+          </div>
+          <div class="quick-chips">
+            <button type="button" class="quick-chip" @click="setDurationPreset('', 5)">&lt; 5s</button>
+            <button type="button" class="quick-chip" @click="setDurationPreset(5, 15)">5s–15s</button>
+            <button type="button" class="quick-chip" @click="setDurationPreset(15, 60)">15s–60s</button>
+            <button type="button" class="quick-chip" @click="setDurationPreset(60, '')">&gt; 60s</button>
+          </div>
+        </div>
+
+        <!-- Video Frame Rate (FPS) -->
+        <div v-if="mediaType !== 'image'" class="filter-group">
+          <label class="group-label">{{ t.filterDrawer.fpsLabel }}</label>
+          <div class="range-inputs">
+            <input
+              v-model.number="minFps"
+              type="number"
+              min="1"
+              max="120"
+              placeholder="Min FPS"
+              class="form-input range-field"
+            />
+            <span class="range-sep">—</span>
+            <input
+              v-model.number="maxFps"
+              type="number"
+              min="1"
+              max="120"
+              placeholder="Max FPS"
+              class="form-input range-field"
+            />
+          </div>
+          <div class="quick-chips">
+            <button type="button" class="quick-chip" @click="minFps = 24">24 FPS+</button>
+            <button type="button" class="quick-chip" @click="minFps = 30">30 FPS+</button>
+            <button type="button" class="quick-chip" @click="minFps = 60">60 FPS+</button>
           </div>
         </div>
 

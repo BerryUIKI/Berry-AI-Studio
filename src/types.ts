@@ -21,7 +21,7 @@ export interface Folder {
   auto_harvest?: boolean;
 }
 
-export type Container = "png" | "jpg" | "webp" | "mp4" | "txt";
+export type Container = "png" | "jpg" | "webp" | "mp4" | "webm" | "txt";
 
 export interface ExtractedMetadata {
   format: string;
@@ -37,6 +37,9 @@ export interface ExtractedMetadata {
   sampler: string | null;
   model_name: string | null;
   model_hash: string | null;
+  duration_seconds?: number | null;
+  fps?: number | null;
+  video_codec?: string | null;
 }
 
 export type FileSortField =
@@ -384,6 +387,11 @@ export interface SearchCriteria {
   tag_id?: number | null;
   folder_id?: number | null;
   stack_id?: string | null;
+  media_type?: string | null;
+  min_duration?: number | null;
+  max_duration?: number | null;
+  min_fps?: number | null;
+  max_fps?: number | null;
   sort?: FileSortField | null;
   direction?: SortDirection | null;
   limit?: number | null;
