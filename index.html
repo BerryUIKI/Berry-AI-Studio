@@ -140,7 +140,7 @@
       <img src="app-icon.svg" alt="Berry Logo" class="w-8 h-8 rounded-lg group-hover:scale-105 transition-transform" />
       <div class="flex items-center gap-2">
         <span class="font-display text-[18px] font-bold text-white tracking-tight">Berry AI Studio</span>
-        <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#12b5cb]/15 text-[#67e8f9] border border-[#12b5cb]/30" id="headerVersionBadge">v0.2.1</span>
+        <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#12b5cb]/15 text-[#67e8f9] border border-[#12b5cb]/30" id="headerVersionBadge">v0.3.0</span>
       </div>
     </a>
 
@@ -197,7 +197,7 @@
       <!-- Release Badge -->
       <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.04] border border-white/10 text-[13px] text-[#94a3b8] mb-6">
         <span class="w-2 h-2 rounded-full bg-[#22c55e] animate-pulse"></span>
-        <span id="heroReleaseTag">v0.2.1 Released · 100% Local & Free Open Source</span>
+        <span id="heroReleaseTag">v0.3.0 Released · 100% Local & Free Open Source</span>
       </div>
 
       <!-- Title -->
@@ -213,11 +213,11 @@
       <!-- Primary Smart Download CTA & Actions -->
       <div class="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto mb-6">
         <!-- Smart Detected Download Button -->
-        <a id="smartDownloadBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.2.1/Berry-AI-Studio_Windows_x64.exe" onclick="handleSmartDownload(event)" class="w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 rounded-xl bg-gradient-to-r from-[#12b5cb] via-[#0ea5e9] to-[#fab82b] text-[#0b0b0e] text-[16px] font-bold hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-[#12b5cb]/25 glow-cyan">
+        <a id="smartDownloadBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.3.0/Berry-AI-Studio_Windows_x64.exe" onclick="handleSmartDownload(event)" class="w-full sm:w-auto flex items-center justify-center gap-3 px-8 py-4 rounded-xl bg-gradient-to-r from-[#12b5cb] via-[#0ea5e9] to-[#fab82b] text-[#0b0b0e] text-[16px] font-bold hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-[#12b5cb]/25 glow-cyan">
           <span id="smartOsIcon" class="text-xl">🪟</span>
           <div class="text-left">
             <div class="text-[15px] font-bold leading-tight" id="smartDownloadTitle">Download for Windows (x64)</div>
-            <div class="text-[11px] opacity-85 font-medium" id="smartDownloadSubtitle">v0.2.1 · Installer (.msi / .exe)</div>
+            <div class="text-[11px] opacity-85 font-medium" id="smartDownloadSubtitle">v0.3.0 · Installer (.msi / .exe)</div>
           </div>
         </a>
 
@@ -376,6 +376,42 @@
             Everything runs on your computer with an embedded database. Zero cloud uploads, zero telemetry, zero subscription fees — your creative assets stay strictly yours.
           </p>
         </div>
+
+        <!-- Feature 12: S3 / WebDAV Cloud Backup & Delta Sync (v0.3.0) -->
+        <div class="p-6 rounded-2xl bg-[#141418] border border-white/[0.08] hover:border-[#12b5cb]/40 transition-all group relative overflow-hidden">
+          <div class="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-[#12b5cb]/15 text-[#67e8f9] text-[10px] font-bold tracking-wide border border-[#12b5cb]/30">v0.3.0</div>
+          <div class="w-12 h-12 rounded-xl bg-[#0284c7]/15 border border-[#0284c7]/30 flex items-center justify-center text-2xl mb-5 group-hover:scale-110 transition-transform">
+            ☁️
+          </div>
+          <h3 class="font-display text-lg font-bold text-white mb-2" data-i18n="features.f12.title">S3 & WebDAV Snapshot Cloud Backup</h3>
+          <p class="text-[#94a3b8] text-[14px] leading-relaxed" data-i18n="features.f12.desc">
+            Hot VACUUM INTO snapshots with schema verification to AWS S3, R2, MinIO, and Synology/Nextcloud WebDAV, plus bidirectional delta asset sync.
+          </p>
+        </div>
+
+        <!-- Feature 13: Standalone HTML Showcase Export (v0.3.0) -->
+        <div class="p-6 rounded-2xl bg-[#141418] border border-white/[0.08] hover:border-[#12b5cb]/40 transition-all group relative overflow-hidden">
+          <div class="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-[#12b5cb]/15 text-[#67e8f9] text-[10px] font-bold tracking-wide border border-[#12b5cb]/30">v0.3.0</div>
+          <div class="w-12 h-12 rounded-xl bg-[#e11d48]/15 border border-[#e11d48]/30 flex items-center justify-center text-2xl mb-5 group-hover:scale-110 transition-transform">
+            📤
+          </div>
+          <h3 class="font-display text-lg font-bold text-white mb-2" data-i18n="features.f13.title">Standalone Single-File HTML Showcase</h3>
+          <p class="text-[#94a3b8] text-[14px] leading-relaxed" data-i18n="features.f13.desc">
+            Export zero-dependency standalone HTML portfolios with responsive dark gallery, fullscreen lightbox, prompt inspector, and keyword search.
+          </p>
+        </div>
+
+        <!-- Feature 14: Multi-Database Team Studio & O(1) Pagination (v0.3.0) -->
+        <div class="p-6 rounded-2xl bg-[#141418] border border-white/[0.08] hover:border-[#12b5cb]/40 transition-all group relative overflow-hidden">
+          <div class="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-[#12b5cb]/15 text-[#67e8f9] text-[10px] font-bold tracking-wide border border-[#12b5cb]/30">v0.3.0</div>
+          <div class="w-12 h-12 rounded-xl bg-[#10b981]/15 border border-[#10b981]/30 flex items-center justify-center text-2xl mb-5 group-hover:scale-110 transition-transform">
+            👥
+          </div>
+          <h3 class="font-display text-lg font-bold text-white mb-2" data-i18n="features.f14.title">Multi-DB Team Studio & O(1) Pagination</h3>
+          <p class="text-[#94a3b8] text-[14px] leading-relaxed" data-i18n="features.f14.desc">
+            Storage engine support for SQLite, MySQL 8.0+, and PostgreSQL 14+ with real-time sync, and keyset cursor deep pagination for 500,000+ assets.
+          </p>
+        </div>
       </div>
     </section>
 
@@ -441,11 +477,11 @@
             <p class="text-[#94a3b8] text-[13px] mb-6" data-i18n="download.winDesc">Compatible with Windows 10 / 11 (64-bit).</p>
             
             <div class="flex flex-col gap-2.5 mb-6">
-              <a id="winMsiBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.2.1/Berry-AI-Studio_Windows_x64.exe" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.09] border border-white/10 text-[13px] text-white font-medium transition-colors">
+              <a id="winMsiBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.3.0/Berry-AI-Studio_Windows_x64.exe" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.09] border border-white/10 text-[13px] text-white font-medium transition-colors">
                 <span class="flex items-center gap-2"><span>📦</span> Windows Installer (.exe)</span>
                 <span class="text-[11px] text-[#67e8f9] font-semibold" data-i18n="download.recommended">Recommended</span>
               </a>
-              <a id="winExeBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.2.1/Berry-AI-Studio_Windows_x64.zip" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 text-[13px] text-[#cbd5e1] transition-colors">
+              <a id="winExeBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.3.0/Berry-AI-Studio_Windows_x64.zip" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 text-[13px] text-[#cbd5e1] transition-colors">
                 <span class="flex items-center gap-2"><span>⚙️</span> Portable Archive (.zip)</span>
                 <span class="text-[11px] text-[#64748b]">x64</span>
               </a>
@@ -467,15 +503,15 @@
             <p class="text-[#94a3b8] text-[13px] mb-6" data-i18n="download.macDesc">Compatible with macOS 11.0 Big Sur or later.</p>
             
             <div class="flex flex-col gap-2.5 mb-6">
-              <a id="macArmBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.2.1/Berry-AI-Studio_macOS_aarch64.dmg" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.09] border border-white/10 text-[13px] text-white font-medium transition-colors">
+              <a id="macArmBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.3.0/Berry-AI-Studio_macOS_aarch64.dmg" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.09] border border-white/10 text-[13px] text-white font-medium transition-colors">
                 <span class="flex items-center gap-2"><span>🍏</span> Apple Silicon (.dmg)</span>
                 <span class="text-[11px] text-[#67e8f9] font-semibold">M1 / M2 / M3 / M4</span>
               </a>
-              <a id="macIntelBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.2.1/Berry-AI-Studio_macOS_x64.dmg" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 text-[13px] text-[#cbd5e1] transition-colors">
+              <a id="macIntelBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.3.0/Berry-AI-Studio_macOS_x64.dmg" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 text-[13px] text-[#cbd5e1] transition-colors">
                 <span class="flex items-center gap-2"><span>🖥️</span> Intel x64 (.dmg)</span>
                 <span class="text-[11px] text-[#64748b]">x86_64</span>
               </a>
-              <a id="macArmTarBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.2.1/Berry-AI-Studio_macOS_aarch64.dmg" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 text-[13px] text-[#cbd5e1] transition-colors">
+              <a id="macArmTarBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.3.0/Berry-AI-Studio_macOS_aarch64.dmg" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 text-[13px] text-[#cbd5e1] transition-colors">
                 <span class="flex items-center gap-2"><span>📦</span> App Bundle (.tar.gz)</span>
                 <span class="text-[11px] text-[#64748b]">Apple Silicon</span>
               </a>
@@ -497,15 +533,15 @@
             <p class="text-[#94a3b8] text-[13px] mb-6" data-i18n="download.linuxDesc">Supports Ubuntu, Debian, Arch, Fedora and others.</p>
             
             <div class="flex flex-col gap-2.5 mb-6">
-              <a id="linuxAppImageBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.2.1/Berry-AI-Studio_Linux_x64.AppImage" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.09] border border-white/10 text-[13px] text-white font-medium transition-colors">
+              <a id="linuxAppImageBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.3.0/Berry-AI-Studio_Linux_x64.AppImage" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.09] border border-white/10 text-[13px] text-white font-medium transition-colors">
                 <span class="flex items-center gap-2"><span>🚀</span> Universal AppImage</span>
                 <span class="text-[11px] text-[#67e8f9] font-semibold" data-i18n="download.recommended">Recommended</span>
               </a>
-              <a id="linuxDebBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.2.1/Berry-AI-Studio_Linux_x64.deb" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 text-[13px] text-[#cbd5e1] transition-colors">
+              <a id="linuxDebBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.3.0/Berry-AI-Studio_Linux_x64.deb" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 text-[13px] text-[#cbd5e1] transition-colors">
                 <span class="flex items-center gap-2"><span>📦</span> Debian / Ubuntu (.deb)</span>
                 <span class="text-[11px] text-[#64748b]">apt</span>
               </a>
-              <a id="linuxRpmBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.2.1/Berry-AI-Studio_Linux_x64.AppImage" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 text-[13px] text-[#cbd5e1] transition-colors">
+              <a id="linuxRpmBtn" href="https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v0.3.0/Berry-AI-Studio_Linux_x64.AppImage" onclick="handleDirectDownload(event, this)" class="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 text-[13px] text-[#cbd5e1] transition-colors">
                 <span class="flex items-center gap-2"><span>🗜️</span> Fedora / RHEL (.rpm)</span>
                 <span class="text-[11px] text-[#64748b]">rpm</span>
               </a>
@@ -522,7 +558,7 @@
             ✓
           </div>
           <div>
-            <div class="text-[14px] font-bold text-white" id="releaseInfoTitle">Latest Release: v0.2.1</div>
+            <div class="text-[14px] font-bold text-white" id="releaseInfoTitle">Latest Release: v0.3.0</div>
             <div class="text-[12px] text-[#94a3b8]" id="releaseInfoDate">Built on Tauri 2.11 + Rust 1.85 + Vue 3.5</div>
           </div>
         </div>
@@ -754,6 +790,12 @@
         "features.f10.desc": "Search across 100,000+ artworks by semantic concepts, mood, and visual aesthetics using local on-device neural embeddings — 100% offline.",
         "features.f11.title": "Masonry Waterfall & Square Grid",
         "features.f11.desc": "Enjoy dynamic waterfall masonry layout alongside classic square grids, showcasing portrait and landscape AI art in their true natural proportions.",
+        "features.f12.title": "S3 & WebDAV Snapshot Cloud Backup",
+        "features.f12.desc": "Hot VACUUM INTO snapshots with schema verification to AWS S3, R2, MinIO, and Synology/Nextcloud WebDAV, plus bidirectional delta asset sync.",
+        "features.f13.title": "Standalone Single-File HTML Showcase",
+        "features.f13.desc": "Export zero-dependency standalone HTML portfolios with responsive dark gallery, fullscreen lightbox, prompt inspector, and keyword search.",
+        "features.f14.title": "Multi-DB Team Studio & O(1) Pagination",
+        "features.f14.desc": "Storage engine support for SQLite, MySQL 8.0+, and PostgreSQL 14+ with real-time sync, and keyset cursor deep pagination for 500,000+ assets.",
         "ecosystem.title": "Universal Support for Leading AIGC Ecosystems",
         "download.heading": "Download Berry AI Studio",
         "download.subheading": "Select your platform below. All releases are digitally packaged and open-source on GitHub Releases.",
@@ -826,6 +868,12 @@
         "features.f10.desc": "内置本地轻量端侧神经网络，支持通过氛围、风格或概念自然语言检索十万张画作，纯离线计算零数据外泄。",
         "features.f11.title": "瀑布流与自适应网格双视图",
         "features.f11.desc": "支持经典等宽正方形网格与动态瀑布流视图随意切换，完美还原本体竖版肖像与宽屏横幅的原生画质比例。",
+        "features.f12.title": "S3 / WebDAV 快照备份与差异同步",
+        "features.f12.desc": "自动化热 VACUUM INTO 备份至 AWS S3、Cloudflare R2、MinIO 与群晖/Nextcloud WebDAV，兼具双向增量资产镜像与带宽限速。",
+        "features.f13.title": "独立单文件 HTML Showcase 导出",
+        "features.f13.desc": "导出零依赖、开箱即用的单个 HTML 作品集，内嵌暗色画廊、全屏缩放灯箱、提示词分词检查器与即时搜索。",
+        "features.f14.title": "多数据库团队协作与 O(1) 游标分页",
+        "features.f14.desc": "抽象存储引擎支持 SQLite、MySQL 与 PostgreSQL，支持乐观并发实时协作，并在 50 万级资产下实现毫秒级游标深度分页。",
         "ecosystem.title": "全方位支持主流 AIGC 绘画工具",
         "download.heading": "下载 Berry AI Studio",
         "download.subheading": "请选择您的操作系统。所有安装包均通过 GitHub Releases 自动化构建并开源发布。",
@@ -898,6 +946,12 @@
         "features.f10.desc": "內建本機輕量端側神經網路，支援透過氛圍、風格或概念自然語言檢索十萬張畫作，純離線計算零資料外洩。",
         "features.f11.title": "瀑布流與自適應網格雙檢視",
         "features.f11.desc": "支援經典等寬正方形網格與動態瀑布流檢視隨意切換，完美還原本體直向肖像與寬螢幕橫幅的原生畫質比例。",
+        "features.f12.title": "S3 / WebDAV 快照備份與差異同步",
+        "features.f12.desc": "自動化熱 VACUUM INTO 備份至 AWS S3、Cloudflare R2、MinIO 與群暉/Nextcloud WebDAV，兼具雙向增量資產鏡像與頻寬限速。",
+        "features.f13.title": "獨立單一 HTML Showcase 匯出",
+        "features.f13.desc": "匯出零依賴、開箱即用的單一 HTML 作品集，內建深色畫廊、全螢幕縮放燈箱、提示詞分詞檢查器與即時搜尋。",
+        "features.f14.title": "多資料庫團隊協作與 O(1) 游標分頁",
+        "features.f14.desc": "抽象儲存引擎支援 SQLite、MySQL 與 PostgreSQL，支援樂觀並行即時協作，並在 50 萬級資產下實現毫秒級游標深度分頁。",
         "ecosystem.title": "全方位支援主流 AIGC 繪畫工具",
         "download.heading": "下載 Berry AI Studio",
         "download.subheading": "請選擇您的作業系統。所有安裝包均透過 GitHub Releases 自動化建置並開源發布。",
@@ -970,6 +1024,12 @@
         "features.f10.desc": "端末内の軽量ニューラルネットにより、雰囲気やスタイルなどの自然言語で10万枚の画像を瞬時に検索。外部通信は一切不要。",
         "features.f11.title": "ウォーターフォール＆スクエアグリッド",
         "features.f11.desc": "正方形グリッドと可変高ウォーターフォール（Masonry）を自由自在に切替。縦長ポートレートやワイド風景を本来の比率で美しく鑑賞。",
+        "features.f12.title": "S3 / WebDAV スナップショット同期＆復元",
+        "features.f12.desc": "AWS S3、Cloudflare R2、MinIO、WebDAVへのホットVACUUM INTOバックアップ。差分双方向アセットミラーリングにも対応。",
+        "features.f13.title": "単一ファイル HTML Showcase 出力",
+        "features.f13.desc": "外部依存ゼロの単一HTML作品集を出力。ダークテーマ画廊、全画面拡大ライトボックス、プロンプト表示機能を内蔵。",
+        "features.f14.title": "マルチDBチームスタジオ＆ O(1) ページ送り",
+        "features.f14.desc": "SQLite、MySQL、PostgreSQLに対応したチーム同期機能と、50万件規模でも1ミリ秒未満で動くキーセットカーソル深層ページネーション。",
         "ecosystem.title": "主要AIGCエコシステムを包括サポート",
         "download.heading": "Berry AI Studio をダウンロード",
         "download.subheading": "お使いのOSを選択してください。GitHub Releasesから直接ダウンロード可能です。",
@@ -1042,6 +1102,12 @@
         "features.f10.desc": "Durchsuchen Sie über 100.000 Bilder nach Stimmung und Konzepten per lokaler KI — 100% offline ohne Datenübertragung.",
         "features.f11.title": "Masonry-Waterfall & Rasteransicht",
         "features.f11.desc": "Dynamisches Waterfall-Layout neben klassischem Quadratformat: Genießen Sie Porträt- und Querformate in ihren natürlichen Proportionen.",
+        "features.f12.title": "S3 / WebDAV Cloud-Backup & Delta-Sync",
+        "features.f12.desc": "Hot VACUUM INTO-Snapshots zu AWS S3, R2, MinIO und WebDAV mit bidirektionaler inkrementeller Assets-Synchronisation.",
+        "features.f13.title": "Eigenständiger HTML-Showcase-Export",
+        "features.f13.desc": "Exportieren Sie eigenständige HTML-Portfolios ohne externe Abhängigkeiten mit responsivem Dark-Theme, Lightbox und Prompt-Inspektor.",
+        "features.f14.title": "Multi-DB Team Studio & O(1)-Paginierung",
+        "features.f14.desc": "Speicher-Engine für SQLite, MySQL und PostgreSQL mit Echtzeit-Zusammenarbeit und Keyset-Cursor-Paginierung für 500.000+ Assets.",
         "ecosystem.title": "Umfassende Unterstützung für moderne AIGC-Tools",
         "download.heading": "Berry AI Studio herunterladen",
         "download.subheading": "Wählen Sie Ihr Betriebssystem. Alle Builds sind als Open-Source auf GitHub verfügbar.",
@@ -1114,6 +1180,12 @@
         "features.f10.desc": "Recherchez parmi plus de 100 000 œuvres par ambiance ou concept visuel grâce à un modèle neuronal embarqué — 100% hors ligne.",
         "features.f11.title": "Galerie Waterfall & Grille Carrée",
         "features.f11.desc": "Basculez entre grille carrée et disposition cascade dynamique pour apprécier les portraits verticaux et paysages dans leurs proportions réelles.",
+        "features.f12.title": "Sauvegarde Cloud S3 / WebDAV & Delta Sync",
+        "features.f12.desc": "Snapshots hot VACUUM INTO vers AWS S3, R2, MinIO et WebDAV avec synchronisation différentielle bidirectionnelle.",
+        "features.f13.title": "Exportation Showcase HTML autonome",
+        "features.f13.desc": "Exportez des portfolios HTML sans dépendance externe avec galerie responsive sombre, lightbox plein écran et inspecteur de prompts.",
+        "features.f14.title": "Team Studio multi-BD & Pagination O(1)",
+        "features.f14.desc": "Moteur de stockage pour SQLite, MySQL et PostgreSQL avec collaboration en temps réel et pagination par curseur pour plus de 500 000 images.",
         "ecosystem.title": "Prise en charge universelle des moteurs AIGC",
         "download.heading": "Télécharger Berry AI Studio",
         "download.subheading": "Sélectionnez votre système d'exploitation. Tous les builds sont open source sur GitHub Releases.",
@@ -1186,6 +1258,12 @@
         "features.f10.desc": "Encuentra imágenes por estado de ánimo o conceptos visuales con IA local para más de 100.000 obras, 100% privada y sin internet.",
         "features.f11.title": "Galería Waterfall y cuadrícula clásica",
         "features.f11.desc": "Disfruta de diseño dinámico en cascada junto a la cuadrícula tradicional para admirar retratos verticales y paisajes panorámicos en su escala natural.",
+        "features.f12.title": "Copia en la nube S3 / WebDAV y sinc. delta",
+        "features.f12.desc": "Instantáneas hot VACUUM INTO en AWS S3, R2, MinIO y WebDAV con sincronización diferencial bidireccional de recursos.",
+        "features.f13.title": "Exportación Showcase HTML independiente",
+        "features.f13.desc": "Exporta colecciones HTML independientes sin dependencias externas con tema oscuro adaptable, lightbox y visor de prompts.",
+        "features.f14.title": "Team Studio multi-BD y paginación O(1)",
+        "features.f14.desc": "Motor de almacenamiento para SQLite, MySQL y PostgreSQL con colaboración en tiempo real y paginación por cursor para más de 500.000 obras.",
         "ecosystem.title": "Soporte universal para los principales ecosistemas de IA",
         "download.heading": "Descargar Berry AI Studio",
         "download.subheading": "Seleccione su plataforma. Todos los paquetes están disponibles en GitHub Releases.",
@@ -1226,7 +1304,7 @@
 
     // Current Language & State
     let currentLang = localStorage.getItem("berry_site_lang") || "en";
-    let latestVersion = "v0.2.1";
+    let latestVersion = "v0.3.0";
     let releaseAssets = [];
 
     // Language Switcher Toggle
@@ -1497,7 +1575,7 @@
           }
         }
       } catch (err) {
-        console.warn("Could not query GitHub Releases API (rate-limited or offline), using fallback v0.2.1 assets:", err);
+        console.warn("Could not query GitHub Releases API (rate-limited or offline), using fallback v0.3.0 assets:", err);
       }
     }
 
