@@ -1,6 +1,6 @@
-# ⌨️ Berry AI Studio Keyboard Shortcuts
+# ⌨️ Omera Keyboard Shortcuts
 
-Berry AI Studio is designed with desktop productivity in mind. Most major operations can be performed using keyboard shortcuts.
+Omera is designed with desktop productivity in mind. Most major operations can be performed using keyboard shortcuts.
 
 ---
 

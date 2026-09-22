@@ -1,6 +1,6 @@
-# 🗺️ Berry AI Studio Roadmap
+# 🗺️ Omera Roadmap
 
-This roadmap documents completed milestones and future engineering goals for **Berry AI Studio**.
+This roadmap documents completed milestones and future engineering goals for **Omera**.
 
 ---
 
@@ -119,7 +119,9 @@ This roadmap documents completed milestones and future engineering goals for **B
 - [x] Keep navigation filters and stack grouping aligned across paginated text and semantic searches.
 - [x] Benchmark a dedicated gallery DTO for the remaining structured metadata fields.
 
-### ✅ Milestone 14: Multi-Database Support & Team Studio (MySQL & PostgreSQL)
+### Deferred: Multi-Database Support & Team Studio (MySQL & PostgreSQL)
+
+**Correction:** The runtime is SQLite. The historical checklist below records prototype work, not working end-to-end MySQL/PostgreSQL support. Remote backends remain unavailable pending command routing, transactions, migrations and integration tests (issue #110).
 *(See architectural design specification: [MULTI_DATABASE_COLLABORATION_RFC.md](./MULTI_DATABASE_COLLABORATION_RFC.md))*
 - [x] Storage Engine trait abstraction with database dialect support for SQLite, MySQL 8.0+, and PostgreSQL 14+.
 - [x] Keyset/cursor-based deep pagination for 500,000+ asset scale (`search_files_cursor_page`).
@@ -132,6 +134,13 @@ This roadmap documents completed milestones and future engineering goals for **B
 ---
 
 ## 🔮 Upcoming Milestones (v0.4.0+)
+
+### Priority: Omera identity and review fixes
+
+- [ ] Complete [OMERA_MIGRATION.md](OMERA_MIGRATION.md): full identity rename, pre-1.0 legacy discovery, staged migration, and separately confirmed cleanup.
+- [ ] Validate signed updates and platform installer transitions, including skipped bridge releases.
+- [ ] Complete review issues #98–#117 with regression coverage.
+- [ ] Measure and implement [STORAGE_EVOLUTION.md](STORAGE_EVOLUTION.md) without rewriting applied migrations.
 
 ### 🎯 Milestone 15: Video & Animation AIGC Ingestion & Playback
 - [ ] **AIGC Video Metadata Extraction**: Parse embedded generation workflows and prompts from MP4 and WebM video containers (ComfyUI AnimateDiff, Wan2.1, HunyuanVideo, CogVideoX, LTX-Video, and Stable Video Diffusion).
@@ -146,10 +155,10 @@ This roadmap documents completed milestones and future engineering goals for **B
 
 ### 🎯 Milestone 17: Bi-Directional ComfyUI Studio, Live Queue & Prompt Diff
 - [ ] **Real-Time ComfyUI WebSocket Monitor**: Direct integration with ComfyUI `/ws` API, displaying live execution progress, queue position, active node execution, and GPU VRAM telemetry in the status bar and Activity popover.
-- [ ] **Zero-Latency Ingestion Pipeline**: Stream newly generated images directly into Berry AI Studio database and UI memory via IPC upon workflow completion, eliminating filesystem polling delay.
+- [ ] **Zero-Latency Ingestion Pipeline**: Stream newly generated images directly into Omera database and UI memory via IPC upon workflow completion, eliminating filesystem polling delay.
 - [ ] **Prompt Diff & Matrix Workbench**: Side-by-side visual diff tool highlighting changes in positive/negative prompt syntax, weights `(keyword:1.2)`, and negative keywords across seeds, model versions, and samplers.
 
-### 🎯 Milestone 18: Local LAN Web Companion (Berry Remote)
+### 🎯 Milestone 18: Local LAN Web Companion (Omera Remote)
 - [ ] **Embedded Lightweight HTTP Web Server**: Built-in Axum/Tokio web server in Tauri backend for local network access with secure PIN/passcode authentication.
 - [ ] **Responsive Mobile/Tablet Web Companion**: Mobile-optimized touch UI allowing wireless browsing, rating, tagging, favoriting, and prompt copying on iPad, tablets, and smartphones on the same Wi-Fi network.
 - [ ] **Live Bi-Directional State Sync**: Rating, tag, and favorite mutations applied on mobile devices immediately synchronize back to the desktop application in real time.
@@ -158,6 +167,5 @@ This roadmap documents completed milestones and future engineering goals for **B
 - [ ] **Dominant Color Extraction & Palette Indexing**: Multi-threaded extraction of 5-color palettes per asset using k-means/octree quantization, indexing hex colors and lightness into `file_colors` table.
 - [ ] **Color Palette Visual Filter Bar**: Interactive hue ribbon and tone picker in search drawer to filter images by dominant color family (Red, Amber, Emerald, Cyan, Violet, Monochrome, Warm, Cool).
 - [ ] **Pre-Computed SQL Facet Distribution**: Migrate expensive filter aggregations (models, samplers, ratings, aspect ratio buckets) to materialized views and cached facet counters for instant multi-facet filter rendering on 100k+ item libraries.
-
 
 

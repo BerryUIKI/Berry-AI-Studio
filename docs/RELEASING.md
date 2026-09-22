@@ -1,12 +1,20 @@
 # 🚀 Releasing & Packaging Guide
 
-This guide describes the release process, versioning conventions, and build artifact management for **Berry AI Studio**.
+## Omera transition release gate
+
+The target product is Omera, identifier `com.berryuiki.omera`, canonical repository [BerryUIKI/Omera](https://github.com/BerryUIKI/Omera), binary `omera`, and asset prefix `Omera_`. Historical naming examples below must be migrated in lockstep with release workflows; they are not the new release contract.
+
+Before publishing, follow [OMERA_MIGRATION.md](OMERA_MIGRATION.md). Verify migration to `omera.db`, `omera_*` settings and the Omera credential service; platform installer replacement; signed OS/architecture-specific updates; and the subsequent Omera update. Test upgrades that skip intermediate releases. Keep legacy data until validated migration and explicit cleanup confirmation. Never reset application/schema versions or publish an unverified rename build.
+
+Implementation branches start from and target `dev`; approved release integration reaches `main`. Signing key provisioning and actual installer upgrade tests are release blockers. A changed macOS Bundle ID requires checking provisioning and App Store distribution as a new identity.
+
+This guide describes the release process, versioning conventions, and build artifact management for **Omera**.
 
 ---
 
 ## 🏷️ Versioning Strategy
 
-Berry AI Studio adheres strictly to [Semantic Versioning 2.0.0](https://semver.org/):
+Omera adheres strictly to [Semantic Versioning 2.0.0](https://semver.org/):
 
 $$\text{v}\langle\text{MAJOR}\rangle.\langle\text{MINOR}\rangle.\langle\text{PATCH}\rangle$$
 
@@ -24,7 +32,7 @@ When preparing a release, update the version number consistently in:
 
 ## 📦 Release Asset Naming Convention
 
-All pre-compiled release assets uploaded to [GitHub Releases](https://github.com/BerryUIKI/Berry-AI-Studio/releases) follow the unified naming convention:
+All pre-compiled release assets uploaded to [GitHub Releases](https://github.com/BerryUIKI/Omera/releases) follow the unified naming convention:
 
 $$\text{<AppName>}\_\text{<OS>}\_\text{<Architecture>}.\text{<extension>}$$
 
@@ -32,12 +40,12 @@ $$\text{<AppName>}\_\text{<OS>}\_\text{<Architecture>}.\text{<extension>}$$
 
 | Platform (OS) | Architecture | Target Triple | Asset File Name |
 | :--- | :--- | :--- | :--- |
-| **Windows** | x86_64 (64-bit) | `x86_64-pc-windows-msvc` | `Berry-AI-Studio_Windows_x64.exe` *(NSIS Setup)* |
-| **Windows** | x86_64 (64-bit) | `x86_64-pc-windows-msvc` | `Berry-AI-Studio_Windows_x64.zip` *(Portable)* |
-| **macOS** | Apple Silicon (ARM64) | `aarch64-apple-darwin` | `Berry-AI-Studio_macOS_aarch64.dmg` |
-| **macOS** | Intel (x86_64) | `x86_64-apple-darwin` | `Berry-AI-Studio_macOS_x64.dmg` |
-| **Linux** | x86_64 (64-bit) | `x86_64-unknown-linux-gnu` | `Berry-AI-Studio_Linux_x64.AppImage` |
-| **Linux** | x86_64 (64-bit) | `x86_64-unknown-linux-gnu` | `Berry-AI-Studio_Linux_x64.deb` |
+| **Windows** | x86_64 (64-bit) | `x86_64-pc-windows-msvc` | `Omera_Windows_x64.exe` *(NSIS Setup)* |
+| **Windows** | x86_64 (64-bit) | `x86_64-pc-windows-msvc` | `Omera_Windows_x64.zip` *(Portable)* |
+| **macOS** | Apple Silicon (ARM64) | `aarch64-apple-darwin` | `Omera_macOS_aarch64.dmg` |
+| **macOS** | Intel (x86_64) | `x86_64-apple-darwin` | `Omera_macOS_x64.dmg` |
+| **Linux** | x86_64 (64-bit) | `x86_64-unknown-linux-gnu` | `Omera_Linux_x64.AppImage` |
+| **Linux** | x86_64 (64-bit) | `x86_64-unknown-linux-gnu` | `Omera_Linux_x64.deb` |
 
 ---
 

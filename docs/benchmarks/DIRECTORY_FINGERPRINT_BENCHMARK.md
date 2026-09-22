@@ -9,7 +9,7 @@
 
 ## 1. Executive Summary
 
-This benchmark evaluates filesystem reconciliation strategies for Berry AI Studio across local fast storage (NVMe SSD) and network-attached storage (SMB, NFS, WebDAV, cloud mounts).
+This benchmark evaluates filesystem reconciliation strategies for Omera across local fast storage (NVMe SSD) and network-attached storage (SMB, NFS, WebDAV, cloud mounts).
 
 As libraries grow into tens of thousands of media files across complex folder hierarchies, scanning performance depends critically on minimizing operating system calls (system calls on local disks, and remote round-trip RPCs over network filesystems).
 

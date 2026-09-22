@@ -8,7 +8,7 @@
 
 ## 1. Executive Summary
 
-This report documents reproducible benchmark measurements for Berry AI Studio across small (1,000 items), medium (10,000 items), and large (50,000 items) media libraries.
+This report documents reproducible benchmark measurements for Omera across small (1,000 items), medium (10,000 items), and large (50,000 items) media libraries.
 
 The tests evaluate:
 1. **Time to first usable gallery** from a warm SQLite database.

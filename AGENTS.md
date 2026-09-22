@@ -1,5 +1,12 @@
 # Agent Guide
 
+## Omera Identity Migration
+
+- The target identity is Omera, `com.berryuiki.omera`, repository `BerryUIKI/Omera`, database `omera.db`, and local settings prefix `omera_`.
+- Follow `docs/OMERA_MIGRATION.md` and `docs/STORAGE_EVOLUTION.md`. Current `berry-*` paths below remain valid until the coordinated source rename.
+- All pre-1.0 releases must retain legacy discovery and supported import. Preserve source data during migration. Cleanup requires validated destination data and a separate explicit user decision in the application.
+- Never include user media, external vaults, or shared directories in automatic legacy application-data cleanup.
+
 This file defines repository-local instructions for coding agents and automated contributors.
 
 ## Working Branch
@@ -57,4 +64,3 @@ For gallery changes, also manually verify Grid, Waterfall, and Table modes at na
 - Repository engineering documentation is written in English.
 - User-facing UI strings belong in `src/i18n/locales/`; do not introduce untranslated template text unless it is a temporary fallback.
 - Update architecture or performance documentation when a change alters lifecycle, caching, virtualization, or persistence behavior.
-

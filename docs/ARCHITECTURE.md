@@ -1,6 +1,10 @@
-# 🏗️ Berry AI Studio Architecture
+# 🏗️ Omera Architecture
 
-**Berry AI Studio** is a high-performance desktop application built on **Tauri 2**, **Rust**, **Vue 3**, and **SQLite**. It uses a multi-crate Rust backend to handle heavy I/O, file system operations, and metadata extraction, while providing a modern Eagle-style 3-Pane Studio UI in the frontend webview.
+## Identity transition
+
+The accepted target is Omera (`com.berryuiki.omera`), repository `BerryUIKI/Omera`, database `omera.db`, and settings prefix `omera_`. Runtime and crate renaming is pending; paths and database names below describe the existing implementation. Follow [OMERA_MIGRATION.md](OMERA_MIGRATION.md) before switching identity. Storage changes follow [STORAGE_EVOLUTION.md](STORAGE_EVOLUTION.md), preserving applied migrations.
+
+**Omera** is a high-performance desktop application built on **Tauri 2**, **Rust**, **Vue 3**, and **SQLite**. It uses a multi-crate Rust backend to handle heavy I/O, file system operations, and metadata extraction, while providing a modern Eagle-style 3-Pane Studio UI in the frontend webview.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -109,7 +113,7 @@ The frontend is built with **Vue 3 Composition API** + **TypeScript** + **Vite**
 
 ## ⚡ Multi-Mode Folders & AIGC Ingestion Pipeline
 
-Berry AI Studio extends conventional folder management into three high-performance modes (see [INGESTION_AND_STACKING.md](INGESTION_AND_STACKING.md) for full specifications):
+Omera extends conventional folder management into three high-performance modes (see [INGESTION_AND_STACKING.md](INGESTION_AND_STACKING.md) for full specifications):
 - **Link Folders (`link`)**: Zero-copy in-place file surveillance without file movement.
 - **Managed Vaults (`managed`)**: Managed repository supporting direct drag-and-drop Copy or Move ingestion.
 - **AIGC Ingestion Pipeline (`pipeline`)**: Automated surveillance of WebUI, ComfyUI, and Fooocus output directories with write-lock debouncing, atomic ingest to the library, and non-destructive delayed cleanup (grace period) moving aged source files to the OS Recycle Bin.

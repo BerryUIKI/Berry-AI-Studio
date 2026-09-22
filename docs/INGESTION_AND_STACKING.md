@@ -1,12 +1,12 @@
 # 📦 Multi-Mode Folders, AIGC Ingestion Pipelines & Image Stacking Specification
 
-This document defines the architectural specification, data schemas, interaction flows, and background processing models for **Multi-Mode Folders**, **AIGC Ingestion Pipelines**, and **Image Stacking** in Berry AI Studio.
+This document defines the architectural specification, data schemas, interaction flows, and background processing models for **Multi-Mode Folders**, **AIGC Ingestion Pipelines**, and **Image Stacking** in Omera.
 
 ---
 
 ## 1. Multi-Mode Folder Architecture
 
-Berry AI Studio organizes local assets through three distinct folder operating modes while preserving existing core library abstractions (All Images, Favorites, Sensitive NSFW 18+, Smart Albums, and Color Tags).
+Omera organizes local assets through three distinct folder operating modes while preserving existing core library abstractions (All Images, Favorites, Sensitive NSFW 18+, Smart Albums, and Color Tags).
 
 ```
 ▼ 📁 Folders (Multi-Mode)
