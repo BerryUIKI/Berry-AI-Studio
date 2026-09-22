@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🍇 Berry AI Studio
+# 🍇 Omera
 
 **The open-source asset manager & prompt studio for AI-generated images.**
 
@@ -12,16 +12,16 @@ Organize, search, compare, and export tens of thousands of AIGC artworks — all
 
 <br/>
 
-<a href="https://github.com/BerryUIKI/Berry-AI-Studio/stargazers"><img src="https://img.shields.io/github/stars/BerryUIKI/Berry-AI-Studio?style=social" alt="GitHub Stars"></a>&nbsp;&nbsp;
-<a href="https://github.com/BerryUIKI/Berry-AI-Studio/network/members"><img src="https://img.shields.io/github/forks/BerryUIKI/Berry-AI-Studio?style=social" alt="GitHub Forks"></a>&nbsp;&nbsp;
-<a href="https://github.com/BerryUIKI/Berry-AI-Studio/issues"><img src="https://img.shields.io/github/issues/BerryUIKI/Berry-AI-Studio?style=social&logo=github" alt="GitHub Issues"></a>
+<a href="https://github.com/BerryUIKI/Omera/stargazers"><img src="https://img.shields.io/github/stars/BerryUIKI/Omera?style=social" alt="GitHub Stars"></a>&nbsp;&nbsp;
+<a href="https://github.com/BerryUIKI/Omera/network/members"><img src="https://img.shields.io/github/forks/BerryUIKI/Omera?style=social" alt="GitHub Forks"></a>&nbsp;&nbsp;
+<a href="https://github.com/BerryUIKI/Omera/issues"><img src="https://img.shields.io/github/issues/BerryUIKI/Omera?style=social&logo=github" alt="GitHub Issues"></a>
 
 <br/>
 
-[![Release](https://img.shields.io/github/v/release/BerryUIKI/Berry-AI-Studio?display_name=tag&style=flat-square&color=blue)](https://github.com/BerryUIKI/Berry-AI-Studio/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/BerryUIKI/Berry-AI-Studio/total?style=flat-square&color=green)](https://github.com/BerryUIKI/Berry-AI-Studio/releases)
+[![Release](https://img.shields.io/github/v/release/BerryUIKI/Omera?display_name=tag&style=flat-square&color=blue)](https://github.com/BerryUIKI/Omera/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/BerryUIKI/Omera/total?style=flat-square&color=green)](https://github.com/BerryUIKI/Omera/releases)
 [![License](https://img.shields.io/badge/license-AGPL--3.0-blue?style=flat-square)](LICENSE)
-[![Website](https://img.shields.io/badge/website-GitHub%20Pages-12b5cb?style=flat-square)](https://berryuiki.github.io/Berry-AI-Studio/)
+[![Website](https://img.shields.io/badge/website-GitHub%20Pages-12b5cb?style=flat-square)](https://berryuiki.github.io/Omera/)
 
 [![Tauri 2](https://img.shields.io/badge/Tauri-2-24c8db?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app)
 [![Rust](https://img.shields.io/badge/Rust-1.75+-f74c00?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org)
@@ -33,7 +33,7 @@ Organize, search, compare, and export tens of thousands of AIGC artworks — all
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/gui_preview_dark.svg">
   <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/gui_preview_light.svg">
-  <img alt="Berry AI Studio — 3-Pane Studio Workspace" src="docs/screenshots/gui_preview_dark.svg" width="100%">
+  <img alt="Omera — 3-Pane Studio Workspace" src="docs/screenshots/gui_preview_dark.svg" width="100%">
 </picture>
 
 </div>
@@ -42,7 +42,7 @@ Organize, search, compare, and export tens of thousands of AIGC artworks — all
 
 ## 🚀 Quick Start
 
-1. **Download** — Grab the [latest release](https://github.com/BerryUIKI/Berry-AI-Studio/releases/latest) for your platform.
+1. **Download** — Grab the [latest release](https://github.com/BerryUIKI/Omera/releases/latest) for your platform.
 2. **Add a Folder** — Point Berry at your WebUI / ComfyUI / NovelAI output directory. Choose *External Link* (zero-copy) or *AIGC Pipeline* (auto-harvest) mode.
 3. **Browse & Create** — Your library is instantly searchable. Rate, tag, compare, and export with full metadata preserved.
 
@@ -128,7 +128,7 @@ Automatically extracts and indexes Prompt, Negative Prompt, Model, Hash, Sampler
 
 ## ⚡ Performance
 
-Berry AI Studio is built for large libraries. The gallery renders from the indexed SQLite database before any filesystem reconciliation begins — no blocking startup scan.
+Omera is built for large libraries. The gallery renders from the indexed SQLite database before any filesystem reconciliation begins — no blocking startup scan.
 
 | Metric | 1 k images | 10 k images | 50 k images |
 |:---|:---:|:---:|:---:|
@@ -152,7 +152,7 @@ Berry AI Studio is built for large libraries. The gallery renders from the index
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Berry AI Studio (Desktop)                    │
+│                    Omera (Desktop)                    │
 ├─────────────────────────────────────────────────────────────────┤
 │  Vue 3 + TypeScript          │  Tauri 2 IPC Commands           │
 │  ─ VirtualGrid / Waterfall   │  ─ Thin adapters, input         │
@@ -197,16 +197,16 @@ Berry AI Studio is built for large libraries. The gallery renders from the index
 
 ## 📥 Downloads
 
-Get the latest pre-built binaries from **[GitHub Releases](https://github.com/BerryUIKI/Berry-AI-Studio/releases/latest)**:
+Get the latest pre-built binaries from **[GitHub Releases](https://github.com/BerryUIKI/Omera/releases/latest)**:
 
 | Platform | Architecture | Format | File Name |
 |:---|:---|:---|:---|
-| **Windows** | x86_64 | NSIS Installer | `Berry-AI-Studio_Windows_x64.exe` |
-| **Windows** | x86_64 | Portable Zip | `Berry-AI-Studio_Windows_x64.zip` |
-| **macOS** | Apple Silicon | DMG | `Berry-AI-Studio_macOS_aarch64.dmg` |
-| **macOS** | Intel x86_64 | DMG | `Berry-AI-Studio_macOS_x64.dmg` |
-| **Linux** | x86_64 | AppImage | `Berry-AI-Studio_Linux_x64.AppImage` |
-| **Linux** | x86_64 | Debian | `Berry-AI-Studio_Linux_x64.deb` |
+| **Windows** | x86_64 | NSIS Installer | `Omera_Windows_x64.exe` |
+| **Windows** | x86_64 | Portable Zip | `Omera_Windows_x64.zip` |
+| **macOS** | Apple Silicon | DMG | `Omera_macOS_aarch64.dmg` |
+| **macOS** | Intel x86_64 | DMG | `Omera_macOS_x64.dmg` |
+| **Linux** | x86_64 | AppImage | `Omera_Linux_x64.AppImage` |
+| **Linux** | x86_64 | Debian | `Omera_Linux_x64.deb` |
 
 ---
 
@@ -222,8 +222,8 @@ Get the latest pre-built binaries from **[GitHub Releases](https://github.com/Be
 
 ```bash
 # Clone
-git clone https://github.com/BerryUIKI/Berry-AI-Studio.git
-cd Berry-AI-Studio
+git clone https://github.com/BerryUIKI/Omera.git
+cd Omera
 
 # Install dependencies
 pnpm install
@@ -246,7 +246,7 @@ Output: `src-tauri/target/release/bundle/`
 | 🎬 Video & Animation AIGC Ingestion (AnimateDiff, Wan2.1, HunyuanVideo) | v0.4.0 |
 | 🧬 Next-Gen Model Architectures (Flux.1, SD3.5, Civitai API) | v0.5.0 |
 | 🔗 Bi-Directional ComfyUI Studio (WebSocket telemetry, prompt diff) | v0.6.0 |
-| 📱 Local LAN Web Companion ("Berry Remote" for tablets & phones) | v0.7.0 |
+| 📱 Local LAN Web Companion ("Omera Remote" for tablets & phones) | v0.7.0 |
 | 🎨 Dominant Color Palette Indexing & Faceted Analytics | v0.8.0 |
 
 📖 See [docs/ROADMAP.md](docs/ROADMAP.md) for full details.
@@ -280,7 +280,7 @@ Copyright © 2026 [BerryUIKI](https://github.com/BerryUIKI).
 
 ## 🙏 Acknowledgments
 
-Berry AI Studio is built on the shoulders of these excellent open-source projects:
+Omera is built on the shoulders of these excellent open-source projects:
 
 - [Tauri](https://tauri.app) — Lightweight cross-platform app framework
 - [Vue.js](https://vuejs.org) — Progressive JavaScript framework
@@ -296,16 +296,16 @@ Berry AI Studio is built on the shoulders of these excellent open-source project
 
 **[⬆ Back to Top](#-berry-ai-studio)**
 
-If you find Berry AI Studio useful, please consider giving it a ⭐ — it helps others discover the project!
+If you find Omera useful, please consider giving it a ⭐ — it helps others discover the project!
 
-<a href="https://star-history.com/#BerryUIKI/Berry-AI-Studio&Date">
+<a href="https://star-history.com/#BerryUIKI/Omera&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=BerryUIKI/Berry-AI-Studio&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=BerryUIKI/Berry-AI-Studio&type=Date" />
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=BerryUIKI/Berry-AI-Studio&type=Date" width="600" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=BerryUIKI/Omera&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=BerryUIKI/Omera&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=BerryUIKI/Omera&type=Date" width="600" />
   </picture>
 </a>
 
-<sub>Made with ❤️ by the Berry AI Studio community</sub>
+<sub>Made with ❤️ by the Omera community</sub>
 
 </div>

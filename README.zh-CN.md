@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🍇 Berry AI Studio
+# 🍇 Omera
 
 **专为 AI 图像创作者与 Prompt 工程师打造的开源资产管理与提示词工作台**
 
@@ -12,16 +12,16 @@
 
 <br/>
 
-<a href="https://github.com/BerryUIKI/Berry-AI-Studio/stargazers"><img src="https://img.shields.io/github/stars/BerryUIKI/Berry-AI-Studio?style=social" alt="GitHub Stars"></a>&nbsp;&nbsp;
-<a href="https://github.com/BerryUIKI/Berry-AI-Studio/network/members"><img src="https://img.shields.io/github/forks/BerryUIKI/Berry-AI-Studio?style=social" alt="GitHub Forks"></a>&nbsp;&nbsp;
-<a href="https://github.com/BerryUIKI/Berry-AI-Studio/issues"><img src="https://img.shields.io/github/issues/BerryUIKI/Berry-AI-Studio?style=social&logo=github" alt="GitHub Issues"></a>
+<a href="https://github.com/BerryUIKI/Omera/stargazers"><img src="https://img.shields.io/github/stars/BerryUIKI/Omera?style=social" alt="GitHub Stars"></a>&nbsp;&nbsp;
+<a href="https://github.com/BerryUIKI/Omera/network/members"><img src="https://img.shields.io/github/forks/BerryUIKI/Omera?style=social" alt="GitHub Forks"></a>&nbsp;&nbsp;
+<a href="https://github.com/BerryUIKI/Omera/issues"><img src="https://img.shields.io/github/issues/BerryUIKI/Omera?style=social&logo=github" alt="GitHub Issues"></a>
 
 <br/>
 
-[![Release](https://img.shields.io/github/v/release/BerryUIKI/Berry-AI-Studio?display_name=tag&style=flat-square&color=blue)](https://github.com/BerryUIKI/Berry-AI-Studio/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/BerryUIKI/Berry-AI-Studio/total?style=flat-square&color=green)](https://github.com/BerryUIKI/Berry-AI-Studio/releases)
+[![Release](https://img.shields.io/github/v/release/BerryUIKI/Omera?display_name=tag&style=flat-square&color=blue)](https://github.com/BerryUIKI/Omera/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/BerryUIKI/Omera/total?style=flat-square&color=green)](https://github.com/BerryUIKI/Omera/releases)
 [![License](https://img.shields.io/badge/协议-AGPL--3.0-blue?style=flat-square)](LICENSE)
-[![Website](https://img.shields.io/badge/官方网站-GitHub%20Pages-12b5cb?style=flat-square)](https://berryuiki.github.io/Berry-AI-Studio/)
+[![Website](https://img.shields.io/badge/官方网站-GitHub%20Pages-12b5cb?style=flat-square)](https://berryuiki.github.io/Omera/)
 
 [![Tauri 2](https://img.shields.io/badge/Tauri-2-24c8db?style=flat-square&logo=tauri&logoColor=white)](https://tauri.app)
 [![Rust](https://img.shields.io/badge/Rust-1.75+-f74c00?style=flat-square&logo=rust&logoColor=white)](https://www.rust-lang.org)
@@ -33,7 +33,7 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/gui_preview_dark.svg">
   <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/gui_preview_light.svg">
-  <img alt="Berry AI Studio — 三栏现代工作台" src="docs/screenshots/gui_preview_dark.svg" width="100%">
+  <img alt="Omera — 三栏现代工作台" src="docs/screenshots/gui_preview_dark.svg" width="100%">
 </picture>
 
 </div>
@@ -42,7 +42,7 @@
 
 ## 🚀 快速上手
 
-1. **下载安装** — 前往 **[GitHub Releases 官方发布页](https://github.com/BerryUIKI/Berry-AI-Studio/releases/latest)** 获取对应系统的安装包。
+1. **下载安装** — 前往 **[GitHub Releases 官方发布页](https://github.com/BerryUIKI/Omera/releases/latest)** 获取对应系统的安装包。
 2. **添加目录** — 将 Berry 指向您的 WebUI、ComfyUI 或 NovelAI 输出目录。选择 *外链模式*（零拷贝就地引用）或 *AIGC 管道模式*（后台防抖自动收割）。
 3. **浏览与创作** — 您的海量图库已被瞬间索引。打星评分、打标管理、多图对比、分词提取与无损导出尽在指尖。
 
@@ -128,7 +128,7 @@
 
 ## ⚡ 卓越性能
 
-Berry AI Studio 为十万级海量图库专门设计。应用启动时直接渲染 SQLite 本地索引库，绝不让文件目录遍历阻塞首屏渲染：
+Omera 为十万级海量图库专门设计。应用启动时直接渲染 SQLite 本地索引库，绝不让文件目录遍历阻塞首屏渲染：
 
 | 评估指标 | 1,000 张图像 | 10,000 张图像 | 50,000 张图像 |
 |:---|:---:|:---:|:---:|
@@ -152,7 +152,7 @@ Berry AI Studio 为十万级海量图库专门设计。应用启动时直接渲�
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Berry AI Studio (桌面客户端)                 │
+│                    Omera (桌面客户端)                 │
 ├─────────────────────────────────────────────────────────────────┤
 │  Vue 3 + TypeScript          │  Tauri 2 IPC 命令通道            │
 │  ─ 虚拟网格 / 瀑布流         │  ─ 轻量适配器、入参校验、        │
@@ -196,16 +196,16 @@ Berry AI Studio 为十万级海量图库专门设计。应用启动时直接渲�
 
 ## 📥 下载安装
 
-前往 **[GitHub Releases 官方发布页](https://github.com/BerryUIKI/Berry-AI-Studio/releases/latest)** 获取最新预编译安装包：
+前往 **[GitHub Releases 官方发布页](https://github.com/BerryUIKI/Omera/releases/latest)** 获取最新预编译安装包：
 
 | 操作系统平台 | 处理器架构 | 格式类型 | 安装包文件名 |
 |:---|:---|:---|:---|
-| **Windows** | x86_64 (64位) | NSIS 安装包 | `Berry-AI-Studio_Windows_x64.exe` |
-| **Windows** | x86_64 (64位) | 免安装便携版 | `Berry-AI-Studio_Windows_x64.zip` |
-| **macOS** | Apple Silicon (ARM64) | DMG 磁盘镜像 | `Berry-AI-Studio_macOS_aarch64.dmg` |
-| **macOS** | Intel (x86_64) | DMG 磁盘镜像 | `Berry-AI-Studio_macOS_x64.dmg` |
-| **Linux** | x86_64 (64位) | AppImage | `Berry-AI-Studio_Linux_x64.AppImage` |
-| **Linux** | x86_64 (64位) | Debian 软件包 | `Berry-AI-Studio_Linux_x64.deb` |
+| **Windows** | x86_64 (64位) | NSIS 安装包 | `Omera_Windows_x64.exe` |
+| **Windows** | x86_64 (64位) | 免安装便携版 | `Omera_Windows_x64.zip` |
+| **macOS** | Apple Silicon (ARM64) | DMG 磁盘镜像 | `Omera_macOS_aarch64.dmg` |
+| **macOS** | Intel (x86_64) | DMG 磁盘镜像 | `Omera_macOS_x64.dmg` |
+| **Linux** | x86_64 (64位) | AppImage | `Omera_Linux_x64.AppImage` |
+| **Linux** | x86_64 (64位) | Debian 软件包 | `Omera_Linux_x64.deb` |
 
 ---
 
@@ -221,8 +221,8 @@ Berry AI Studio 为十万级海量图库专门设计。应用启动时直接渲�
 
 ```bash
 # 1. 克隆代码仓库
-git clone https://github.com/BerryUIKI/Berry-AI-Studio.git
-cd Berry-AI-Studio
+git clone https://github.com/BerryUIKI/Omera.git
+cd Omera
 
 # 2. 安装前端依赖
 pnpm install
@@ -245,7 +245,7 @@ pnpm run tauri build
 | 🎬 视频与动态 AIGC 支持 (ComfyUI AnimateDiff, Wan2.1, HunyuanVideo 逐帧预览与灯箱播放) | v0.4.0 |
 | 🧬 新一代模型架构适配 (Flux.1, SD3.5 Guidance 与双文本编码器提取, Civitai API) | v0.5.0 |
 | 🔗 双向 ComfyUI 深度集成 (WebSocket 遥测监控, 零延迟入库, 提示词 Diff 对比) | v0.6.0 |
-| 📱 局域网 Web 伴侣 ("Berry Remote" 平板与手机端无线浏览) | v0.7.0 |
+| 📱 局域网 Web 伴侣 ("Omera Remote" 平板与手机端无线浏览) | v0.7.0 |
 | 🎨 主导色彩提取与多维 SQL 分析仪表盘 | v0.8.0 |
 
 📖 查阅完整开发计划：[docs/ROADMAP.md](docs/ROADMAP.md)。
@@ -279,7 +279,7 @@ Copyright © 2026 [BerryUIKI](https://github.com/BerryUIKI).
 
 ## 🙏 特别致谢
 
-Berry AI Studio 的诞生离不开以下优秀的开源项目：
+Omera 的诞生离不开以下优秀的开源项目：
 
 - [Tauri](https://tauri.app) — 超轻量跨平台桌面应用开发框架
 - [Vue.js](https://vuejs.org) — 渐进式前端 JavaScript 框架
@@ -295,16 +295,16 @@ Berry AI Studio 的诞生离不开以下优秀的开源项目：
 
 **[⬆ 返回顶部](#-berry-ai-studio)**
 
-如果您觉得 Berry AI Studio 对您的创作有所帮助，请为我们点亮一颗 ⭐，这能让更多创作者发现这个项目！
+如果您觉得 Omera 对您的创作有所帮助，请为我们点亮一颗 ⭐，这能让更多创作者发现这个项目！
 
-<a href="https://star-history.com/#BerryUIKI/Berry-AI-Studio&Date">
+<a href="https://star-history.com/#BerryUIKI/Omera&Date">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=BerryUIKI/Berry-AI-Studio&type=Date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=BerryUIKI/Berry-AI-Studio&type=Date" />
-    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=BerryUIKI/Berry-AI-Studio&type=Date" width="600" />
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=BerryUIKI/Omera&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=BerryUIKI/Omera&type=Date" />
+    <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=BerryUIKI/Omera&type=Date" width="600" />
   </picture>
 </a>
 
-<sub>Made with ❤️ by the Berry AI Studio community</sub>
+<sub>Made with ❤️ by the Omera community</sub>
 
 </div>

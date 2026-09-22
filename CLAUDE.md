@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Berry AI Studio** is an open-source **local asset manager and prompt studio for
+**Omera** is an open-source **local asset manager and prompt studio for
 AI-generated images**: it scans folders of images/videos, extracts prompt/model/
 parameter metadata (PNGInfo, EXIF, `.txt` sidecars), and indexes it into SQLite
 for search, organization (albums, tags, favorites, ratings, NSFW), and model

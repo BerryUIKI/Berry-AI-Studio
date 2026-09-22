@@ -1,8 +1,12 @@
 # Performance Architecture and Optimization Plan
 
+## Omera storage direction
+
+See [STORAGE_EVOLUTION.md](STORAGE_EVOLUTION.md) for measured SQLite optimization and [OMERA_MIGRATION.md](OMERA_MIGRATION.md) for pre-1.0 compatibility. Renaming a database is not a performance improvement. Migration precedes opening an imported library; ordinary startup must continue to render indexed data before optional scans, cache migration, or model verification.
+
 ## Performance Goals
 
-Berry AI Studio should remain interactive with large local libraries while keeping CPU, memory, and cache growth predictable. The UI should render indexed data immediately, perform filesystem reconciliation in the background, and limit image decoding to the visible working set.
+Omera should remain interactive with large local libraries while keeping CPU, memory, and cache growth predictable. The UI should render indexed data immediately, perform filesystem reconciliation in the background, and limit image decoding to the visible working set.
 
 ## Implemented Safeguards
 
@@ -118,4 +122,3 @@ Progress-event coalescing and streaming full-folder traversal are complete. Comp
 - [x] Provide System, Midnight, Graphite, Violet, and Light themes. Use semantic color tokens so every panel follows the selected theme.
 - [x] Add a small background-activity popover for scans, thumbnail generation, tagging, and embeddings, with pause/cancel controls where supported.
 - [x] Preserve scroll position independently per folder/search context so navigation does not force users back to the beginning.
-

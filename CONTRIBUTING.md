@@ -1,6 +1,6 @@
-# Contributing to Berry AI Studio
+# Contributing to Omera
 
-Thank you for your interest in contributing to **Berry AI Studio**! We welcome bug reports, feature suggestions, new metadata format extractors, translation contributions, and code improvements.
+Thank you for your interest in contributing to **Omera**! We welcome bug reports, feature suggestions, new metadata format extractors, translation contributions, and code improvements.
 
 ---
 
@@ -26,8 +26,8 @@ Thank you for your interest in contributing to **Berry AI Studio**! We welcome b
 
 ```bash
 # 1. Clone your fork
-git clone https://github.com/<your-username>/Berry-AI-Studio.git
-cd Berry-AI-Studio
+git clone https://github.com/<your-username>/Omera.git
+cd Omera
 
 # 2. Checkout dev branch
 git checkout dev
@@ -98,4 +98,4 @@ We welcome new languages and translation improvements.
 
 ## License
 
-By contributing to Berry AI Studio, you agree that your contributions will be licensed under the **AGPL-3.0 License**.
+By contributing to Omera, you agree that your contributions will be licensed under the **AGPL-3.0 License**.

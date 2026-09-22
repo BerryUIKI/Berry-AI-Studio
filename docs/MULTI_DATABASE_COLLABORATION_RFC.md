@@ -1,7 +1,7 @@
 # RFC: Multi-Database Support (MySQL & PostgreSQL) and Multi-User Collaboration for 500k+ Assets
 
-- **Author**: Berry AI Studio Architecture Group
-- **Status**: Draft / Approved for Design
+- **Author**: Omera Architecture Group
+- **Status**: Deferred proposal; not an implemented or supported runtime backend
 - **Target Release**: v0.4.0+
 - **Keywords**: MySQL 8.0, PostgreSQL 14+, Storage Abstraction, Keyset Cursor, Multi-User Collaboration, Cross-Platform Root Mapping
 
@@ -9,7 +9,9 @@
 
 ## 1. Executive Summary & Problem Statement
 
-Berry AI Studio currently operates on an embedded SQLite database (`rusqlite`) with write-ahead logging (WAL). While SQLite delivers exceptional zero-configuration speed and reliability for personal libraries (10k–100k items), scaling to **500,000+ assets** and **multi-user studio collaboration** introduces fundamental physical limitations:
+Local storage remains SQLite. Asset count alone does not establish a need to replace it: measure workloads under [STORAGE_EVOLUTION.md](STORAGE_EVOLUTION.md). This remote service proposal is separate from the Omera identity transition.
+
+Omera currently operates on an embedded SQLite database (`rusqlite`) with write-ahead logging (WAL). While SQLite delivers exceptional zero-configuration speed and reliability for personal libraries (10k–100k items), scaling to **500,000+ assets** and **multi-user studio collaboration** introduces fundamental physical limitations:
 
 1. **SQLite Concurrency Bottlenecks at Scale**:
    - SQLite enforces a single active writer lock at the database level. During concurrent background thumbnail indexing, batch metadata harvesting, and user interactions, write lock contention degrades latency.
@@ -23,7 +25,7 @@ Berry AI Studio currently operates on an embedded SQLite database (`rusqlite`) w
 
 ### The Solution: Dual-Mode Storage Architecture
 
-Berry AI Studio will introduce an asynchronous, pluggable storage abstraction layer supporting:
+Omera will introduce an asynchronous, pluggable storage abstraction layer supporting:
 - **Local Embedded Mode (Default)**: Embedded SQLite with WAL mode. Zero configuration, self-contained, fully offline.
 - **Team Studio Mode**: Client-server connectivity to **MySQL 8.0+** or **PostgreSQL 14+**, featuring connection pooling, row-level locking, distributed change tracking, cross-platform path abstraction, and client-side on-demand thumbnail caching.
 
@@ -372,7 +374,7 @@ If zero rows are updated, the client detects a mid-air collision and invokes the
 
 ## 6. Tiered Real-Time Change Notification Architecture
 
-Collaborating users need immediate UI feedback when teammates tag, rate, or cull assets. Berry AI Studio provides a progressive, tiered notification model:
+Collaborating users need immediate UI feedback when teammates tag, rate, or cull assets. Omera provides a progressive, tiered notification model:
 
 ```mermaid
 sequenceDiagram
@@ -553,4 +555,4 @@ The migration tool transfers existing SQLite libraries to MySQL or PostgreSQL:
 
 ## 10. Summary & Sign-off
 
-This RFC provides a clear, production-tested architectural roadmap to scale Berry AI Studio to **500,000+ assets** and **multi-user team collaboration** without sacrificing the simplicity and zero-configuration speed of the local standalone edition.
+This RFC provides a clear, production-tested architectural roadmap to scale Omera to **500,000+ assets** and **multi-user team collaboration** without sacrificing the simplicity and zero-configuration speed of the local standalone edition.
