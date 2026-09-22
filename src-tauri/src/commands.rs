@@ -100,12 +100,13 @@ pub fn get_app_info(state: State<'_, AppState>) -> Result<AppInfo, String> {
 /// Register a folder for scanning. Rejects paths that do not exist, are not
 /// directories, or are already registered.
 #[tauri::command]
-pub fn add_folder(path: String, state: State<'_, AppState>) -> Result<Folder, String> {
-    add_folder_with_options(path, None, None, None, None, None, state)
+pub fn add_folder(path: String, app_handle: AppHandle, state: State<'_, AppState>) -> Result<Folder, String> {
+    add_folder_with_options(path, None, None, None, None, None, app_handle, state)
 }
 
 /// Register a folder with explicit mode ('link', 'managed', 'pipeline') and pipeline options.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn add_folder_with_options(
     path: String,
     folder_type: Option<String>,
@@ -113,6 +114,7 @@ pub fn add_folder_with_options(
     ingest_action: Option<String>,
     grace_period_hours: Option<i32>,
     auto_harvest: Option<bool>,
+    app_handle: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<Folder, String> {
     let ftype = folder_type.unwrap_or_else(|| "link".to_string());
@@ -122,6 +124,7 @@ pub fn add_folder_with_options(
     }
 
     let canonical = canonicalize_folder(&path)?;
+    app_handle.asset_protocol_scope().allow_directory(&canonical, true).map_err(|e| e.to_string())?;
     let db = db(&state)?;
     if db
         .find_folder_by_path(&canonical)
@@ -899,161 +902,25 @@ pub fn list_model_cache(state: State<'_, AppState>) -> Result<Vec<ModelCacheEntr
 
 // --- File Operations & Drag-and-Drop ---
 
-/// Move files and their sidecars to a target indexed folder, updating database paths.
 #[tauri::command]
-pub fn move_files(
-    file_paths: Vec<String>,
-    target_folder_id: i64,
-    state: State<'_, AppState>,
-) -> Result<usize, String> {
-    let target_folder = {
-        let database = db(&state)?;
-        database
-            .list_folders()
-            .map_err(|e| e.to_string())?
-            .into_iter()
-            .find(|f| f.id == target_folder_id)
-            .ok_or_else(|| format!("Target folder {target_folder_id} not found"))?
-    };
-
-    let target_dir = Path::new(&target_folder.path);
-    let mut moved_count = 0;
-
-    let database = db(&state)?;
-    for src_str in file_paths {
-        let src_path = Path::new(&src_str);
-        if !src_path.exists() {
-            continue;
-        }
-        let file_name = match src_path.file_name() {
-            Some(name) => name,
-            None => continue,
-        };
-        let dest_path = target_dir.join(file_name);
-        if dest_path == src_path {
-            continue;
-        }
-
-        // Rename main file
-        if std::fs::rename(src_path, &dest_path).is_err() {
-            // Cross-device fallback: copy then remove
-            std::fs::copy(src_path, &dest_path)
-                .map_err(|e| format!("Failed to move file to {}: {e}", dest_path.display()))?;
-            std::fs::remove_file(src_path).map_err(|e| {
-                format!(
-                    "Copied to {} but failed to remove source file {}: {e}",
-                    dest_path.display(),
-                    src_path.display()
-                )
-            })?;
-        }
-
-        // Check and move sibling sidecars (.txt, .json)
-        let sidecar_txt = src_path.with_extension("txt");
-        if sidecar_txt.exists() {
-            let dest_txt = dest_path.with_extension("txt");
-            let _ = std::fs::rename(&sidecar_txt, &dest_txt).or_else(|_| {
-                std::fs::copy(&sidecar_txt, &dest_txt)
-                    .and_then(|_| std::fs::remove_file(&sidecar_txt))
-            });
-        }
-
-        // Update database record
-        let new_path_str = dest_path.to_string_lossy().to_string();
-        let _ = database.move_file_record(&src_str, &new_path_str, target_folder_id);
-        moved_count += 1;
-    }
-
-    Ok(moved_count)
+pub async fn move_files(file_paths: Vec<String>, target_folder_id: i64, state: State<'_, AppState>) -> Result<usize, String> {
+    let database_path = db(&state)?.path().ok_or("Database has no path")?.to_path_buf();
+    tauri::async_runtime::spawn_blocking(move || berry_scan::file_operations::execute(&database_path, &file_paths, Some(target_folder_id), berry_scan::file_operations::Operation::Move))
+        .await.map_err(|error| error.to_string())?
 }
 
-/// Copy files and their sidecars to a target indexed folder, inserting new database rows.
 #[tauri::command]
-pub fn copy_files(
-    file_paths: Vec<String>,
-    target_folder_id: i64,
-    state: State<'_, AppState>,
-) -> Result<usize, String> {
-    let target_folder = {
-        let database = db(&state)?;
-        database
-            .list_folders()
-            .map_err(|e| e.to_string())?
-            .into_iter()
-            .find(|f| f.id == target_folder_id)
-            .ok_or_else(|| format!("Target folder {target_folder_id} not found"))?
-    };
-
-    let target_dir = Path::new(&target_folder.path);
-    let mut copied_count = 0;
-
-    let database = db(&state)?;
-    for src_str in file_paths {
-        let src_path = Path::new(&src_str);
-        if !src_path.exists() {
-            continue;
-        }
-        let file_name = match src_path.file_name() {
-            Some(name) => name,
-            None => continue,
-        };
-        let dest_path = target_dir.join(file_name);
-        if dest_path == src_path {
-            continue;
-        }
-
-        // Copy main file
-        std::fs::copy(src_path, &dest_path)
-            .map_err(|e| format!("Failed to copy file to {}: {e}", dest_path.display()))?;
-
-        // Copy sidecars if present
-        let sidecar_txt = src_path.with_extension("txt");
-        if sidecar_txt.exists() {
-            let dest_txt = dest_path.with_extension("txt");
-            let _ = std::fs::copy(&sidecar_txt, &dest_txt);
-        }
-
-        // Copy database record with new path
-        if let Ok(Some(mut orig)) = database.get_file_by_path(&src_str) {
-            orig.id = None;
-            orig.folder_id = target_folder_id;
-            orig.path = dest_path.to_string_lossy().to_string();
-            let _ = database.upsert_file(&orig);
-        }
-        copied_count += 1;
-    }
-
-    Ok(copied_count)
+pub async fn copy_files(file_paths: Vec<String>, target_folder_id: i64, state: State<'_, AppState>) -> Result<usize, String> {
+    let database_path = db(&state)?.path().ok_or("Database has no path")?.to_path_buf();
+    tauri::async_runtime::spawn_blocking(move || berry_scan::file_operations::execute(&database_path, &file_paths, Some(target_folder_id), berry_scan::file_operations::Operation::Copy))
+        .await.map_err(|error| error.to_string())?
 }
 
-/// Safely move files and sidecars to the system Trash / Recycle Bin and remove from DB.
 #[tauri::command]
-pub fn trash_files(file_paths: Vec<String>, state: State<'_, AppState>) -> Result<usize, String> {
-    let mut trashed_count = 0;
-    let database = db(&state)?;
-
-    for path_str in file_paths {
-        let path = Path::new(&path_str);
-        if path.exists() {
-            if let Err(e) = trash::delete(path) {
-                // If trash fails (e.g. headless/external), fallback to permanent remove
-                std::fs::remove_file(path).map_err(|rem_e| {
-                    format!(
-                        "Failed to trash or remove {}: trash error: {e}, remove error: {rem_e}",
-                        path.display()
-                    )
-                })?;
-            }
-            let sidecar_txt = path.with_extension("txt");
-            if sidecar_txt.exists() {
-                let _ = trash::delete(&sidecar_txt).or_else(|_| std::fs::remove_file(&sidecar_txt));
-            }
-        }
-        let _ = database.delete_file_by_path(&path_str);
-        trashed_count += 1;
-    }
-
-    Ok(trashed_count)
+pub async fn trash_files(file_paths: Vec<String>,  state: State<'_, AppState>) -> Result<usize, String> {
+    let database_path = db(&state)?.path().ok_or("Database has no path")?.to_path_buf();
+    tauri::async_runtime::spawn_blocking(move || berry_scan::file_operations::execute(&database_path, &file_paths, None, berry_scan::file_operations::Operation::Trash))
+        .await.map_err(|error| error.to_string())?
 }
 
 /// Reveal the selected file in the system file manager (Finder / Explorer / Files).
@@ -1112,6 +979,11 @@ pub fn backup_database(destination_path: String, state: State<'_, AppState>) -> 
         .map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub fn get_album_counts(state: State<'_, AppState>) -> Result<HashMap<i64, i64>, String> {
+    db(&state)?.album_counts().map_err(|error| error.to_string())
+}
+
 /// Retrieve database storage and table statistics.
 #[tauri::command]
 pub fn get_database_stats(state: State<'_, AppState>) -> Result<DatabaseStats, String> {
@@ -1120,51 +992,11 @@ pub fn get_database_stats(state: State<'_, AppState>) -> Result<DatabaseStats, S
 
 /// Restore database from a backup file, verifying integrity and reloading connection.
 #[tauri::command]
-pub fn restore_database(
-    source_path: String,
-    app_handle: AppHandle,
-    state: State<'_, AppState>,
-) -> Result<(), String> {
-    use tauri::Manager;
-    let src = Path::new(&source_path);
-    if !src.exists() {
-        return Err(format!("Backup source file does not exist: {source_path}"));
-    }
-
-    // Verify backup database is valid and readable
-    let _test_db =
-        Database::connect(src).map_err(|e| format!("Invalid backup SQLite file: {e}"))?;
-
-    let data_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("Failed to get app data dir: {e}"))?;
-    let active_db_path = data_dir.join("berry.db");
-
-    // Release connection on active database file to avoid Windows lock collision
-    {
-        let mut guard = state
-            .db
-            .lock()
-            .map_err(|_| "Database lock poisoned".to_string())?;
-        *guard = Database::connect_in_memory()
-            .map_err(|e| format!("Failed to create temporary DB: {e}"))?;
-    }
-
-    // Copy backup to active database location
-    std::fs::copy(src, &active_db_path)
-        .map_err(|e| format!("Failed to copy backup database to active location: {e}"))?;
-
-    // Reopen database connection in AppState
-    let new_db = Database::connect(&active_db_path)
-        .map_err(|e| format!("Failed to reconnect restored database: {e}"))?;
-    let mut guard = state
-        .db
-        .lock()
-        .map_err(|_| "Database lock poisoned".to_string())?;
-    *guard = new_db;
-
-    Ok(())
+pub async fn restore_database(source_path: String, app_handle: AppHandle) -> Result<(), String> {
+    let active = app_handle.path().app_data_dir().map_err(|e| e.to_string())?.join("berry.db");
+    tauri::async_runtime::spawn_blocking(move || berry_storage::recovery::stage_restore(Path::new(&source_path), &active))
+        .await.map_err(|e| e.to_string())??;
+    app_handle.restart();
 }
 
 // --- Storage Roots & Path Resolution Commands ---
@@ -1355,10 +1187,10 @@ pub fn test_database_connection(
             let latency_ms = start.elapsed().as_millis() as u64;
             if connected {
                 Ok(DatabasePingResult {
-                    success: true,
+                    success: false,
                     latency_ms,
                     backend: backend_lower,
-                    message: format!("Host reachable at {host}:{port} ({latency_ms} ms ping)."),
+                    message: format!("Host reachable at {host}:{port}, but remote database storage is not supported."),
                 })
             } else {
                 Ok(DatabasePingResult {
@@ -1765,19 +1597,8 @@ pub fn find_similar_to_file(
         .find_similar_to_file(file_id, model_id.as_deref(), lim)
         .map_err(|e| e.to_string())?;
 
-    let mut results = Vec::with_capacity(matches.len());
-    for m in matches {
-        if let Some(file) = database
-            .get_file_by_id(m.file_id)
-            .map_err(|e| e.to_string())?
-        {
-            results.push(SimilarFileItem {
-                file,
-                score: m.score,
-            });
-        }
-    }
-    Ok(results)
+    hydrate_similarity_results(&database, matches)
+
 }
 
 // --- WD14 Tagger & AI Tagging ---
@@ -2001,6 +1822,7 @@ pub struct ClipIndexStatus {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClipBatchIndexResult {
+    pub failed_count: usize,
     pub indexed_count: usize,
     pub remaining_count: usize,
     pub total_count: usize,
@@ -2151,55 +1973,39 @@ pub fn get_clip_index_status(
 
 /// Process a batch of unindexed images using the active CLIP vision model and save embeddings to database.
 #[tauri::command]
-pub fn index_clip_images_batch(
-    batch_size: usize,
-    state: State<'_, AppState>,
-) -> Result<ClipBatchIndexResult, String> {
-    let guard = clip_guard(&state)?;
-    let engine = guard
-        .as_ref()
-        .ok_or_else(|| "No CLIP model loaded. Please load a model first.".to_string())?;
-
-    let model_id = engine.info.model_id.clone();
-    let limit = if batch_size == 0 { 20 } else { batch_size };
-
-    let unindexed = {
-        let database = db(&state)?;
-        database
-            .get_unindexed_files(&model_id, limit)
-            .map_err(|e| e.to_string())?
-    };
-
-    let mut indexed_count = 0;
-    for file in &unindexed {
-        let file_id = match file.id {
-            Some(id) => id,
-            None => continue,
-        };
-
-        if let Ok(img) = image::open(&file.path) {
-            if let Ok(embedding) = engine.encode_image(&img) {
-                let database = db(&state)?;
-                if database
-                    .upsert_file_embedding(file_id, &model_id, &embedding)
-                    .is_ok()
-                {
-                    indexed_count += 1;
-                }
+pub async fn index_clip_images_batch(batch_size: usize, retry_failed: Option<bool>, app_handle: AppHandle) -> Result<ClipBatchIndexResult, String> {
+    if retry_failed.unwrap_or(false) { app_handle.state::<AppState>().clip_cancel.store(false, Ordering::Release); }
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app_handle.state::<AppState>();
+        let path = db(&state)?.path().ok_or("Database has no path")?.to_path_buf();
+        let database = Database::connect(&path).map_err(|e| e.to_string())?;
+        let guard = clip_guard(&state)?;
+        let engine = guard.as_ref().ok_or("No CLIP model loaded")?;
+        let model = &engine.info.model_id;
+        if retry_failed.unwrap_or(false) { database.clear_embedding_failures(model).map_err(|e| e.to_string())?; }
+        let files = database.get_unindexed_files(model, batch_size.clamp(1, 20)).map_err(|e| e.to_string())?;
+        let mut indexed_count = 0;
+        for file in files {
+            if state.clip_cancel.load(Ordering::Acquire) { break; }
+            let Some(id) = file.id else { continue; };
+            let result = image::open(&file.path).map_err(|e| e.to_string())
+                .and_then(|image| engine.encode_image(&image).map_err(|e| e.to_string()))
+                .and_then(|embedding| database.upsert_file_embedding(id, model, &embedding).map_err(|e| e.to_string()));
+            match result {
+                Ok(()) => indexed_count += 1,
+                Err(error) => database.record_embedding_failure(id, model, file.modified_at, &error).map_err(|e| e.to_string())?,
             }
         }
-    }
+        let (indexed, total) = database.get_embedding_index_stats(model).map_err(|e| e.to_string())?;
+        let failed_count = database.embedding_failure_count(model).map_err(|e| e.to_string())?;
+        let has_more = !database.get_unindexed_files(model, 1).map_err(|e| e.to_string())?.is_empty();
+        Ok(ClipBatchIndexResult { indexed_count, failed_count, remaining_count: if has_more { total.saturating_sub(indexed + failed_count).max(1) } else { 0 }, total_count: total })
+    }).await.map_err(|e| e.to_string())?
+}
 
-    let database = db(&state)?;
-    let (indexed_total, total_images) = database
-        .get_embedding_index_stats(&model_id)
-        .map_err(|e| e.to_string())?;
-
-    Ok(ClipBatchIndexResult {
-        indexed_count,
-        remaining_count: total_images.saturating_sub(indexed_total),
-        total_count: total_images,
-    })
+#[tauri::command]
+pub fn cancel_clip_indexing(state: State<'_, AppState>) {
+    state.clip_cancel.store(true, Ordering::Release);
 }
 
 /// Text-to-image semantic search: encode text prompt via active CLIP textual model and search database.
@@ -2208,7 +2014,7 @@ pub fn search_by_text_prompt(
     prompt: String,
     limit: usize,
     state: State<'_, AppState>,
-) -> Result<Vec<SimilarityMatch>, String> {
+) -> Result<Vec<SimilarFileItem>, String> {
     if prompt.trim().is_empty() {
         return Ok(vec![]);
     }
@@ -2226,8 +2032,17 @@ pub fn search_by_text_prompt(
         .search_similar_files(&model_id, &query_vector, limit)
         .map_err(|e| e.to_string())?;
 
-    Ok(results)
+    hydrate_similarity_results(&database, results)
 }
+fn hydrate_similarity_results(database: &Database, matches: Vec<SimilarityMatch>) -> Result<Vec<SimilarFileItem>, String> {
+    let ids: Vec<i64> = matches.iter().map(|item| item.file_id).collect();
+    let mut files: HashMap<i64, ImageFile> = database.get_files_by_ids(&ids)
+        .map_err(|error| error.to_string())?.into_iter()
+        .filter_map(|file| file.id.map(|id| (id, file))).collect();
+    Ok(matches.into_iter().filter_map(|item| files.remove(&item.file_id)
+        .map(|file| SimilarFileItem { file, score: item.score })).collect())
+}
+
 
 /// Helper to strip basic HTML tags from descriptions (e.g. Civitai info).
 fn strip_html_tags(input: &str) -> String {
@@ -2479,6 +2294,10 @@ pub fn scan_loras_directory(dir_path: String, state: State<'_, AppState>) -> Res
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
+    #[serde(default)]
+    pub config_revision: u64,
+    #[serde(default = "default_migrated")]
+    pub legacy_migration_complete: bool,
     pub locale: String,
     pub auto_scan: bool,
     #[serde(default = "default_startup_scan_interval")]
@@ -2521,6 +2340,8 @@ pub struct AppConfig {
     #[serde(default)]
     pub cloud_backup: berry_domain::CloudBackupConfig,
 }
+
+fn default_migrated() -> bool { true }
 
 fn default_comfyui_url() -> String {
     "http://127.0.0.1:8188".to_string()
@@ -2565,6 +2386,8 @@ fn default_stack_time_window() -> i64 {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
+            config_revision: 0,
+            legacy_migration_complete: false,
             locale: "auto".to_string(),
             auto_scan: false,
             startup_scan_interval_minutes: default_startup_scan_interval(),
@@ -2648,37 +2471,12 @@ pub struct StoragePaths {
 /// Retrieve the persisted application configuration from config.json.
 #[tauri::command]
 pub fn get_app_config(app: AppHandle) -> Result<AppConfig, String> {
-    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let config_path = data_dir.join("config.json");
-
-    if config_path.is_file() {
-        if let Ok(content) = std::fs::read_to_string(&config_path) {
-            if let Ok(cfg) = serde_json::from_str::<AppConfig>(&content) {
-                return Ok(cfg);
-            }
-        }
-    }
-
-    // Default configuration if not found or corrupted
-    let default_cfg = AppConfig::default();
-    if let Ok(json) = serde_json::to_string_pretty(&default_cfg) {
-        let _ = std::fs::create_dir_all(&data_dir);
-        let _ = std::fs::write(&config_path, json);
-    }
-    Ok(default_cfg)
+    crate::config_store::load(&app.path().app_data_dir().map_err(|e| e.to_string())?.join("config.json"))
 }
 
-/// Save the application configuration to config.json in the app data directory.
 #[tauri::command]
-pub fn save_app_config(app: AppHandle, config: AppConfig) -> Result<(), String> {
-    let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let _ = std::fs::create_dir_all(&data_dir);
-    let config_path = data_dir.join("config.json");
-    let json = serde_json::to_string_pretty(&config)
-        .map_err(|e| format!("Failed to serialize configuration: {e}"))?;
-    std::fs::write(&config_path, json)
-        .map_err(|e| format!("Failed to write configuration file: {e}"))?;
-    Ok(())
+pub fn save_app_config(app: AppHandle, config: AppConfig) -> Result<AppConfig, String> {
+    crate::config_store::save(&app.path().app_data_dir().map_err(|e| e.to_string())?.join("config.json"), config)
 }
 
 /// Retrieve all standard storage and cache paths.
@@ -2774,6 +2572,8 @@ pub async fn download_update(
     filename: String,
 ) -> Result<String, String> {
     use std::io::{Read, Write};
+    crate::update_verification::trusted_key()?;
+    crate::update_verification::validate_url(&url)?;
 
     let data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     let updates_dir = data_dir.join("updates");
@@ -2785,7 +2585,8 @@ pub async fn download_update(
         .unwrap_or("update_installer.exe")
         .to_string();
     let dest_path = updates_dir.join(&clean_filename);
-    let tmp_path = updates_dir.join(format!("{clean_filename}.tmp"));
+    let temporary = tempfile::NamedTempFile::new_in(&updates_dir).map_err(|e| e.to_string())?;
+    let tmp_path = temporary.path().to_path_buf();
 
     let app_clone = app.clone();
     let url_clone = url.clone();
@@ -2803,6 +2604,7 @@ pub async fn download_update(
             .call()
             .map_err(|e| format!("Download request failed: {e}"))?;
 
+        if !resp.get_url().starts_with("https://") { return Err("Insecure update redirect".into()); }
         let total_bytes = resp
             .header("content-length")
             .and_then(|v| v.parse::<u64>().ok())
@@ -2866,11 +2668,16 @@ pub async fn download_update(
             .map_err(|e| format!("Failed to flush update file: {e}"))?;
         drop(file);
 
+        let signature_response = agent.get(&format!("{url_clone}.minisig")).call().map_err(|e| format!("Missing update signature: {e}"))?;
+        if !signature_response.get_url().starts_with("https://") { return Err("Insecure signature redirect".into()); }
+        let mut signature = String::new();
+        signature_response.into_reader().take(8192).read_to_string(&mut signature).map_err(|e| e.to_string())?;
+        crate::update_verification::verify(&tmp_path, &signature)?;
+        std::fs::write(dest_path_clone.with_extension("minisig"), signature).map_err(|e| e.to_string())?;
         if dest_path_clone.exists() {
             let _ = std::fs::remove_file(&dest_path_clone);
         }
-        std::fs::rename(&tmp_path, &dest_path_clone)
-            .map_err(|e| format!("Failed to rename update file: {e}"))?;
+        temporary.persist(&dest_path_clone).map_err(|e| e.to_string())?;
 
         let final_path_str = dest_path_clone.to_string_lossy().to_string();
 
@@ -2907,6 +2714,12 @@ pub fn install_update(
     if !p.exists() {
         return Err(format!("Installer file not found: {installer_path}"));
     }
+
+    let canonical = p.canonicalize().map_err(|e| e.to_string())?;
+    let updates = app.path().app_data_dir().map_err(|e| e.to_string())?.join("updates").canonicalize().map_err(|e| e.to_string())?;
+    if canonical.parent() != Some(updates.as_path()) { return Err("Installer is outside the managed updates directory".into()); }
+    let signature = std::fs::read_to_string(canonical.with_extension("minisig")).map_err(|e| format!("Missing update signature: {e}"))?;
+    crate::update_verification::verify(&canonical, &signature)?;
 
     let _is_silent = silent.unwrap_or(false);
 
@@ -3543,8 +3356,12 @@ pub async fn cloud_backup_create_snapshot(
         .path()
         .app_data_dir()
         .map_err(|e| format!("Failed to get app data dir: {e}"))?;
-    let db_guard = db(&state)?;
-    crate::cloud_backup::create_cloud_snapshot(&db_guard, &config, &data_dir, description)
+    let database_path = db(&state)?.path().ok_or("Database has no path")?.to_path_buf();
+    tauri::async_runtime::spawn_blocking(move || {
+        let database = Database::connect(&database_path).map_err(|e| e.to_string())?;
+        crate::cloud_backup::create_cloud_snapshot(&database, &config, &data_dir, description)
+    }).await.map_err(|e| e.to_string())?
+
 }
 
 /// List all available snapshot archives from the cloud storage backend.
@@ -3558,35 +3375,12 @@ pub fn cloud_backup_list_snapshots(
 /// Restore a cloud snapshot into the active SQLite database.
 #[tauri::command]
 pub async fn cloud_backup_restore_snapshot(
-    config: berry_domain::CloudBackupConfig,
-    snapshot_filename: String,
-    app_handle: AppHandle,
-    state: State<'_, AppState>,
+    config: berry_domain::CloudBackupConfig, snapshot_filename: String, app_handle: AppHandle,
 ) -> Result<berry_domain::CloudRestoreResult, String> {
-    let data_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e| format!("Failed to get app data dir: {e}"))?;
-    let active_db_path = data_dir.join("berry.db");
-
-    // Release database lock during file operations
-    drop(db(&state)?);
-
-    let res =
-        crate::cloud_backup::restore_cloud_snapshot(&active_db_path, &config, &snapshot_filename)?;
-
-    // Reconnect database in state
-    match berry_storage::Database::connect(&active_db_path) {
-        Ok(new_db) => {
-            let mut state_db = state.db.lock().map_err(|e| format!("Lock error: {e}"))?;
-            *state_db = new_db;
-        }
-        Err(e) => {
-            return Err(format!("Restored but failed to reconnect database: {e}"));
-        }
-    }
-
-    Ok(res)
+    let active = app_handle.path().app_data_dir().map_err(|e| e.to_string())?.join("berry.db");
+    tauri::async_runtime::spawn_blocking(move || crate::cloud_backup::restore_cloud_snapshot(&active, &config, &snapshot_filename))
+        .await.map_err(|e| e.to_string())??;
+    app_handle.restart();
 }
 
 #[tauri::command]
