@@ -137,6 +137,8 @@ This roadmap documents completed milestones and future engineering goals for **O
 
 ### Priority: Omera identity and review fixes
 
+Execution order and ownership: [DELIVERY_ROADMAP.md](DELIVERY_ROADMAP.md) and [ENGINEERING_HANDOFF.md](ENGINEERING_HANDOFF.md). High-impact migration, persistence and release work stays with the lead; ordinary UI, parser and bounded performance tasks are prepared for general implementation engineers.
+
 - [ ] Complete [OMERA_MIGRATION.md](OMERA_MIGRATION.md): full identity rename, pre-1.0 legacy discovery, staged migration, and separately confirmed cleanup.
 - [ ] Validate signed updates and platform installer transitions, including skipped bridge releases.
 - [ ] Complete review issues #98–#117 with regression coverage.

@@ -2,6 +2,8 @@
 
 Status: design direction; optimizations require measurements and append-only migrations.
 
+Ownership: lead maintainer/Codex. General engineers may supply fixtures and benchmark results; authoritative schema, migration, recovery and database-layout changes remain lead-owned.
+
 ## Decision
 
 Retain embedded SQLite with WAL as the authoritative local library, renamed to `omera.db`. The current application already relies on relational transactions for files, folders, tags, albums, stacks, and recovery. Renaming or replacing the engine alone does not make those workloads faster. Remote MySQL/PostgreSQL support is not implemented end to end and must not be advertised as available.

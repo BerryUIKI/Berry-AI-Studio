@@ -2,6 +2,8 @@
 
 ## Omera Identity Migration
 
+- Use `docs/ENGINEERING_HANDOFF.md` for ownership boundaries and task acceptance, and `docs/DELIVERY_ROADMAP.md` for dependency order. High-impact persistence, identity, cleanup, security and release changes are lead-owned; general-engineer assignments are explicitly listed there.
+
 - The target identity is Omera, `com.berryuiki.omera`, repository `BerryUIKI/Omera`, database `omera.db`, and local settings prefix `omera_`.
 - Follow `docs/OMERA_MIGRATION.md` and `docs/STORAGE_EVOLUTION.md`. Current `berry-*` paths below remain valid until the coordinated source rename.
 - All pre-1.0 releases must retain legacy discovery and supported import. Preserve source data during migration. Cleanup requires validated destination data and a separate explicit user decision in the application.

@@ -2,6 +2,8 @@
 
 Status: accepted product direction; implementation and release verification pending.
 
+Ownership: lead maintainer/Codex. General engineers consume the migration contracts and implement presentation only after the safety services are ready. See [ENGINEERING_HANDOFF.md](ENGINEERING_HANDOFF.md).
+
 ## Target identity
 
 The product is Omera. The application identifier is `com.berryuiki.omera` and the canonical repository is `https://github.com/BerryUIKI/Omera`. Use `omera` for the executable/package name, `omera-*` for workspace crates, `omera_*` for local settings, `Omera` for the credential service, and `omera.db` for the active library database. Release artifacts, websites, CI, examples, translations, exported branding, and documentation must use the new identity. Keep BerryUIKI attribution and license history intact.
