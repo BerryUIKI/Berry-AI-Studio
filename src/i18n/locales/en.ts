@@ -40,6 +40,8 @@ export const en = {
     tags: "Tags",
     newTag: "+ New",
     noTags: "No tags yet.",
+    recursiveMode: "Subfolders",
+    singleLevelMode: "Direct only",
   },
   search: {
     placeholder: "Search prompts, models, parameters... (e.g. prompt:cat steps:>=20)",

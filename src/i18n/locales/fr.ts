@@ -42,6 +42,8 @@ export const fr: typeof en = {
     tags: "Tags",
     newTag: "+ Nouveau",
     noTags: "Aucun tag.",
+    recursiveMode: "Sous-dossiers",
+    singleLevelMode: "Dossier actuel",
   },
   search: {
     placeholder: "Rechercher prompts, modèles, paramètres... (ex: prompt:cat steps:>=20)",

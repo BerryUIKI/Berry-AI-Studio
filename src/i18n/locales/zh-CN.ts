@@ -42,6 +42,8 @@ export const zhCN: typeof en = {
     tags: "标签",
     newTag: "+ 新建",
     noTags: "暂无标签。",
+    recursiveMode: "包含子文件夹",
+    singleLevelMode: "仅当前目录",
   },
   search: {
     placeholder: "搜索提示词、模型、参数... (例: prompt:cat steps:>=20)",

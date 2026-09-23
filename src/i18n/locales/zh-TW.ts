@@ -42,6 +42,8 @@ export const zhTW: typeof en = {
     tags: "標籤",
     newTag: "+ 新增",
     noTags: "暫無標籤。",
+    recursiveMode: "包含子資料夾",
+    singleLevelMode: "僅目前目錄",
   },
   search: {
     placeholder: "搜尋提示詞、模型、參數... (例: prompt:cat steps:>=20)",

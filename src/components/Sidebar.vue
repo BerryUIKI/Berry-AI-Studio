@@ -2,7 +2,8 @@
 import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { t } from "../i18n";
-import type { Album, Folder, LibraryCounts, NavTarget, ScanProgress, ScanStats, Tag } from "../types";
+import type { Album, Folder, LibraryCounts, NavTarget, ScanProgress, ScanStats, SubdirectoryEntry, Tag } from "../types";
+import FolderTreeNode from "./FolderTreeNode.vue";
 
 const props = defineProps<{
   folders: Folder[];
@@ -37,6 +38,10 @@ const emit = defineEmits<{
 const addingFolder = ref(false);
 const running = ref<{ id: number; action: "scan" | "rebuild" | "harvest" } | null>(null);
 const error = ref("");
+
+const subdirectories = ref<Record<string, SubdirectoryEntry[]>>({});
+const expandedPaths = ref<Set<string>>(new Set());
+const loadingPaths = ref<Set<string>>(new Set());
 
 function displayPath(path: string): string {
   return path.replace(/^\\\\\?\\/, "");
@@ -78,6 +83,9 @@ async function scan(folder: Folder, action: "scan" | "rebuild" = "scan") {
       action === "rebuild" ? "rebuild_metadata" : "scan_folder",
       { folderId: folder.id },
     );
+    if (expandedPaths.value.has(folder.path)) {
+      void loadSubdirectories(folder, folder.path);
+    }
     emit("scanned", folder.id);
   } catch (e) {
     error.value = String(e);
@@ -91,16 +99,76 @@ async function removeFolder(folder: Folder, e: MouseEvent) {
   error.value = "";
   try {
     await invoke("remove_folder", { folderId: folder.id });
+    expandedPaths.value.delete(folder.path);
+    delete subdirectories.value[folder.path];
     emit("removed", folder.id);
   } catch (e) {
     error.value = String(e);
   }
 }
 
+async function loadSubdirectories(folder: Folder, path: string) {
+  loadingPaths.value.add(path);
+  loadingPaths.value = new Set(loadingPaths.value);
+  try {
+    const entries = await invoke<SubdirectoryEntry[]>("list_subdirectories", {
+      folderId: folder.id,
+      dirPath: path,
+    });
+    subdirectories.value[path] = entries;
+  } catch (err) {
+    console.error("Failed to load subdirectories for", path, err);
+  } finally {
+    loadingPaths.value.delete(path);
+    loadingPaths.value = new Set(loadingPaths.value);
+  }
+}
+
+async function toggleFolderExpand(folder: Folder) {
+  const rootPath = folder.path;
+  if (expandedPaths.value.has(rootPath)) {
+    expandedPaths.value.delete(rootPath);
+    expandedPaths.value = new Set(expandedPaths.value);
+    return;
+  }
+  expandedPaths.value.add(rootPath);
+  expandedPaths.value = new Set(expandedPaths.value);
+
+  if (!subdirectories.value[rootPath]) {
+    await loadSubdirectories(folder, rootPath);
+  }
+}
+
+async function toggleSubfolderExpand(folder: Folder, path: string) {
+  if (expandedPaths.value.has(path)) {
+    expandedPaths.value.delete(path);
+    expandedPaths.value = new Set(expandedPaths.value);
+    return;
+  }
+  expandedPaths.value.add(path);
+  expandedPaths.value = new Set(expandedPaths.value);
+
+  if (!subdirectories.value[path]) {
+    await loadSubdirectories(folder, path);
+  }
+}
+
+function selectSubfolder(folder: Folder, subfolderPath: string) {
+  emit("selectNav", {
+    type: "folder",
+    folder,
+    subfolderPath,
+    recursive: false,
+  });
+}
+
 function isTargetActive(target: NavTarget): boolean {
   if (props.activeTarget.type !== target.type) return false;
   if (target.type === "folder" && props.activeTarget.type === "folder") {
-    return props.activeTarget.folder.id === target.folder.id;
+    if (props.activeTarget.folder.id !== target.folder.id) return false;
+    const activeSub = props.activeTarget.subfolderPath || "";
+    const targetSub = target.subfolderPath || "";
+    return activeSub === targetSub;
   }
   if (target.type === "album" && props.activeTarget.type === "album") {
     return props.activeTarget.album.id === target.album.id;
@@ -269,52 +337,83 @@ function onDropOnTag(e: DragEvent, tag: Tag) {
           </button>
         </div>
         <ul class="nav-list">
-          <li
-            v-for="folder in folders"
-            :key="folder.id"
-            class="nav-item folder-item"
-            :class="{ active: isTargetActive({ type: 'folder', folder }) }"
-            :title="displayPath(folder.path)"
-            @click="emit('selectNav', { type: 'folder', folder })"
-            @dragover.prevent
-            @drop="onDropOnFolder($event, folder)"
-          >
-            <span class="item-icon">
-              {{ folder.folder_type === 'pipeline' ? '⚡' : folder.folder_type === 'managed' ? '📦' : '📁' }}
-            </span>
-            <span class="item-label truncate">{{ getFolderName(folder.path) }}</span>
-            <span v-if="counts?.folders" class="item-badge">{{ counts.folders[folder.id] ?? 0 }}</span>
+          <template v-for="folder in folders" :key="folder.id">
+            <li
+              class="nav-item folder-item"
+              :class="{ active: isTargetActive({ type: 'folder', folder }) }"
+              :title="displayPath(folder.path)"
+              @click="emit('selectNav', { type: 'folder', folder, subfolderPath: undefined, recursive: true })"
+              @dragover.prevent
+              @drop="onDropOnFolder($event, folder)"
+            >
+              <button
+                type="button"
+                class="tree-arrow-btn"
+                :class="{ expanded: expandedPaths.has(folder.path) }"
+                :title="expandedPaths.has(folder.path) ? 'Collapse' : 'Expand'"
+                @click.stop="toggleFolderExpand(folder)"
+              >
+                <span v-if="loadingPaths.has(folder.path)" class="tree-loading-dot">…</span>
+                <span v-else>{{ expandedPaths.has(folder.path) ? '▼' : '▶' }}</span>
+              </button>
 
-            <div class="folder-actions" @click.stop>
-              <button
-                v-if="folder.folder_type === 'pipeline'"
-                type="button"
-                class="icon-btn harvest-btn"
-                :disabled="isBusy(folder.id)"
-                :title="t.nav.harvest || 'Harvest New Images'"
-                @click="harvest(folder, $event)"
-              >
-                {{ isBusy(folder.id) ? '⏳' : '⚡' }}
-              </button>
-              <button
-                type="button"
-                class="icon-btn"
-                :disabled="isBusy(folder.id)"
-                :title="t.nav.scan"
-                @click="scan(folder, 'scan')"
-              >
-                {{ isBusy(folder.id) ? '⏳' : '🔄' }}
-              </button>
-              <button
-                type="button"
-                class="icon-btn remove-btn"
-                :title="t.nav.remove"
-                @click="removeFolder(folder, $event)"
-              >
-                ✕
-              </button>
-            </div>
-          </li>
+              <span class="item-icon">
+                {{ folder.folder_type === 'pipeline' ? '⚡' : folder.folder_type === 'managed' ? '📦' : (expandedPaths.has(folder.path) ? '📂' : '📁') }}
+              </span>
+              <span class="item-label truncate">{{ getFolderName(folder.path) }}</span>
+              <span v-if="counts?.folders" class="item-badge">{{ counts.folders[folder.id] ?? 0 }}</span>
+
+              <div class="folder-actions" @click.stop>
+                <button
+                  v-if="folder.folder_type === 'pipeline'"
+                  type="button"
+                  class="icon-btn harvest-btn"
+                  :disabled="isBusy(folder.id)"
+                  :title="t.nav.harvest || 'Harvest New Images'"
+                  @click="harvest(folder, $event)"
+                >
+                  {{ isBusy(folder.id) ? '⏳' : '⚡' }}
+                </button>
+                <button
+                  type="button"
+                  class="icon-btn"
+                  :disabled="isBusy(folder.id)"
+                  :title="t.nav.scan"
+                  @click="scan(folder, 'scan')"
+                >
+                  {{ isBusy(folder.id) ? '⏳' : '🔄' }}
+                </button>
+                <button
+                  type="button"
+                  class="icon-btn remove-btn"
+                  :title="t.nav.remove"
+                  @click="removeFolder(folder, $event)"
+                >
+                  ✕
+                </button>
+              </div>
+            </li>
+
+            <!-- Recursive Subdirectory Tree -->
+            <ul
+              v-if="expandedPaths.has(folder.path) && subdirectories[folder.path]?.length"
+              class="subfolder-tree-list root-subfolder-list"
+            >
+              <FolderTreeNode
+                v-for="child in subdirectories[folder.path]"
+                :key="child.path"
+                :folder="folder"
+                :entry="child"
+                :depth="1"
+                :active-target="activeTarget"
+                :expanded-paths="expandedPaths"
+                :subdirectories="subdirectories"
+                :loading-paths="loadingPaths"
+                @toggle-expand="toggleSubfolderExpand"
+                @select-subfolder="selectSubfolder"
+              />
+            </ul>
+          </template>
           <li v-if="folders.length === 0" class="empty-hint">
             {{ t.nav.noFolders }}
           </li>
@@ -597,6 +696,47 @@ function onDropOnTag(e: DragEvent, tag: Tag) {
 
 .folder-item:hover .item-badge {
   display: none;
+}
+
+.tree-arrow-btn {
+  background: transparent;
+  border: none;
+  color: #64748b;
+  font-size: 0.65rem;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.12s ease;
+  flex-shrink: 0;
+}
+
+.tree-arrow-btn:hover {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.tree-loading-dot {
+  font-size: 0.65rem;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+.subfolder-tree-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
 
 .icon-btn {

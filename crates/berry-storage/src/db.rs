@@ -724,6 +724,26 @@ impl Database {
             params.push(rusqlite::types::Value::Integer(fid));
         }
 
+        if let Some(folder_path) = &criteria.folder_path {
+            let normalized = folder_path.trim_end_matches(['/', '\\']);
+            let is_recursive = criteria.recursive.unwrap_or(true);
+            if is_recursive {
+                conditions.push("(path = ? OR path LIKE ? OR path LIKE ?)".to_string());
+                params.push(rusqlite::types::Value::Text(normalized.to_string()));
+                params.push(rusqlite::types::Value::Text(format!("{normalized}/%")));
+                params.push(rusqlite::types::Value::Text(format!("{normalized}\\%")));
+            } else {
+                conditions.push(
+                    "((path LIKE ? AND path NOT LIKE ?) OR (path LIKE ? AND path NOT LIKE ?))"
+                        .to_string(),
+                );
+                params.push(rusqlite::types::Value::Text(format!("{normalized}/%")));
+                params.push(rusqlite::types::Value::Text(format!("{normalized}/%/%")));
+                params.push(rusqlite::types::Value::Text(format!("{normalized}\\%")));
+                params.push(rusqlite::types::Value::Text(format!("{normalized}\\%\\%")));
+            }
+        }
+
         if let Some(stack_id) = &criteria.stack_id {
             conditions.push("stack_id = ?".to_string());
             params.push(rusqlite::types::Value::Text(stack_id.clone()));
@@ -1303,6 +1323,23 @@ impl Database {
         let count = self.conn.query_row(
             "SELECT COUNT(*) FROM files WHERE folder_id = ?1",
             [folder_id],
+            |row| row.get(0),
+        )?;
+        Ok(count)
+    }
+
+    /// Number of indexed files in a folder under a specific directory path (recursively).
+    pub fn count_files_under_path(
+        &self,
+        folder_id: i64,
+        dir_path: &str,
+    ) -> Result<i64, DatabaseError> {
+        let normalized = dir_path.trim_end_matches(['/', '\\']);
+        let p_slash = format!("{normalized}/%");
+        let p_backslash = format!("{normalized}\\%");
+        let count = self.conn.query_row(
+            "SELECT COUNT(*) FROM files WHERE folder_id = ?1 AND (path = ?2 OR path LIKE ?3 OR path LIKE ?4)",
+            params![folder_id, normalized, p_slash, p_backslash],
             |row| row.get(0),
         )?;
         Ok(count)
@@ -5720,5 +5757,85 @@ mod tests {
         ));
         assert_eq!(db.get_stack_members(&target).unwrap().len(), 1);
         assert_eq!(db.get_stack_members("source").unwrap().len(), 2);
+    }
+
+    #[test]
+    fn folder_path_filtering_recursive_and_single_level() {
+        let db = Database::connect_in_memory().unwrap();
+        let folder = db.add_folder("/library").unwrap();
+
+        let make_file = |path: &str| ImageFile {
+            id: None,
+            folder_id: folder.id,
+            path: path.to_string(),
+            size_bytes: 100,
+            modified_at: 1000,
+            container: Container::Png,
+            metadata: None,
+            rating: None,
+            aesthetic_score: None,
+            is_favorite: false,
+            is_nsfw: false,
+            stack_id: None,
+            stack_order: 0,
+        };
+
+        db.upsert_file(&make_file("/library/root_img.png")).unwrap();
+        db.upsert_file(&make_file("/library/project_a/a1.png"))
+            .unwrap();
+        db.upsert_file(&make_file("/library/project_a/sub/a2.png"))
+            .unwrap();
+        db.upsert_file(&make_file("/library/project_b/b1.png"))
+            .unwrap();
+
+        // Count under path
+        assert_eq!(db.count_files_under_path(folder.id, "/library").unwrap(), 4);
+        assert_eq!(
+            db.count_files_under_path(folder.id, "/library/project_a")
+                .unwrap(),
+            2
+        );
+        assert_eq!(
+            db.count_files_under_path(folder.id, "/library/project_a/sub")
+                .unwrap(),
+            1
+        );
+        assert_eq!(
+            db.count_files_under_path(folder.id, "/library/project_b")
+                .unwrap(),
+            1
+        );
+
+        // Search recursive under project_a
+        let recursive_crit = SearchCriteria {
+            folder_id: Some(folder.id),
+            folder_path: Some("/library/project_a".to_string()),
+            recursive: Some(true),
+            ..Default::default()
+        };
+        let res_rec = db.search_files(&recursive_crit).unwrap();
+        assert_eq!(res_rec.len(), 2);
+
+        // Search single-level under project_a (only immediate files, not in sub/)
+        let single_crit = SearchCriteria {
+            folder_id: Some(folder.id),
+            folder_path: Some("/library/project_a".to_string()),
+            recursive: Some(false),
+            ..Default::default()
+        };
+        let res_single = db.search_files(&single_crit).unwrap();
+        assert_eq!(res_single.len(), 1);
+        assert_eq!(res_single[0].path, "/library/project_a/a1.png");
+
+        // Search single-level on root
+        let root_single = SearchCriteria {
+            folder_id: Some(folder.id),
+            folder_path: Some("/library".to_string()),
+            recursive: Some(false),
+            ..Default::default()
+        };
+        let res_root = db.search_files(&root_single).unwrap();
+        assert_eq!(res_root.len(), 1);
+        assert_eq!(res_root[0].path, "/library/root_img.png");
     }
 }

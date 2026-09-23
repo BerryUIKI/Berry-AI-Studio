@@ -176,6 +176,131 @@ pub fn list_folders(state: State<'_, AppState>) -> Result<Vec<Folder>, String> {
     db(&state)?.list_folders().map_err(|e| e.to_string())
 }
 
+/// A subdirectory entry within a root folder.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubdirectoryEntry {
+    pub name: String,
+    pub path: String,
+    pub has_children: bool,
+    pub file_count: i64,
+}
+
+pub fn list_subdirectories_from_db(
+    db: Option<&Database>,
+    folder_id: i64,
+    base_dir: &Path,
+) -> Result<Vec<SubdirectoryEntry>, String> {
+    if !base_dir.is_dir() {
+        return Ok(Vec::new());
+    }
+
+    let entries = match std::fs::read_dir(base_dir) {
+        Ok(e) => e,
+        Err(e) => {
+            return Err(format!(
+                "Failed to read directory {}: {e}",
+                base_dir.display()
+            ))
+        }
+    };
+
+    let mut result = Vec::new();
+
+    for entry in entries.flatten() {
+        let child_path = entry.path();
+        if !child_path.is_dir() {
+            continue;
+        }
+
+        let name = match child_path.file_name() {
+            Some(n) => n.to_string_lossy().to_string(),
+            None => continue,
+        };
+
+        if name.starts_with('.')
+            || name.eq_ignore_ascii_case("$RECYCLE.BIN")
+            || name.eq_ignore_ascii_case("System Volume Information")
+        {
+            continue;
+        }
+
+        let mut has_children = false;
+        if let Ok(sub_entries) = std::fs::read_dir(&child_path) {
+            for sub in sub_entries.flatten() {
+                if let Ok(file_type) = sub.file_type() {
+                    if file_type.is_dir() {
+                        let sub_name = sub.file_name().to_string_lossy().to_string();
+                        if !sub_name.starts_with('.') {
+                            has_children = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        let clean_path = {
+            let canonical = child_path
+                .canonicalize()
+                .unwrap_or_else(|_| child_path.clone());
+            let text = canonical.to_string_lossy();
+            text.strip_prefix(r"\\?\").unwrap_or(&text).to_string()
+        };
+
+        let file_count = if let Some(database) = db {
+            database
+                .count_files_under_path(folder_id, &clean_path)
+                .unwrap_or(0)
+        } else {
+            0
+        };
+
+        result.push(SubdirectoryEntry {
+            name,
+            path: clean_path,
+            has_children,
+            file_count,
+        });
+    }
+
+    result.sort_by_key(|a| a.name.to_lowercase());
+    Ok(result)
+}
+
+/// Discover and list immediate subdirectories within a folder or subfolder.
+#[tauri::command]
+pub async fn list_subdirectories(
+    folder_id: i64,
+    directory_path: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<Vec<SubdirectoryEntry>, String> {
+    let (target_path_str, folder_id, db_path) = {
+        let db = db(&state)?;
+        let folder = db
+            .find_folder_by_id(folder_id)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "folder not found".to_string())?;
+        let path = match directory_path {
+            Some(p) if !p.trim().is_empty() => p,
+            _ => folder.path,
+        };
+        let db_path = db.path().map(|p| p.to_path_buf());
+        (path, folder.id, db_path)
+    };
+
+    tauri::async_runtime::spawn_blocking(move || {
+        let target_path = PathBuf::from(target_path_str);
+        if let Some(db_p) = db_path {
+            if let Ok(db) = Database::connect(&db_p) {
+                return list_subdirectories_from_db(Some(&db), folder_id, &target_path);
+            }
+        }
+        list_subdirectories_from_db(None, folder_id, &target_path)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 /// Remove a folder and its indexed files.
 #[tauri::command]
 pub fn remove_folder(folder_id: i64, state: State<'_, AppState>) -> Result<(), String> {
@@ -3928,6 +4053,55 @@ mod tests {
         let album_files = db.list_album_files(album.id).unwrap();
         assert_eq!(album_files.len(), 1);
         assert_eq!(album_files[0].id, Some(file_id));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
+    }
+
+    #[test]
+    fn test_list_subdirectories() {
+        let temp_dir =
+            std::env::temp_dir().join(format!("omera_test_subdirs_{}", std::process::id()));
+        let root_dir = temp_dir.join("root");
+        let sub1 = root_dir.join("sub1");
+        let sub2 = root_dir.join("sub2");
+        let subsub = sub1.join("nested");
+        std::fs::create_dir_all(&subsub).unwrap();
+        std::fs::create_dir_all(&sub2).unwrap();
+
+        let db = Database::connect_in_memory().unwrap();
+        let folder = db.add_folder(&root_dir.to_string_lossy()).unwrap();
+
+        let dummy = ImageFile {
+            id: None,
+            folder_id: folder.id,
+            path: subsub.join("img.png").to_string_lossy().to_string(),
+            size_bytes: 10,
+            modified_at: 100,
+            container: berry_domain::Container::Png,
+            metadata: None,
+            rating: None,
+            aesthetic_score: None,
+            is_favorite: false,
+            is_nsfw: false,
+            stack_id: None,
+            stack_order: 0,
+        };
+        db.upsert_file(&dummy).unwrap();
+
+        let entries = list_subdirectories_from_db(Some(&db), folder.id, &root_dir).unwrap();
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].name, "sub1");
+        assert!(entries[0].has_children);
+        assert_eq!(entries[0].file_count, 1);
+
+        assert_eq!(entries[1].name, "sub2");
+        assert!(!entries[1].has_children);
+        assert_eq!(entries[1].file_count, 0);
+
+        let nested_entries = list_subdirectories_from_db(Some(&db), folder.id, &sub1).unwrap();
+        assert_eq!(nested_entries.len(), 1);
+        assert_eq!(nested_entries[0].name, "nested");
+        assert_eq!(nested_entries[0].file_count, 1);
 
         let _ = std::fs::remove_dir_all(temp_dir);
     }

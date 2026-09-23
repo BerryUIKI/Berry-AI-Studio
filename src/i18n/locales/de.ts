@@ -42,6 +42,8 @@ export const de: typeof en = {
     tags: "Tags",
     newTag: "+ Neu",
     noTags: "Noch keine Tags.",
+    recursiveMode: "Unterordner",
+    singleLevelMode: "Nur aktueller",
   },
   search: {
     placeholder: "Prompts, Modelle, Parameter durchsuchen... (z.B. prompt:cat steps:>=20)",

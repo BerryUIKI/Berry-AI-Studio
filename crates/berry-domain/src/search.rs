@@ -52,6 +52,12 @@ pub struct SearchCriteria {
     pub tag_id: Option<i64>,
     /// Optional folder constraint. If `None`, searches across all indexed folders.
     pub folder_id: Option<i64>,
+    /// Optional folder directory path constraint (e.g. subfolder path).
+    #[serde(default)]
+    pub folder_path: Option<String>,
+    /// Whether folder_path matches recursively (default: true).
+    #[serde(default)]
+    pub recursive: Option<bool>,
     /// Optional stack constraint used by filtered stack expansion.
     pub stack_id: Option<String>,
     /// Media type constraint ("all" | "image" | "video").
@@ -127,6 +133,8 @@ mod tests {
             album_id: Some(10),
             tag_id: Some(5),
             folder_id: Some(42),
+            folder_path: Some("/library/sub".to_string()),
+            recursive: Some(true),
             stack_id: Some("stack-a".to_string()),
             media_type: Some("video".to_string()),
             min_duration: Some(5.0),
