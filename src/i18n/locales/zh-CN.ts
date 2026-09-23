@@ -91,6 +91,7 @@ export const zhCN: typeof en = {
     copy: "📄 复制",
     trash: "🗑 移至废纸篓",
     export: "📤 批量导出...",
+    more: "更多",
   },
   preview: {
     reveal: "在访达中显示",

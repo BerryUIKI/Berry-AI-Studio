@@ -91,6 +91,7 @@ export const zhTW: typeof en = {
     copy: "📄 複製",
     trash: "🗑 移至垃圾桶",
     export: "📤 批次匯出...",
+    more: "更多",
   },
   preview: {
     reveal: "在 Finder 中顯示",

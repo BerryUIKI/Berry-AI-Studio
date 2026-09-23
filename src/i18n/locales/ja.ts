@@ -91,6 +91,7 @@ export const ja: typeof en = {
     copy: "📄 コピー",
     trash: "🗑 ゴミ箱へ移動",
     export: "📤 一括エクスポート...",
+    more: "その他",
   },
   preview: {
     reveal: "Finderで表示",
