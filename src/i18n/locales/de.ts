@@ -1,6 +1,21 @@
 import type { en } from "./en";
 
 export const de: typeof en = {
+  review: {
+    indexFailures: "{count} Bilder fehlgeschlagen. Indexierung zum Wiederholen erneut starten.",
+    gallery: "Bildergalerie",
+    noMatches: "Keine passenden Bilder",
+    clearFilters: "Filter löschen",
+    retry: "Erneut versuchen",
+    minimize: "Minimieren",
+    maximize: "Maximieren",
+    restoreWindow: "Fenster wiederherstellen",
+    close: "Schließen",
+    emptyLibrary: "Fügen Sie einen Ordner hinzu.",
+    emptyFolder: "Dieser Ordner ist leer.",
+    restartRestore: "Die Wiederherstellung startet die Anwendung neu.",
+    remoteUnavailable: "Remote-Speicher wird noch nicht unterstützt. Migrationsexport ist verfügbar.",
+  },
   app: {
     title: "Berry AI Studio",
     tagline: "Metadaten-Indexer und Viewer für KI-generierte Bilder",

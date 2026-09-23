@@ -1,6 +1,21 @@
 import type { en } from "./en";
 
 export const ja: typeof en = {
+  review: {
+    indexFailures: "{count} 件の画像に失敗しました。再実行して再試行してください。",
+    gallery: "画像ギャラリー",
+    noMatches: "一致する画像がありません",
+    clearFilters: "フィルターを解除",
+    retry: "再試行",
+    minimize: "最小化",
+    maximize: "最大化",
+    restoreWindow: "ウィンドウを復元",
+    close: "閉じる",
+    emptyLibrary: "フォルダーを追加してください。",
+    emptyFolder: "このフォルダーは空です。",
+    restartRestore: "復元するとアプリが再起動します。",
+    remoteUnavailable: "リモート保存は未対応です。移行用エクスポートは利用できます。",
+  },
   app: {
     title: "Berry AI Studio",
     tagline: "AI生成画像のメタデータインデクサー＆ビューア",

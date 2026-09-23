@@ -28,6 +28,12 @@ export class CollaborationSyncEngine {
   private batchLimit: number = 100;
   private lastSyncTime: number = 0;
   private totalSyncedCount: number = 0;
+  private runGeneration: number = 0;
+  private readonly visibilityListener = () => {
+    if (typeof document !== "undefined") {
+      this.setDocumentVisible(!document.hidden);
+    }
+  };
 
   constructor(options?: CollaborationSyncOptions) {
     if (options?.activeCadenceMs) this.activeCadenceMs = options.activeCadenceMs;
@@ -60,6 +66,14 @@ export class CollaborationSyncEngine {
     return this.isRunning;
   }
 
+  public getRunGeneration(): number {
+    return this.runGeneration;
+  }
+
+  public getVisibilityListener(): () => void {
+    return this.visibilityListener;
+  }
+
   public setDocumentVisible(visible: boolean) {
     this.isDocumentVisible = visible;
   }
@@ -85,21 +99,33 @@ export class CollaborationSyncEngine {
   public start() {
     if (this.isRunning) return;
     this.isRunning = true;
+    this.runGeneration++;
     this.setupVisibilityListeners();
     this.scheduleNextTick();
   }
 
   public stop() {
     this.isRunning = false;
+    this.runGeneration++;
+    if (typeof document !== "undefined" && typeof document.removeEventListener === "function") {
+      document.removeEventListener("visibilitychange", this.visibilityListener);
+    }
     if (this.timer) {
       clearTimeout(this.timer);
       this.timer = null;
     }
   }
 
+  public dispose() {
+    this.stop();
+    this.listeners.clear();
+    this.batchListeners.clear();
+  }
+
   public async pollOnce(
     fetchFn?: (query: ChangeLogSyncQuery) => Promise<ChangeLogEntry[]>,
   ): Promise<ChangeLogEntry[]> {
+    const generation = this.runGeneration;
     try {
       const query: ChangeLogSyncQuery = {
         after_id: this.lastSyncId,
@@ -110,6 +136,10 @@ export class CollaborationSyncEngine {
       const entries = fetchFn
         ? await fetchFn(query)
         : await invoke<ChangeLogEntry[]>("fetch_change_log", { query });
+
+      if (generation !== this.runGeneration) {
+        return [];
+      }
 
       this.lastSyncTime = Date.now();
 
@@ -151,19 +181,21 @@ export class CollaborationSyncEngine {
 
   private scheduleNextTick() {
     if (!this.isRunning) return;
+    const generation = this.runGeneration;
     const cadence = this.getEffectiveCadenceMs();
     this.timer = setTimeout(async () => {
-      if (!this.isRunning) return;
+      if (!this.isRunning || generation !== this.runGeneration) return;
       await this.pollOnce();
-      this.scheduleNextTick();
+      if (generation === this.runGeneration && this.isRunning) {
+        this.scheduleNextTick();
+      }
     }, cadence);
   }
 
   private setupVisibilityListeners() {
     if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
-      document.addEventListener("visibilitychange", () => {
-        this.setDocumentVisible(!document.hidden);
-      });
+      this.visibilityListener();
+      document.addEventListener("visibilitychange", this.visibilityListener);
     }
   }
 }

@@ -1,6 +1,21 @@
 import type { en } from "./en";
 
 export const es: typeof en = {
+  review: {
+    indexFailures: "Fallaron {count} imágenes. Ejecute la indexación de nuevo para reintentar.",
+    gallery: "Galería de imágenes",
+    noMatches: "No hay imágenes coincidentes",
+    clearFilters: "Borrar filtros",
+    retry: "Reintentar",
+    minimize: "Minimizar",
+    maximize: "Maximizar",
+    restoreWindow: "Restaurar ventana",
+    close: "Cerrar",
+    emptyLibrary: "Añada una carpeta para comenzar.",
+    emptyFolder: "Esta carpeta está vacía.",
+    restartRestore: "La restauración reiniciará la aplicación.",
+    remoteUnavailable: "El almacenamiento remoto aún no es compatible. La exportación de migración sigue disponible.",
+  },
   app: {
     title: "Berry AI Studio",
     tagline: "Indexador y visor de metadatos para imágenes de IA",
