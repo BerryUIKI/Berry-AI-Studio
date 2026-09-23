@@ -17,6 +17,7 @@ mod folder;
 mod image_file;
 mod lora;
 mod metadata_format;
+mod migration;
 mod pipeline;
 mod prompt_stacking;
 mod prompt_stat;
@@ -52,6 +53,11 @@ pub use folder::Folder;
 pub use image_file::{Container, FileSortField, ImageFile, SortDirection};
 pub use lora::{DetectedLora, LoraModel};
 pub use metadata_format::MetadataFormat;
+pub use migration::{
+    CleanupItem, DiscoveredSource, LegacyCleanupPreview, LegacyCleanupResult, LegacyMigrationJob,
+    LegacyMigrationPreview, LegacyMigrationStatus, MigratedArtifact, MigrationError,
+    MigrationReceipt,
+};
 pub use pipeline::{CleanupQueueItem, PipelineDetectedPath};
 pub use prompt_stacking::{plan_prompt_stacks, PromptStackCandidate, PromptStackPlan};
 pub use prompt_stat::PromptStat;
