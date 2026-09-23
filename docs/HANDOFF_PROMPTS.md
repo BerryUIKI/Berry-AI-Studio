@@ -2,6 +2,8 @@
 
 Use one prompt per assignment. Replace `BASELINE_COMMIT` with the maintainer-provided implementation commit before dispatch. Do not substitute the documentation-only PR commit. Read [ENGINEERING_HANDOFF.md](ENGINEERING_HANDOFF.md) for task cards and [DELIVERY_ROADMAP.md](DELIVERY_ROADMAP.md) for dependencies.
 
+Use [TASK_ASSIGNMENT_BOARD.md](TASK_ASSIGNMENT_BOARD.md) to choose a ready assignment and its baseline. `4f57246` is the current `dev` starting point for independent tasks; `5fabdd8` is an unmerged review snapshot, not automatically approved for integration. If `dev` has advanced, record its new exact SHA and check overlap before dispatch. Validation evidence is in [VALIDATION_STATUS.md](VALIDATION_STATUS.md).
+
 These prompts assign implementation to ordinary engineers while the lead owns architecture, persistence, migration, update trust and release qualification. They do not authorize publishing releases, merging to main, rewriting migrations, deleting legacy data, or adding undocumented backend APIs.
 
 ## Standard assignment wrapper

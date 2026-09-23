@@ -13,7 +13,7 @@ Status: current source contract plus explicitly marked proposals. The current so
 | Update DTOs | Rust `UpdateDownloadProgress` | `src/utils/updater.ts` |
 | Watcher events | `src-tauri/src/watcher.rs` | App refresh scheduling |
 
-[IPC_REFERENCE.md](IPC_REFERENCE.md) inventories all 138 currently registered commands, their actual request keys and Rust return types. Regenerate with `node scripts/generate-ipc-reference.mjs`; check with `node scripts/generate-ipc-reference.mjs --check`. The generator fails if a registered signature is not recognized. It does not validate nested DTOs; engineers must test Serde/TypeScript compatibility explicitly.
+[IPC_REFERENCE.md](IPC_REFERENCE.md) inventories all 138 commands registered in implementation snapshot `5fabdd8`, their actual request keys and Rust return types. This source is in draft PR #138, not yet integrated into `dev`. On a documentation-only checkout, validate with `node scripts/generate-ipc-reference.mjs --source-ref 5fabdd8 --check` after fetching that branch. On an implementation checkout, regenerate/check without `--source-ref`. The generator fails if a registered signature is not recognized. It does not validate nested DTOs; engineers must test Serde/TypeScript compatibility explicitly. See [VALIDATION_STATUS.md](VALIDATION_STATUS.md).
 
 Current commands are local Tauri IPC, not HTTP endpoints. Do not invent REST routes or expose these commands through a network server. Commands are restricted to the configured application WebView; IPC arguments still require backend validation.
 
