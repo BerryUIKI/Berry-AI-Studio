@@ -726,21 +726,26 @@ impl Database {
 
         if let Some(folder_path) = &criteria.folder_path {
             let normalized = folder_path.trim_end_matches(['/', '\\']);
+            let norm_slash = normalized.replace('\\', "/");
+            let norm_backslash = normalized.replace('/', "\\");
             let is_recursive = criteria.recursive.unwrap_or(true);
             if is_recursive {
-                conditions.push("(path = ? OR path LIKE ? OR path LIKE ?)".to_string());
-                params.push(rusqlite::types::Value::Text(normalized.to_string()));
-                params.push(rusqlite::types::Value::Text(format!("{normalized}/%")));
-                params.push(rusqlite::types::Value::Text(format!("{normalized}\\%")));
+                conditions.push("(path = ? OR path = ? OR path LIKE ? OR path LIKE ?)".to_string());
+                params.push(rusqlite::types::Value::Text(norm_slash.clone()));
+                params.push(rusqlite::types::Value::Text(norm_backslash.clone()));
+                params.push(rusqlite::types::Value::Text(format!("{norm_slash}/%")));
+                params.push(rusqlite::types::Value::Text(format!("{norm_backslash}\\%")));
             } else {
                 conditions.push(
                     "((path LIKE ? AND path NOT LIKE ?) OR (path LIKE ? AND path NOT LIKE ?))"
                         .to_string(),
                 );
-                params.push(rusqlite::types::Value::Text(format!("{normalized}/%")));
-                params.push(rusqlite::types::Value::Text(format!("{normalized}/%/%")));
-                params.push(rusqlite::types::Value::Text(format!("{normalized}\\%")));
-                params.push(rusqlite::types::Value::Text(format!("{normalized}\\%\\%")));
+                params.push(rusqlite::types::Value::Text(format!("{norm_slash}/%")));
+                params.push(rusqlite::types::Value::Text(format!("{norm_slash}/%/%")));
+                params.push(rusqlite::types::Value::Text(format!("{norm_backslash}\\%")));
+                params.push(rusqlite::types::Value::Text(format!(
+                    "{norm_backslash}\\%\\%"
+                )));
             }
         }
 
@@ -1335,11 +1340,13 @@ impl Database {
         dir_path: &str,
     ) -> Result<i64, DatabaseError> {
         let normalized = dir_path.trim_end_matches(['/', '\\']);
-        let p_slash = format!("{normalized}/%");
-        let p_backslash = format!("{normalized}\\%");
+        let norm_slash = normalized.replace('\\', "/");
+        let norm_backslash = normalized.replace('/', "\\");
+        let p_slash = format!("{norm_slash}/%");
+        let p_backslash = format!("{norm_backslash}\\%");
         let count = self.conn.query_row(
-            "SELECT COUNT(*) FROM files WHERE folder_id = ?1 AND (path = ?2 OR path LIKE ?3 OR path LIKE ?4)",
-            params![folder_id, normalized, p_slash, p_backslash],
+            "SELECT COUNT(*) FROM files WHERE folder_id = ?1 AND (path = ?2 OR path = ?3 OR path LIKE ?4 OR path LIKE ?5)",
+            params![folder_id, norm_slash, norm_backslash, p_slash, p_backslash],
             |row| row.get(0),
         )?;
         Ok(count)

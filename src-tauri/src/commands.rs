@@ -240,10 +240,7 @@ pub fn list_subdirectories_from_db(
         }
 
         let clean_path = {
-            let canonical = child_path
-                .canonicalize()
-                .unwrap_or_else(|_| child_path.clone());
-            let text = canonical.to_string_lossy();
+            let text = child_path.to_string_lossy();
             text.strip_prefix(r"\\?\").unwrap_or(&text).to_string()
         };
 
