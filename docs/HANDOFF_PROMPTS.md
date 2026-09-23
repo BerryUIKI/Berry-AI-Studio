@@ -243,4 +243,4 @@ Persistence / security / release review needed:
 Follow-up work intentionally excluded:
 ```
 
-The lead reviews correctness, contract stability and scope before integration. A passed build does not authorize data cleanup or release publication. Keep deferred product work (#118 and remote collaboration) out of the rename stabilization path.
+The lead reviews correctness, contract stability and scope before integration. A passed build does not authorize data cleanup or release publication. Keep remote collaboration and the planned #118 image-transformation work out of the rename stabilization path. For #118 after the Phase 6 gate, use the package-specific handoff prompt in [IMAGE_TRANSFORM_PLAN.md](IMAGE_TRANSFORM_PLAN.md); it is not a ready assignment yet.

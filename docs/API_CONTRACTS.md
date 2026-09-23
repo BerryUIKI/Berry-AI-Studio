@@ -119,6 +119,10 @@ Subscribe to progress before starting an operation and always dispose listeners 
 
 An `async fn` declaration alone does not ensure work is off the runtime thread. Blocking filesystem/decode/inference/network work belongs in bounded workers, and shared database locks must be released before that work. See L8/#102 for command-by-command ownership changes.
 
+## Planned image transformation contract — NOT IMPLEMENTED
+
+The #118 import/batch transformation commands, job receipt, source-disposition authorization and archive/recovery behavior are **proposals**, not registered IPC. See [IMAGE_TRANSFORM_PLAN.md](IMAGE_TRANSFORM_PLAN.md) for the draft shape and gates. `export_files_batch` remains the existing callable command; changes to its DTO, progress event or privacy semantics require a coordinated Rust/TypeScript contract update and [IPC_REFERENCE.md](IPC_REFERENCE.md) update. The lead must approve backend-owned path selection, staged publication, persistent partial results and source cleanup before any UI invokes new commands.
+
 ## Proposed migration IPC — NOT IMPLEMENTED
 
 Owner: lead. These names and DTOs are a design proposal for review, not callable commands. Engineers may create typed UI mocks after confirming the proposal; production calls must wait for registration and contract tests.

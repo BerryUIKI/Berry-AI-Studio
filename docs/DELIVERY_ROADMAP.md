@@ -46,4 +46,10 @@ Exit: required automated checks and platform/manual matrix pass; release blocker
 
 ## Phase 5 — Stabilization and 1.0 review
 
-All pre-1.0 releases retain legacy detection and supported import. Keep cleanup optional. Resolve verified migration problems before removing compatibility paths. Decide the 1.0 import policy explicitly and document it; never use version 1.0 as permission to erase legacy data. Revisit #118 and remote collaboration as separate product work after stabilization.
+All pre-1.0 releases retain legacy detection and supported import. Keep cleanup optional. Resolve verified migration problems before removing compatibility paths. Decide the 1.0 import policy explicitly and document it; never use version 1.0 as permission to erase legacy data. Remote collaboration remains a separate product decision after stabilization.
+
+## Phase 6 — Library image transformation (planned; issue #118 design)
+
+Follow [IMAGE_TRANSFORM_PLAN.md](IMAGE_TRANSFORM_PLAN.md). This product work begins after the identity/migration and safe file-operation gates, rather than joining the release-critical rename path. Sequence: repair the existing export codec, metadata and write-result behavior; add export preview/progress; add optional transform during managed import; then offer verified post-import batch transformation with keep/archive/Trash choices. Target-size controls follow only after the core flows are qualified.
+
+The lead owns catalog identity, staged filesystem publication, metadata policy, source disposition, archive/recovery and any schema/API decision. General engineers can implement bounded export/UI packages against approved contracts. Exit requires codec/extension, source-preservation, collision, interruption/restart and archive-restore evidence; documentation or an export-only PR does not claim the full feature shipped.

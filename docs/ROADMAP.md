@@ -170,4 +170,14 @@ Execution order and ownership: [DELIVERY_ROADMAP.md](DELIVERY_ROADMAP.md) and [E
 - [ ] **Color Palette Visual Filter Bar**: Interactive hue ribbon and tone picker in search drawer to filter images by dominant color family (Red, Amber, Emerald, Cyan, Violet, Monochrome, Warm, Cool).
 - [ ] **Pre-Computed SQL Facet Distribution**: Migrate expensive filter aggregations (models, samplers, ratings, aspect ratio buckets) to materialized views and cached facet counters for instant multi-facet filter rendering on 100k+ item libraries.
 
+### 🎯 Milestone 20: Library Image Compression and Conversion (planned after stabilization)
+
+Scope, order, safety gates and handoff: [IMAGE_TRANSFORM_PLAN.md](IMAGE_TRANSFORM_PLAN.md) and [DELIVERY_ROADMAP.md](DELIVERY_ROADMAP.md), Phase 6. This is the Omera-native follow-up to [#118](https://github.com/BerryUIKI/Omera/issues/118), not a claim that its import and batch flows already exist.
+
+- [ ] [#158](https://github.com/BerryUIKI/Omera/issues/158): Fix current export codec/extension, quality, metadata and collision/result correctness; retain directory and ZIP compatibility.
+- [ ] Add export preview, size estimate and explicit per-file outcomes.
+- [ ] [#159](https://github.com/BerryUIKI/Omera/issues/159): Add optional compression/conversion while importing into managed storage, retaining external originals by default.
+- [ ] [#160](https://github.com/BerryUIKI/Omera/issues/160): Add verified post-import batch transformation for managed assets with keep/archive/system-Trash choices and recovery.
+- [ ] Evaluate target-size, percentage resize and alignment controls after measuring quality and processing cost.
+
 
