@@ -18,6 +18,7 @@ import {
   getThumbnailUrlSync,
 } from "../utils/thumbnail";
 import { t } from "../i18n";
+import { useGalleryNavigation } from "../utils/gallery-navigation";
 
 const props = defineProps<{
   files: ImageFile[];
@@ -26,6 +27,10 @@ const props = defineProps<{
   hasMore?: boolean;
   selectedFile?: ImageFile | null;
   selectedFilePaths?: Set<string>;
+  contextKey?: string;
+  fileRevision?: number;
+  emptyMessage?: string;
+  emptyActionText?: string;
 }>();
 
 const emit = defineEmits<{
@@ -34,6 +39,7 @@ const emit = defineEmits<{
   (e: "toggleSelect", file: ImageFile): void;
   (e: "toggleAll"): void;
   (e: "loadMore"): void;
+  (e: "recover"): void;
 }>();
 
 const ROW_HEIGHT = 46;
@@ -45,6 +51,23 @@ const scrollTop = ref(0);
 const containerHeight = ref(0);
 let scrollFrame: number | null = null;
 let resizeFrame: number | null = null;
+
+const navigation = useGalleryNavigation({
+  element: containerRef,
+  key: () => props.contextKey ?? "all",
+  files: () => props.files,
+  revision: () => props.fileRevision ?? 0,
+  loading: () => props.loading,
+  hasMore: () => !!props.hasMore,
+  loadingMore: () => !!props.loadingMore,
+  top: (index) => index * ROW_HEIGHT,
+  itemHeight: () => ROW_HEIGHT,
+  firstVisible: () => Math.floor(scrollTop.value / ROW_HEIGHT),
+  loadMore: () => emit("loadMore"),
+  onRestore: (top) => {
+    scrollTop.value = top;
+  },
+});
 
 const startRow = computed(() => {
   const raw = Math.floor(scrollTop.value / ROW_HEIGHT);
@@ -73,6 +96,7 @@ function onScroll(e: Event) {
   scrollFrame = requestAnimationFrame(() => {
     scrollTop.value = target.scrollTop;
     scrollFrame = null;
+    navigation.save();
     maybeRequestMore();
   });
 }
@@ -182,10 +206,19 @@ function size(meta: ImageFile["metadata"]): string {
 <template>
   <section class="files">
     <p v-if="loading" class="empty">{{ t.view.loading }}</p>
-    <p v-else-if="!files.length" class="empty">{{ t.view.selectFolderPrompt }}</p>
+    <div v-else-if="!files.length" class="empty empty-state">
+      <span class="empty-state-message">{{ emptyMessage || t.review.noMatches }}</span>
+      <button
+        type="button"
+        class="empty-state-btn"
+        @click="emit('recover')"
+      >
+        {{ emptyActionText || t.review.retry }}
+      </button>
+    </div>
 
     <div v-else ref="containerRef" class="scroll" @scroll.passive="onScroll">
-      <table class="table">
+      <table class="table" role="table" :aria-label="t.review.gallery">
         <thead class="sticky-header">
           <tr>
             <th class="th-checkbox">
@@ -302,10 +335,40 @@ function size(meta: ImageFile["metadata"]): string {
 }
 
 .empty {
-  color: #71717a;
+  color: var(--color-text-secondary);
   font-size: 0.85em;
   padding: 2rem;
   text-align: center;
+}
+
+.empty.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.empty-state-message {
+  font-size: 0.95rem;
+  color: var(--color-text-secondary);
+}
+
+.empty-state-btn {
+  padding: 6px 16px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border-radius: 6px;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.empty-state-btn:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-primary);
 }
 
 .scroll {

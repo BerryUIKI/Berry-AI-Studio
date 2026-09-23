@@ -24,6 +24,7 @@ import { t } from "../i18n";
 import { resolveStackHeroPaths } from "../utils/stack";
 import { calculateGalleryColumns } from "../utils/gallery-layout";
 import { hasActiveDialog, isEditableTarget } from "../utils/dialog";
+import { useGalleryNavigation } from "../utils/gallery-navigation";
 
 const props = withDefaults(
   defineProps<{
@@ -42,6 +43,9 @@ const props = withDefaults(
     expandedStacks?: Set<string>;
     layout?: "grid" | "masonry";
     contextKey?: string;
+    fileRevision?: number;
+    emptyMessage?: string;
+    emptyActionText?: string;
   }>(),
   {
     selectedFile: null,
@@ -66,6 +70,7 @@ const emit = defineEmits<{
   (e: "compareStack", stackId: string): void;
   (e: "cullStack", stackId: string): void;
   (e: "loadMore"): void;
+  (e: "recover"): void;
 }>();
 
 const containerRef = ref<HTMLElement | null>(null);
@@ -86,26 +91,6 @@ function retryImage(file: ImageFile) {
   getThumbnailUrl(file, Math.max(itemWidth.value, rowHeight.value)).catch(() => {});
 }
 
-// Persist and restore gallery scroll position per folder/search context
-const contextScrollPositions = new Map<string, number>();
-
-watch(
-  () => props.contextKey,
-  (newKey, oldKey) => {
-    if (oldKey !== undefined && containerRef.value) {
-      contextScrollPositions.set(oldKey, containerRef.value.scrollTop);
-    }
-    if (newKey !== undefined && containerRef.value) {
-      const saved = contextScrollPositions.get(newKey) ?? 0;
-      requestAnimationFrame(() => {
-        if (containerRef.value) {
-          containerRef.value.scrollTop = saved;
-          scrollTop.value = saved;
-        }
-      });
-    }
-  },
-);
 
 function toggleNsfwReveal(path: string) {
   if (revealedNsfw.value.has(path)) {
@@ -182,6 +167,7 @@ function onScroll(e: Event) {
   scrollFrame = requestAnimationFrame(() => {
     scrollTop.value = target.scrollTop;
     scrollFrame = null;
+    navigation.save();
     maybeRequestMore();
   });
 }
@@ -334,6 +320,42 @@ const visibleItems = computed(() => {
 });
 
 const translateY = computed(() => startRow.value * rowHeight.value);
+
+const navigation = useGalleryNavigation({
+  element: containerRef,
+  key: () => props.contextKey ?? "all",
+  files: () => props.files,
+  revision: () => props.fileRevision ?? 0,
+  loading: () => props.loading,
+  hasMore: () => props.hasMore,
+  loadingMore: () => props.loadingMore,
+  top: (index) => {
+    if (props.layout === "masonry") {
+      return masonryItems.value[index]?.top ?? 0;
+    }
+    return Math.floor(index / cols.value) * rowHeight.value;
+  },
+  itemHeight: (index) => {
+    if (props.layout === "masonry") {
+      return masonryItems.value[index]?.height ?? cardHeight.value;
+    }
+    return cardHeight.value;
+  },
+  firstVisible: () => {
+    if (props.layout === "masonry") {
+      return (
+        visibleMasonryItems.value.find(
+          (item) => item.top + item.height >= scrollTop.value,
+        )?.index ?? 0
+      );
+    }
+    return Math.floor(scrollTop.value / rowHeight.value) * cols.value;
+  },
+  loadMore: () => emit("loadMore"),
+  onRestore: (top) => {
+    scrollTop.value = top;
+  },
+});
 
 // A revision signal keeps rendering reactive without retaining a second,
 // unbounded URL map beside the shared LRU thumbnail cache.
@@ -622,8 +644,15 @@ function onDragStart(e: DragEvent, file: ImageFile) {
 <template>
   <div class="virtual-grid-wrapper">
     <div v-if="loading" class="grid-placeholder">{{ t.view.loading }}</div>
-    <div v-else-if="!files.length" class="grid-placeholder">
-      {{ t.view.selectFolderPrompt }}
+    <div v-else-if="!files.length" class="grid-placeholder empty-state">
+      <div class="empty-state-message">{{ emptyMessage || t.review.noMatches }}</div>
+      <button
+        type="button"
+        class="empty-state-btn"
+        @click="emit('recover')"
+      >
+        {{ emptyActionText || t.review.retry }}
+      </button>
     </div>
 
     <div
@@ -632,7 +661,7 @@ function onDragStart(e: DragEvent, file: ImageFile) {
       class="virtual-grid-container"
       :class="{ 'is-masonry': layout === 'masonry' }"
       role="grid"
-      aria-label="Image gallery grid"
+      :aria-label="t.review.gallery"
       tabindex="0"
       @scroll.passive="onScroll"
     >
@@ -974,8 +1003,35 @@ function onDragStart(e: DragEvent, file: ImageFile) {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #888;
+  color: var(--color-text-secondary);
   font-size: 0.9em;
+}
+
+.grid-placeholder.empty-state {
+  flex-direction: column;
+  gap: 12px;
+}
+
+.empty-state-message {
+  font-size: 0.95rem;
+  color: var(--color-text-secondary);
+}
+
+.empty-state-btn {
+  padding: 6px 16px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border-radius: 6px;
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.empty-state-btn:hover {
+  background: var(--color-bg-hover);
+  border-color: var(--color-primary);
 }
 
 .virtual-phantom {
