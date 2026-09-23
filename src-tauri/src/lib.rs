@@ -112,6 +112,7 @@ pub fn run() {
             commands::get_app_info,
             commands::add_folder,
             commands::list_folders,
+            commands::list_subdirectories,
             commands::remove_folder,
             commands::list_files,
             commands::query_files,

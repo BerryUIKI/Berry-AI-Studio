@@ -42,6 +42,8 @@ export const es: typeof en = {
     tags: "Etiquetas",
     newTag: "+ Nueva",
     noTags: "Sin etiquetas.",
+    recursiveMode: "Subcarpetas",
+    singleLevelMode: "Carpeta actual",
   },
   search: {
     placeholder: "Buscar prompts, modelos, parámetros... (ej: prompt:cat steps:>=20)",

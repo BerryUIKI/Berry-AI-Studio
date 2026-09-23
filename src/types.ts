@@ -386,6 +386,8 @@ export interface SearchCriteria {
   album_id?: number | null;
   tag_id?: number | null;
   folder_id?: number | null;
+  folder_path?: string | null;
+  recursive?: boolean | null;
   stack_id?: string | null;
   media_type?: string | null;
   min_duration?: number | null;
@@ -399,11 +401,18 @@ export interface SearchCriteria {
   cursor?: PageCursor | null;
 }
 
+export interface SubdirectoryEntry {
+  name: string;
+  path: string;
+  has_children: boolean;
+  file_count: number;
+}
+
 export type NavTarget =
   | { type: "all" }
   | { type: "favorites" }
   | { type: "nsfw" }
-  | { type: "folder"; folder: Folder }
+  | { type: "folder"; folder: Folder; subfolderPath?: string | null; recursive?: boolean }
   | { type: "album"; album: Album }
   | { type: "tag"; tag: Tag };
 

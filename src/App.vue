@@ -745,8 +745,14 @@ const targetTitle = computed(() => {
       return t.value.nav.favorites;
     case "nsfw":
       return t.value.nav.sensitive;
-    case "folder":
-      return activeTarget.value.folder.path.split(/[\\/]/).pop() || activeTarget.value.folder.path;
+    case "folder": {
+      const rootName = activeTarget.value.folder.path.split(/[\\/]/).pop() || activeTarget.value.folder.path;
+      if (activeTarget.value.subfolderPath) {
+        const subName = activeTarget.value.subfolderPath.split(/[\\/]/).pop() || activeTarget.value.subfolderPath;
+        return `📁 ${rootName} / ${subName}`;
+      }
+      return rootName;
+    }
     case "album":
       return `📚 ${activeTarget.value.album.name}`;
     case "tag":
@@ -764,7 +770,7 @@ const galleryContextKey = computed(() =>
   JSON.stringify({
     target:
       activeTarget.value.type === "folder"
-        ? ["folder", activeTarget.value.folder.id]
+        ? ["folder", activeTarget.value.folder.id, activeTarget.value.subfolderPath, activeTarget.value.recursive]
         : activeTarget.value.type === "album"
           ? ["album", activeTarget.value.album.id]
           : activeTarget.value.type === "tag"
@@ -1548,12 +1554,30 @@ function currentPagedCriteria(offset: number, cursor?: PageCursor | null): Searc
     offset,
     cursor: cursor ?? null,
   };
-  if (activeTarget.value.type === "folder") criteria.folder_id = activeTarget.value.folder.id;
+  if (activeTarget.value.type === "folder") {
+    criteria.folder_id = activeTarget.value.folder.id;
+    if (activeTarget.value.subfolderPath) {
+      criteria.folder_path = activeTarget.value.subfolderPath;
+    }
+    if (activeTarget.value.recursive !== undefined) {
+      criteria.recursive = activeTarget.value.recursive;
+    }
+  }
   else if (activeTarget.value.type === "favorites") criteria.is_favorite = true;
   else if (activeTarget.value.type === "nsfw") criteria.is_nsfw = true;
   else if (activeTarget.value.type === "album") criteria.album_id = activeTarget.value.album.id;
   else if (activeTarget.value.type === "tag") criteria.tag_id = activeTarget.value.tag.id;
   return criteria;
+}
+
+function toggleRecursiveView() {
+  if (activeTarget.value.type !== "folder") return;
+  const isRecursive = activeTarget.value.recursive ?? (activeTarget.value.subfolderPath ? false : true);
+  activeTarget.value = {
+    ...activeTarget.value,
+    recursive: !isRecursive,
+  };
+  void loadFiles();
 }
 
 async function loadMoreFiles() {
@@ -2028,6 +2052,17 @@ function onResetZoom() {
               {{ targetTitle }}
               <span class="items-count-badge">({{ galleryTotal }})</span>
             </h2>
+            <button
+              v-if="activeTarget.type === 'folder'"
+              type="button"
+              class="recursive-view-toggle-btn"
+              :class="{ active: activeTarget.recursive ?? (activeTarget.subfolderPath ? false : true) }"
+              :title="(activeTarget.recursive ?? (activeTarget.subfolderPath ? false : true)) ? t.nav.recursiveMode : t.nav.singleLevelMode"
+              @click="toggleRecursiveView"
+            >
+              <span class="mode-icon">{{ (activeTarget.recursive ?? (activeTarget.subfolderPath ? false : true)) ? '🌳' : '📄' }}</span>
+              <span class="mode-label">{{ (activeTarget.recursive ?? (activeTarget.subfolderPath ? false : true)) ? t.nav.recursiveMode : t.nav.singleLevelMode }}</span>
+            </button>
           </div>
 
           <!-- Search Bar & Filter Chips -->
@@ -2515,10 +2550,38 @@ function onResetZoom() {
 .topbar-left {
   display: flex;
   align-items: center;
-  max-width: 160px;
+  gap: 8px;
+  max-width: 260px;
   min-width: 0;
   flex-shrink: 0;
   overflow: hidden;
+}
+
+.recursive-view-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--color-bg-secondary, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  color: var(--color-text-secondary, #94a3b8);
+  font-size: 0.72rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.12s ease;
+  flex-shrink: 0;
+}
+
+.recursive-view-toggle-btn:hover {
+  background: var(--color-bg-hover, rgba(255, 255, 255, 0.1));
+  color: var(--color-text-primary, #f8fafc);
+}
+
+.recursive-view-toggle-btn.active {
+  background: rgba(139, 92, 246, 0.2);
+  border-color: rgba(139, 92, 246, 0.4);
+  color: #c4b5fd;
 }
 
 .target-title {
@@ -2731,8 +2794,11 @@ function onResetZoom() {
   .filter-label {
     display: none;
   }
+  .recursive-view-toggle-btn .mode-label {
+    display: none;
+  }
   .topbar-left {
-    max-width: 100px;
+    max-width: 140px;
   }
 }
 

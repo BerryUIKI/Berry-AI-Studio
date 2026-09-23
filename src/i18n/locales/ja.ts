@@ -42,6 +42,8 @@ export const ja: typeof en = {
     tags: "タグ",
     newTag: "+ 新規",
     noTags: "タグがありません。",
+    recursiveMode: "サブフォルダ含む",
+    singleLevelMode: "このフォルダのみ",
   },
   search: {
     placeholder: "プロンプト、モデル、パラメータを検索... (例: prompt:cat steps:>=20)",
