@@ -30,6 +30,8 @@ Exit: each issue's functional cases pass, production helper tests run in CI, and
 
 ## Phase 3 — Coordinated identity activation
 
+Use [OMERA_RENAME_EXECUTION.md](OMERA_RENAME_EXECUTION.md) for the complete rename work packages, ownership and verification matrix. Its R1 presentation work may precede this phase; runtime identity activation may not.
+
 Lead: switch to `com.berryuiki.omera`, `omera.db`, `omera_*`, Omera credentials, executable/packages/crates and the Omera repository only after migration services are ready. Audit source, workflow, installer, backup format and exported branding. Preserve compatibility aliases and historical migrations. Review E12 version tooling and E9 branding integration.
 
 Engineers: update localized presentation against the approved brand constants; implement migration progress/source-choice/cleanup UI against the lead-owned commands. Show exact previewed cleanup paths; keep the default action non-destructive.
