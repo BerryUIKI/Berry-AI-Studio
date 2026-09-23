@@ -9,6 +9,7 @@
 
 mod db;
 mod engine;
+pub mod legacy_migration;
 mod migration_export;
 mod migrations;
 pub mod recovery;

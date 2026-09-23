@@ -3927,6 +3927,96 @@ pub fn cloud_sync_get_summary(
     Ok(st.summary.clone())
 }
 
+#[tauri::command]
+pub fn get_legacy_migration_status(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<berry_domain::LegacyMigrationStatus, String> {
+    let mut coordinator = state
+        .migration_coordinator
+        .lock()
+        .map_err(|e| e.to_string())?;
+    coordinator.get_status(&app)
+}
+
+#[tauri::command]
+pub fn preview_legacy_migration(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    source_id: String,
+) -> Result<berry_domain::LegacyMigrationPreview, String> {
+    let mut coordinator = state
+        .migration_coordinator
+        .lock()
+        .map_err(|e| e.to_string())?;
+    coordinator.preview_migration(&app, &source_id)
+}
+
+#[tauri::command]
+pub fn start_legacy_migration(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    plan_id: String,
+) -> Result<berry_domain::LegacyMigrationJob, String> {
+    let mut coordinator = state
+        .migration_coordinator
+        .lock()
+        .map_err(|e| e.to_string())?;
+    coordinator.start_migration(&app, &plan_id)
+}
+
+#[tauri::command]
+pub fn get_legacy_migration_job(
+    state: State<'_, AppState>,
+    job_id: String,
+) -> Result<berry_domain::LegacyMigrationJob, String> {
+    let coordinator = state
+        .migration_coordinator
+        .lock()
+        .map_err(|e| e.to_string())?;
+    coordinator.get_job(&job_id)
+}
+
+#[tauri::command]
+pub fn preview_legacy_cleanup(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    receipt_id: String,
+) -> Result<berry_domain::LegacyCleanupPreview, String> {
+    let mut coordinator = state
+        .migration_coordinator
+        .lock()
+        .map_err(|e| e.to_string())?;
+    coordinator.preview_cleanup(&app, &receipt_id)
+}
+
+#[tauri::command]
+pub fn confirm_legacy_cleanup(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    preview_id: String,
+    confirmed: bool,
+) -> Result<berry_domain::LegacyCleanupResult, String> {
+    let mut coordinator = state
+        .migration_coordinator
+        .lock()
+        .map_err(|e| e.to_string())?;
+    coordinator.confirm_cleanup(&app, &preview_id, confirmed)
+}
+
+#[tauri::command]
+pub fn defer_legacy_cleanup(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    receipt_id: String,
+) -> Result<(), String> {
+    let mut coordinator = state
+        .migration_coordinator
+        .lock()
+        .map_err(|e| e.to_string())?;
+    coordinator.defer_cleanup(&app, &receipt_id)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
