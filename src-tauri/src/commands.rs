@@ -543,6 +543,14 @@ pub fn count_album_files(album_id: i64, state: State<'_, AppState>) -> Result<i6
         .map_err(|e| e.to_string())
 }
 
+/// Return file counts grouped by album ID.
+#[tauri::command]
+pub fn get_album_counts(state: State<'_, AppState>) -> Result<HashMap<i64, i64>, String> {
+    db(&state)?
+        .album_counts()
+        .map_err(|error| error.to_string())
+}
+
 /// List files in an album.
 #[tauri::command]
 pub fn list_album_files(

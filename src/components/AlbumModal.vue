@@ -35,11 +35,12 @@ async function loadAlbums() {
   loading.value = true;
   error.value = "";
   try {
-    albums.value = await invoke<Album[]>("list_albums");
-    for (const album of albums.value) {
-      const count = await invoke<number>("count_album_files", { albumId: album.id });
-      albumCounts.value[album.id] = count;
-    }
+    const [fetchedAlbums, counts] = await Promise.all([
+      invoke<Album[]>("list_albums"),
+      invoke<Record<number, number>>("get_album_counts"),
+    ]);
+    albums.value = fetchedAlbums;
+    albumCounts.value = counts;
   } catch (e) {
     error.value = String(e);
   } finally {

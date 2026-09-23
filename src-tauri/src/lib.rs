@@ -41,7 +41,7 @@ pub fn run() {
             let database_path = data_dir.join("berry.db");
             let db = Database::connect(&database_path)?;
             let folders = db.list_folders()?;
-            let mut filesystem_watcher =
+            let filesystem_watcher =
                 match watcher::LibraryWatcher::new(app.handle().clone(), database_path.clone()) {
                     Ok(watcher) => Some(watcher),
                     Err(error) => {
@@ -49,13 +49,6 @@ pub fn run() {
                         None
                     }
                 };
-            if let Some(watcher) = filesystem_watcher.as_mut() {
-                for folder in &folders {
-                    if let Err(error) = watcher.watch_folder(folder) {
-                        eprintln!("could not watch folder {}: {error}", folder.path);
-                    }
-                }
-            }
             app.manage(AppState {
                 db: Mutex::new(db),
                 tagger: Mutex::new(None),
@@ -63,6 +56,20 @@ pub fn run() {
                 watcher: Mutex::new(filesystem_watcher),
                 thumbnail_generation: Arc::new(AtomicU64::new(0)),
                 cloud_sync: Arc::new(Mutex::new(cloud_sync::CloudSyncState::default())),
+            });
+            let app_handle = app.handle().clone();
+            std::thread::spawn(move || {
+                if let Some(state) = app_handle.try_state::<AppState>() {
+                    for folder in folders {
+                        if let Ok(mut watcher) = state.watcher.lock() {
+                            if let Some(watcher) = watcher.as_mut() {
+                                if let Err(error) = watcher.watch_folder(&folder) {
+                                    eprintln!("could not watch folder {}: {error}", folder.path);
+                                }
+                            }
+                        }
+                    }
+                }
             });
             let thumbnail_data_dir = data_dir.clone();
             let thumbnail_database_path = database_path.clone();
@@ -119,6 +126,7 @@ pub fn run() {
             commands::remove_file_from_album,
             commands::remove_files_from_album,
             commands::count_album_files,
+            commands::get_album_counts,
             commands::list_album_files,
             commands::create_tag,
             commands::list_tags,
