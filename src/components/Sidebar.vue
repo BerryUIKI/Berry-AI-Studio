@@ -29,6 +29,7 @@ const emit = defineEmits<{
   openAddFolderModal: [];
   moveFilesToFolder: [payload: { filePaths: string[]; folderId: number }];
   addFilesToAlbum: [payload: { fileIds: number[]; albumId: number }];
+  importExternalFilesToAlbum: [payload: { filePaths: string[]; albumId: number }];
   tagFiles: [payload: { fileIds: number[]; tagId: number }];
   toggleCollapse: [];
 }>();
@@ -130,17 +131,65 @@ function onDropOnFolder(e: DragEvent, folder: Folder) {
 function onDropOnAlbum(e: DragEvent, album: Album) {
   e.preventDefault();
   const data = e.dataTransfer?.getData("application/json");
-  if (!data) return;
-  try {
-    const payload = JSON.parse(data);
-    if (payload.file_ids && payload.file_ids.length > 0) {
-      emit("addFilesToAlbum", {
-        fileIds: payload.file_ids,
+  if (data) {
+    try {
+      const payload = JSON.parse(data);
+      if (payload.file_ids && payload.file_ids.length > 0) {
+        emit("addFilesToAlbum", {
+          fileIds: payload.file_ids,
+          albumId: album.id,
+        });
+        return;
+      }
+    } catch (err) {
+      console.error("Drop on album parse error:", err);
+    }
+  }
+
+  // Handle external OS file drops
+  const droppedFiles = e.dataTransfer?.files;
+  if (droppedFiles && droppedFiles.length > 0) {
+    const filePaths: string[] = [];
+    for (let i = 0; i < droppedFiles.length; i++) {
+      const f = droppedFiles[i] as any;
+      if (f.path) {
+        filePaths.push(f.path);
+      }
+    }
+    if (filePaths.length > 0) {
+      emit("importExternalFilesToAlbum", {
+        filePaths,
+        albumId: album.id,
+      });
+      return;
+    }
+  }
+
+  // Handle URI / plain text drop fallback
+  const text = e.dataTransfer?.getData("text/plain") || e.dataTransfer?.getData("text/uri-list");
+  if (text) {
+    const lines = text.split(/[\r\n]+/).map((s) => s.trim()).filter(Boolean);
+    const filePaths: string[] = [];
+    for (const line of lines) {
+      if (line.startsWith("file://")) {
+        try {
+          const url = new URL(line);
+          let pathname = decodeURIComponent(url.pathname);
+          if (/^\/[a-zA-Z]:/.test(pathname)) {
+            pathname = pathname.substring(1);
+          }
+          filePaths.push(pathname);
+        } catch {}
+      } else if (/^[a-zA-Z]:[\\/]/.test(line) || line.startsWith("/")) {
+        filePaths.push(line);
+      }
+    }
+    if (filePaths.length > 0) {
+      emit("importExternalFilesToAlbum", {
+        filePaths,
         albumId: album.id,
       });
     }
-  } catch (err) {
-    console.error("Drop on album parse error:", err);
   }
 }
 

@@ -143,6 +143,7 @@ pub fn run() {
             commands::count_album_files,
             commands::get_album_counts,
             commands::list_album_files,
+            commands::import_files_to_managed_vault,
             commands::create_tag,
             commands::list_tags,
             commands::delete_tag,

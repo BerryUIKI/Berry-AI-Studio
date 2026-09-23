@@ -572,6 +572,183 @@ pub fn list_album_files(
         .map_err(|e| e.to_string())
 }
 
+/// Ingest external files into a managed vault folder and optionally associate with an album.
+#[tauri::command]
+pub fn import_files_to_managed_vault(
+    file_paths: Vec<String>,
+    target_folder_id: Option<i64>,
+    target_album_id: Option<i64>,
+    state: State<'_, AppState>,
+) -> Result<Vec<i64>, String> {
+    let db = db(&state)?;
+    import_files_to_managed_vault_inner(&db, &file_paths, target_folder_id, target_album_id)
+}
+
+pub fn import_files_to_managed_vault_inner(
+    db: &Database,
+    file_paths: &[String],
+    target_folder_id: Option<i64>,
+    target_album_id: Option<i64>,
+) -> Result<Vec<i64>, String> {
+    if file_paths.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let managed_folder = {
+        let folders = db.list_folders().map_err(|e| e.to_string())?;
+
+        if let Some(target_id) = target_folder_id {
+            folders
+                .into_iter()
+                .find(|f| f.id == target_id && f.folder_type == "managed")
+                .ok_or_else(|| format!("Target folder {target_id} is not a managed vault folder"))?
+        } else {
+            folders
+                .into_iter()
+                .find(|f| f.folder_type == "managed")
+                .ok_or_else(|| {
+                    "No managed vault folder found. Please create a managed vault folder first."
+                        .to_string()
+                })?
+        }
+    };
+
+    let dest_dir = Path::new(&managed_folder.path);
+    std::fs::create_dir_all(dest_dir)
+        .map_err(|e| format!("Failed to create destination directory: {e}"))?;
+
+    let supported_exts = ["png", "jpg", "jpeg", "webp", "mp4", "webm"];
+    let now_ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs() as i64;
+
+    let mut imported_ids = Vec::new();
+
+    for src_path_str in file_paths {
+        let src_path = Path::new(&src_path_str);
+        if !src_path.is_file() {
+            continue;
+        }
+
+        let ext = src_path
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+
+        if !supported_exts.contains(&ext.as_str()) {
+            continue;
+        }
+
+        let meta = match src_path.metadata() {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+
+        if meta.len() == 0 {
+            continue;
+        }
+
+        let file_mtime = meta
+            .modified()
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(now_ts);
+
+        let file_name = match src_path.file_name() {
+            Some(n) => n.to_string_lossy().to_string(),
+            None => continue,
+        };
+
+        let mut dest_path = dest_dir.join(&file_name);
+        if dest_path.exists() {
+            let is_same = dest_path
+                .metadata()
+                .map(|m| m.len() == meta.len())
+                .unwrap_or(false);
+            if !is_same {
+                let stem = src_path
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("file");
+                let ext_part = if ext.is_empty() {
+                    String::new()
+                } else {
+                    format!(".{ext}")
+                };
+                let mut counter = 1;
+                while dest_path.exists() {
+                    dest_path = dest_dir.join(format!("{stem}_{counter}{ext_part}"));
+                    counter += 1;
+                }
+            }
+        }
+
+        if !dest_path.exists() {
+            std::fs::copy(src_path, &dest_path)
+                .map_err(|e| format!("Failed to copy {src_path_str} to destination: {e}"))?;
+
+            for sidecar_ext in ["txt", "json"] {
+                let src_sidecar = src_path.with_extension(sidecar_ext);
+                if src_sidecar != src_path && src_sidecar.is_file() {
+                    let dest_sidecar = dest_path.with_extension(sidecar_ext);
+                    let _ = std::fs::copy(&src_sidecar, &dest_sidecar);
+                }
+            }
+        }
+
+        let container = match ext.as_str() {
+            "png" => berry_domain::Container::Png,
+            "jpg" | "jpeg" => berry_domain::Container::Jpeg,
+            "webp" => berry_domain::Container::WebP,
+            "mp4" => berry_domain::Container::Mp4,
+            "webm" => berry_domain::Container::Webm,
+            _ => continue,
+        };
+
+        let metadata = berry_metadata::extract_metadata(container, &dest_path);
+        let tgt_str = {
+            let canonical = dest_path
+                .canonicalize()
+                .unwrap_or_else(|_| dest_path.clone());
+            let text = canonical.to_string_lossy();
+            text.strip_prefix(r"\\?\").unwrap_or(&text).to_string()
+        };
+
+        let image_file = ImageFile {
+            id: None,
+            folder_id: managed_folder.id,
+            path: tgt_str.clone(),
+            size_bytes: meta.len(),
+            modified_at: file_mtime,
+            container,
+            metadata,
+            rating: None,
+            aesthetic_score: None,
+            is_favorite: false,
+            is_nsfw: false,
+            stack_id: None,
+            stack_order: 0,
+        };
+
+        let file_id = match db.get_file_by_path(&tgt_str).map_err(|e| e.to_string())? {
+            Some(existing) if existing.id.is_some() => existing.id.unwrap(),
+            _ => db.upsert_file(&image_file).map_err(|e| e.to_string())?,
+        };
+
+        if let Some(album_id) = target_album_id {
+            db.add_file_to_album(album_id, file_id)
+                .map_err(|e| e.to_string())?;
+        }
+
+        imported_ids.push(file_id);
+    }
+
+    Ok(imported_ids)
+}
+
 // --- Tags ---
 
 /// Create a tag.
@@ -3691,5 +3868,67 @@ mod tests {
             .saturating_sub(indexed_total)
             .saturating_sub(failed_count);
         assert_eq!(remaining, 5);
+    }
+
+    #[test]
+    fn test_import_files_to_managed_vault() {
+        let temp_dir =
+            std::env::temp_dir().join(format!("omera_test_managed_{}", std::process::id()));
+        let vault_dir = temp_dir.join("vault");
+        let external_dir = temp_dir.join("external");
+        std::fs::create_dir_all(&vault_dir).unwrap();
+        std::fs::create_dir_all(&external_dir).unwrap();
+
+        let db = Database::connect_in_memory().unwrap();
+        let folder = db
+            .add_folder_with_mode(
+                &vault_dir.to_string_lossy(),
+                "managed",
+                None,
+                None,
+                None,
+                true,
+            )
+            .unwrap();
+
+        let album = db.create_album("My Managed Album", None).unwrap();
+
+        let ext_img = external_dir.join("sample.png");
+        let png_bytes = [
+            0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48,
+            0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00,
+            0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54, 0x78,
+            0x9C, 0x63, 0x00, 0x01, 0x00, 0x00, 0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00,
+            0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+        ];
+        std::fs::write(&ext_img, &png_bytes).unwrap();
+        let ext_sidecar = external_dir.join("sample.txt");
+        std::fs::write(&ext_sidecar, "masterpiece, best quality, 1girl").unwrap();
+
+        let paths = vec![ext_img.to_string_lossy().to_string()];
+        let imported =
+            import_files_to_managed_vault_inner(&db, &paths, Some(folder.id), Some(album.id))
+                .unwrap();
+
+        assert_eq!(imported.len(), 1);
+        let file_id = imported[0];
+        let file = db
+            .get_file_by_id(file_id)
+            .unwrap()
+            .expect("file exists in db");
+        assert_eq!(file.folder_id, folder.id);
+
+        let dest_img = std::path::Path::new(&file.path);
+        assert!(dest_img.exists());
+        let dest_sidecar = dest_img.with_extension("txt");
+        assert!(dest_sidecar.exists());
+        let sidecar_content = std::fs::read_to_string(dest_sidecar).unwrap();
+        assert_eq!(sidecar_content, "masterpiece, best quality, 1girl");
+
+        let album_files = db.list_album_files(album.id).unwrap();
+        assert_eq!(album_files.len(), 1);
+        assert_eq!(album_files[0].id, Some(file_id));
+
+        let _ = std::fs::remove_dir_all(temp_dir);
     }
 }

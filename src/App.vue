@@ -1764,6 +1764,27 @@ async function onDropAddFilesToAlbum(payload: { fileIds: number[]; albumId: numb
   }
 }
 
+async function onDropImportExternalFilesToAlbum(payload: { filePaths: string[]; albumId: number }) {
+  try {
+    const currentManagedId = (activeTarget.value.type === "folder" && activeTarget.value.folder.folder_type === "managed" ? activeTarget.value.folder.id : null)
+      || folders.value.find((f) => f.folder_type === "managed")?.id
+      || null;
+
+    const importedIds = await invoke<number[]>("import_files_to_managed_vault", {
+      filePaths: payload.filePaths,
+      targetFolderId: currentManagedId,
+      targetAlbumId: payload.albumId,
+    });
+    if (importedIds && importedIds.length > 0) {
+      await loadAlbumsAndTags();
+      await refreshCounts();
+      await loadFiles();
+    }
+  } catch (err) {
+    error.value = String(err);
+  }
+}
+
 async function onDropTagFiles(payload: { fileIds: number[]; tagId: number }) {
   try {
     await invoke("tag_files", {
@@ -1993,6 +2014,7 @@ function onResetZoom() {
         @open-add-folder-modal="addFolderModalOpen = true"
         @move-files-to-folder="onDropMoveFiles"
         @add-files-to-album="onDropAddFilesToAlbum"
+        @import-external-files-to-album="onDropImportExternalFilesToAlbum"
         @tag-files="onDropTagFiles"
       />
 
