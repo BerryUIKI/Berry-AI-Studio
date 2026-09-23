@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, shallowRef, triggerRef, watch } from "vue";
 import { GalleryPages } from "./utils/gallery-state";
+import { FileDetailsManager } from "./utils/file-details";
 import { invoke } from "@tauri-apps/api/core";
 import { open as openFolderDialog } from "@tauri-apps/plugin-dialog";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -176,66 +177,54 @@ const activeFilterCount = computed(() => countActiveFilters(activeCriteria.value
 const selectedFile = ref<ImageFile | null>(null);
 const selectedFilePaths = ref<Set<string>>(new Set());
 const selectionAnchorPath = ref<string | null>(null);
-const fileDetailsCache = new Map<string, ImageFile>();
-const fileDetailsInFlight = new Map<string, Promise<ImageFile>>();
-const MAX_FILE_DETAILS_CACHE = 64;
+const fileDetailsManager = new FileDetailsManager(64);
 
-function fileDetailsKey(file: ImageFile): string | null {
-  return file.id == null ? null : `${file.id}:${file.modified_at}`;
-}
+async function hydrateFileDetails(file: ImageFile, force = false) {
+  if (file.id == null) return;
+  const targetId = file.id;
+  const targetRevision = FileDetailsManager.revisionKey(file);
 
-function cacheFileDetails(key: string, file: ImageFile) {
-  fileDetailsCache.delete(key);
-  fileDetailsCache.set(key, file);
-  while (fileDetailsCache.size > MAX_FILE_DETAILS_CACHE) {
-    const oldestKey = fileDetailsCache.keys().next().value;
-    if (oldestKey === undefined) break;
-    fileDetailsCache.delete(oldestKey);
-  }
-}
+  try {
+    const res = await fileDetailsManager.hydrate(
+      file,
+      (fileId) => invoke<ImageFile>("get_file_details", { fileId }),
+      force,
+    );
+    if (!res) return;
 
-async function hydrateFileDetails(file: ImageFile) {
-  const key = fileDetailsKey(file);
-  if (!key || file.id == null) return;
-  let details = fileDetailsCache.get(key);
-  if (!details) {
-    let request = fileDetailsInFlight.get(key);
-    if (!request) {
-      request = invoke<ImageFile>("get_file_details", { fileId: file.id });
-      fileDetailsInFlight.set(key, request);
+    if (
+      selectedFile.value &&
+      selectedFile.value.id === targetId &&
+      FileDetailsManager.revisionKey(selectedFile.value) === targetRevision
+    ) {
+      selectedFile.value = fileDetailsManager.merge(selectedFile.value, res.details);
     }
-    try {
-      details = await request;
-      cacheFileDetails(key, details);
-    } catch (detailError) {
-      console.warn("Failed to load full file details:", detailError);
-      return;
-    } finally {
-      if (fileDetailsInFlight.get(key) === request) fileDetailsInFlight.delete(key);
-    }
-  }
 
-  if (selectedFile.value && fileDetailsKey(selectedFile.value) === key) {
-    selectedFile.value = details;
-  }
-  if (lightboxFile.value && fileDetailsKey(lightboxFile.value) === key) {
-    lightboxFile.value = details;
+    if (
+      lightboxFile.value &&
+      lightboxFile.value.id === targetId &&
+      FileDetailsManager.revisionKey(lightboxFile.value) === targetRevision
+    ) {
+      lightboxFile.value = fileDetailsManager.merge(lightboxFile.value, res.details);
+    }
+  } catch (detailError) {
+    console.warn("Failed to load full file details:", detailError);
   }
 }
 
-watch(
-  () => selectedFile.value?.id,
-  () => {
-    if (selectedFile.value) void hydrateFileDetails(selectedFile.value);
-  },
+const selectedRevisionKey = computed(() =>
+  selectedFile.value ? FileDetailsManager.revisionKey(selectedFile.value) : null,
 );
+watch(selectedRevisionKey, () => {
+  if (selectedFile.value) void hydrateFileDetails(selectedFile.value);
+});
 
-watch(
-  () => lightboxFile.value?.id,
-  () => {
-    if (lightboxFile.value) void hydrateFileDetails(lightboxFile.value);
-  },
+const lightboxRevisionKey = computed(() =>
+  lightboxFile.value ? FileDetailsManager.revisionKey(lightboxFile.value) : null,
 );
+watch(lightboxRevisionKey, () => {
+  if (lightboxFile.value) void hydrateFileDetails(lightboxFile.value);
+});
 
 // Fast lookup map computed once per files change (O(1) lookups on selection)
 const filePathMap = computed(() => {
@@ -906,6 +895,9 @@ async function onBatchRate(rating: number | null) {
 
   try {
     await invoke("set_files_rating", { fileIds: ids, rating });
+    for (const id of ids) {
+      fileDetailsManager.update(id, { rating: rating ?? undefined });
+    }
     const idSet = new Set(ids);
     files.value = files.value.map((f) => {
       if (f.id != null && idSet.has(f.id)) {
@@ -932,6 +924,7 @@ function onLightboxNavigate(file: ImageFile) {
 }
 
 function onFileRated(fileId: number, rating: number | null) {
+  fileDetailsManager.update(fileId, { rating: rating ?? undefined });
   const idx = files.value.findIndex((f) => f.id === fileId);
   if (idx !== -1) {
     const updated = [...files.value];
@@ -1364,6 +1357,9 @@ async function onBatchToggleFavorite(isFavorite: boolean) {
   if (ids.length === 0) return;
   try {
     await invoke("set_files_favorite", { fileIds: ids, isFavorite });
+    for (const id of ids) {
+      fileDetailsManager.update(id, { is_favorite: isFavorite });
+    }
     const updated = files.value.map((f) => {
       if (selectedFilePaths.value.has(f.path)) {
         return { ...f, is_favorite: isFavorite };
@@ -1386,6 +1382,9 @@ async function onBatchToggleNsfw(isNsfw: boolean) {
   if (ids.length === 0) return;
   try {
     await invoke("set_files_nsfw", { fileIds: ids, isNsfw });
+    for (const id of ids) {
+      fileDetailsManager.update(id, { is_nsfw: isNsfw });
+    }
     const updated = files.value.map((f) => {
       if (selectedFilePaths.value.has(f.path)) {
         return { ...f, is_nsfw: isNsfw };
@@ -1426,6 +1425,9 @@ async function onFileOpCompleted() {
 }
 
 function onUpdateFile(file: ImageFile) {
+  if (file.id != null) {
+    fileDetailsManager.update(file.id, file);
+  }
   const idx = files.value.findIndex((f) => f.id === file.id);
   if (idx !== -1) {
     const updated = [...files.value];
@@ -1442,6 +1444,7 @@ function onUpdateFile(file: ImageFile) {
 
 async function loadFiles() {
   const requestVersion = ++libraryRequestVersion;
+  fileDetailsManager.reset();
   similaritySourceFile.value = null;
   rawSimilarityFiles.value = [];
   semanticSearchFiles.value = [];
