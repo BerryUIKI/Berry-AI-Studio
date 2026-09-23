@@ -74,10 +74,10 @@ The source selector must be a validated backend-managed selection, not an arbitr
 
 | Package | Primary owner | Deliverable and acceptance gate |
 | --- | --- | --- |
-| T0: export contract/correctness | Lead for filesystem/privacy contract; engineer for bounded implementation | Codec/extension agreement, effective quality, non-overwrite output, truthful metadata policy, correct ZIP/sidecar errors; regression fixtures for PNG/JPEG/WebP and interruption |
+| [T0: export contract/correctness](https://github.com/BerryUIKI/Omera/issues/158) | Lead for filesystem/privacy contract; engineer for bounded implementation | Codec/extension agreement, effective quality, non-overwrite output, truthful metadata policy, correct ZIP/sidecar errors; regression fixtures for PNG/JPEG/WebP and interruption |
 | T1: export experience | General UI engineer | Preview, estimate, collision selection, localized progress/results; manual directory/ZIP and keyboard matrix |
-| T2: managed import transform | Lead for catalog/filesystem contract; engineer for UI after approval | Verified staging, unchanged source by default, indexing of final image, retry/cancel and insufficient-space cases |
-| T3: existing-library batch | Lead for asset identity, journal, archive/Trash and schema decision; engineer for UI after approval | Crash/restart recovery, preserved relations, no stale thumbnails/embeddings, archive restore and partial-failure evidence |
+| [T2: managed import transform](https://github.com/BerryUIKI/Omera/issues/159) | Lead for catalog/filesystem contract; engineer for UI after approval | Verified staging, unchanged source by default, indexing of final image, retry/cancel and insufficient-space cases |
+| [T3: existing-library batch](https://github.com/BerryUIKI/Omera/issues/160) | Lead for asset identity, journal, archive/Trash and schema decision; engineer for UI after approval | Crash/restart recovery, preserved relations, no stale thumbnails/embeddings, archive restore and partial-failure evidence |
 | T4: advanced controls | General engineer after T0–T3 | Bounded target-size search and optional scaling/alignment with measured runtime/quality tradeoffs |
 
 Use separate PRs targeting `dev`, with one bounded package per PR. Phase gates: identity/migration stability and safe file-operation contracts first; T0/T1 before T2; T2 before T3; T4 last. Required tests include codec signatures/extensions, alpha and orientation, metadata/sidecars, duplicate names in directory and ZIP, read-only/unavailable source, low disk space, cancellation at each publish stage, crash/restart and large batches under a measured memory limit. Test source preservation and actual restore from archive/Trash; a successful mock-only UI test does not qualify destructive behavior.

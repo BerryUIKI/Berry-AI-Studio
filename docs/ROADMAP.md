@@ -174,10 +174,10 @@ Execution order and ownership: [DELIVERY_ROADMAP.md](DELIVERY_ROADMAP.md) and [E
 
 Scope, order, safety gates and handoff: [IMAGE_TRANSFORM_PLAN.md](IMAGE_TRANSFORM_PLAN.md) and [DELIVERY_ROADMAP.md](DELIVERY_ROADMAP.md), Phase 6. This is the Omera-native follow-up to [#118](https://github.com/BerryUIKI/Omera/issues/118), not a claim that its import and batch flows already exist.
 
-- [ ] Fix current export codec/extension, quality, metadata and collision/result correctness; retain directory and ZIP compatibility.
+- [ ] [#158](https://github.com/BerryUIKI/Omera/issues/158): Fix current export codec/extension, quality, metadata and collision/result correctness; retain directory and ZIP compatibility.
 - [ ] Add export preview, size estimate and explicit per-file outcomes.
-- [ ] Add optional compression/conversion while importing into managed storage, retaining external originals by default.
-- [ ] Add verified post-import batch transformation for managed assets with keep/archive/system-Trash choices and recovery.
+- [ ] [#159](https://github.com/BerryUIKI/Omera/issues/159): Add optional compression/conversion while importing into managed storage, retaining external originals by default.
+- [ ] [#160](https://github.com/BerryUIKI/Omera/issues/160): Add verified post-import batch transformation for managed assets with keep/archive/system-Trash choices and recovery.
 - [ ] Evaluate target-size, percentage resize and alignment controls after measuring quality and processing cost.
 
 
