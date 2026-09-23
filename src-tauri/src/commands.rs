@@ -2294,13 +2294,18 @@ pub fn get_image_detected_loras(
 
     let mut detected = Vec::new();
     if let Some(ref meta) = file.metadata {
-        detected = berry_metadata::lora::extract_loras(
+        detected = berry_metadata::lora::extract_loras_full(
             meta.prompt.as_deref(),
-            meta.raw.as_deref().or(meta.parameters.as_deref()),
+            meta.raw.as_deref(),
+            meta.parameters.as_deref(),
         );
         for l in &mut detected {
             if let Ok(Some(m)) = database.find_lora_by_name_or_hash(&l.name) {
                 l.model = Some(m);
+            } else if let Some(ref h) = l.hash {
+                if let Ok(Some(m)) = database.find_lora_by_name_or_hash(h) {
+                    l.model = Some(m);
+                }
             }
         }
     }

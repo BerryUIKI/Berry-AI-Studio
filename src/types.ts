@@ -520,5 +520,6 @@ export interface LoraModel {
 export interface DetectedLora {
   name: string;
   weight: number;
+  hash?: string | null;
   model?: LoraModel | null;
 }
