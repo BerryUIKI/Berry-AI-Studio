@@ -604,13 +604,31 @@ function scrollToIndex(index: number) {
 }
 
 function onDragStart(e: DragEvent, file: ImageFile) {
-  const selectedPaths = props.selectedFilePaths && props.selectedFilePaths.has(file.path)
-    ? Array.from(props.selectedFilePaths)
+  const isMulti = Boolean(props.selectedFilePaths && props.selectedFilePaths.has(file.path));
+  const selectedPaths = isMulti
+    ? Array.from(props.selectedFilePaths!)
     : [file.path];
+
+  let selectedIds: number[] = [];
+  if (isMulti) {
+    const pathSet = props.selectedFilePaths!;
+    const seen = new Set<number>();
+    for (const f of props.files) {
+      if (f.id != null && pathSet.has(f.path) && !seen.has(f.id)) {
+        seen.add(f.id);
+        selectedIds.push(f.id);
+      }
+    }
+    if (selectedIds.length === 0 && file.id != null) {
+      selectedIds = [file.id];
+    }
+  } else if (file.id != null) {
+    selectedIds = [file.id];
+  }
 
   const payload = {
     file_paths: selectedPaths,
-    file_ids: file.id ? [file.id] : [],
+    file_ids: selectedIds,
   };
 
   e.dataTransfer?.setData("application/json", JSON.stringify(payload));
