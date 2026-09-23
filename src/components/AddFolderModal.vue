@@ -512,11 +512,23 @@ function close() {
   font-size: 0.88em;
 }
 
+:root[data-theme="light"] .path-input-group input,
+:root[data-theme="light"] .select-field {
+  background: #fff;
+  color: #111827;
+}
+
 @media (prefers-color-scheme: light) {
   .path-input-group input,
   .select-field {
     background: #fff;
+    color: #111827;
   }
+}
+
+.select-field option {
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
 }
 
 .btn-browse {

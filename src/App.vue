@@ -2337,15 +2337,15 @@ function onResetZoom() {
   height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #18181c;
-  color: #f1f5f9;
+  background: var(--color-bg-app);
+  color: var(--color-text-primary);
   overflow: hidden;
 }
 
 .titlebar-quick-btn {
   background: transparent;
   border: none;
-  color: #71717a;
+  color: var(--color-text-muted);
   width: 32px;
   height: 28px;
   border-radius: 4px;
@@ -2357,8 +2357,8 @@ function onResetZoom() {
 }
 
 .titlebar-quick-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
 }
 
 .titlebar-quick-btn.active {
@@ -2410,7 +2410,7 @@ function onResetZoom() {
   margin: 0;
   font-size: 0.86rem;
   font-weight: 700;
-  color: #f8fafc;
+  color: var(--color-text-primary);
   display: flex;
   align-items: center;
   gap: 5px;
@@ -2422,7 +2422,7 @@ function onResetZoom() {
 .items-count-badge {
   font-size: 0.72rem;
   font-weight: 500;
-  color: #71717a;
+  color: var(--color-text-muted);
   flex-shrink: 0;
 }
 
@@ -2436,9 +2436,9 @@ function onResetZoom() {
 }
 
 .filter-btn {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: #a1a1aa;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--color-text-secondary);
   border-radius: 6px;
   padding: 4px 8px;
   font-size: 0.74rem;
@@ -2453,8 +2453,8 @@ function onResetZoom() {
 }
 
 .filter-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
 }
 
 .filter-btn.active {
@@ -2483,16 +2483,16 @@ function onResetZoom() {
   display: flex;
   align-items: center;
   gap: 5px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--color-bg-secondary);
   padding: 3px 6px;
   border-radius: 5px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
   height: 28px;
   flex-shrink: 0;
 }
 
 .zoom-icon {
-  color: #71717a;
+  color: var(--color-text-muted);
   font-size: 0.65rem;
 }
 
@@ -2509,8 +2509,8 @@ function onResetZoom() {
 
 .view-mode-toggle {
   display: flex;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--border-color);
   border-radius: 5px;
   overflow: hidden;
   height: 28px;
@@ -2520,7 +2520,7 @@ function onResetZoom() {
 .toggle-btn {
   background: transparent;
   border: none;
-  color: #71717a;
+  color: var(--color-text-muted);
   padding: 0 7px;
   font-size: 0.78rem;
   cursor: pointer;
@@ -2531,8 +2531,8 @@ function onResetZoom() {
 }
 
 .toggle-btn:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #ffffff;
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
 }
 
 .toggle-btn.active {

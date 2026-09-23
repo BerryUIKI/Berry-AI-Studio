@@ -485,13 +485,13 @@ function onDropOnTag(e: DragEvent, tag: Tag) {
 }
 
 .nav-item:hover {
-  background: rgba(255, 255, 255, 0.04);
-  color: #e2e8f0;
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
 }
 
 .nav-item.active {
-  background: #27272a;
-  color: #f8fafc;
+  background: var(--color-bg-active);
+  color: var(--color-text-primary);
   font-weight: 600;
 }
 
@@ -564,8 +564,8 @@ function onDropOnTag(e: DragEvent, tag: Tag) {
 }
 
 .icon-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
 }
 
 .icon-btn.remove-btn:hover {
@@ -585,16 +585,16 @@ function onDropOnTag(e: DragEvent, tag: Tag) {
   gap: 5px;
   padding: 2px 8px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--color-bg-hover);
   font-size: 0.74rem;
-  color: #94a3b8;
+  color: var(--color-text-secondary);
   cursor: pointer;
   transition: all 0.12s;
 }
 
 .tag-chip-eagle:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #ffffff;
+  background: var(--color-bg-active);
+  color: var(--color-text-primary);
 }
 
 .tag-chip-eagle.active {

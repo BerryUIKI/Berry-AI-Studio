@@ -61,21 +61,27 @@ function toggleDirection() {
   height: 28px;
   padding: 0 6px;
   border-radius: 5px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: #202024;
-  color: #d4d4d8;
+  border: 1px solid var(--border-color);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
   cursor: pointer;
   outline: none;
   transition: all 0.12s ease;
 }
 
 .sort-select:hover {
-  background: #27272a;
-  border-color: rgba(255, 255, 255, 0.15);
+  background: var(--color-bg-tertiary);
+  border-color: var(--border-color-strong);
 }
 
-.sort-select:focus {
-  border-color: rgba(168, 85, 247, 0.5);
+.sort-select:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.sort-select option {
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
 }
 
 .direction-btn {
@@ -87,15 +93,20 @@ function toggleDirection() {
   align-items: center;
   justify-content: center;
   border-radius: 5px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: #202024;
-  color: #a1a1aa;
+  border: 1px solid var(--border-color);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
   cursor: pointer;
   transition: all 0.12s ease;
 }
 
 .direction-btn:hover {
-  background: #27272a;
-  color: #f4f4f5;
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+}
+
+.direction-btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
 }
 </style>

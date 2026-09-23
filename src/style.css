@@ -38,6 +38,9 @@
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;
+  /* Scrollbars */
+  --scrollbar-thumb: rgba(255, 255, 255, 0.14);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.24);
 }
 
 :root[data-theme="graphite"] {
@@ -71,6 +74,8 @@
   --color-text-muted: #64748b;
   --border-color: rgba(15, 23, 42, 0.12);
   --border-color-strong: rgba(15, 23, 42, 0.22);
+  --scrollbar-thumb: rgba(15, 23, 42, 0.2);
+  --scrollbar-thumb-hover: rgba(15, 23, 42, 0.35);
 }
 
 @media (prefers-color-scheme: light) {
@@ -87,15 +92,16 @@
     --color-text-muted: #64748b;
     --border-color: rgba(15, 23, 42, 0.12);
     --border-color-strong: rgba(15, 23, 42, 0.22);
+    --scrollbar-thumb: rgba(15, 23, 42, 0.2);
+    --scrollbar-thumb-hover: rgba(15, 23, 42, 0.35);
   }
 }
 
 :root[data-theme="light"] .grid-card,
 :root[data-theme="light"] .settings-dialog,
-:root[data-theme="light"] .settings-tabs,
-:root[data-theme="light"] .setting-row,
 :root[data-theme="light"] .about-card,
-:root[data-theme="light"] .parser-item {
+:root[data-theme="light"] .batch-bar,
+:root[data-theme="light"] .rating-menu {
   background: var(--color-bg-primary) !important;
   border-color: var(--border-color) !important;
 }
@@ -104,13 +110,16 @@
 :root[data-theme="light"] .setting-row,
 :root[data-theme="light"] .parser-item {
   background: var(--color-bg-secondary) !important;
+  border-color: var(--border-color) !important;
 }
 
 :root[data-theme="light"] .dialog-title,
 :root[data-theme="light"] .panel-title,
 :root[data-theme="light"] .row-label,
 :root[data-theme="light"] .parser-name,
-:root[data-theme="light"] .card-title {
+:root[data-theme="light"] .card-title,
+:root[data-theme="light"] .target-title,
+:root[data-theme="light"] .brand-title {
   color: var(--color-text-primary) !important;
 }
 
@@ -119,6 +128,67 @@
 :root[data-theme="light"] .card-meta,
 :root[data-theme="light"] .tab-btn {
   color: var(--color-text-secondary) !important;
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-theme="system"] .grid-card,
+  :root[data-theme="system"] .settings-dialog,
+  :root[data-theme="system"] .about-card,
+  :root[data-theme="system"] .batch-bar,
+  :root[data-theme="system"] .rating-menu {
+    background: var(--color-bg-primary) !important;
+    border-color: var(--border-color) !important;
+  }
+
+  :root[data-theme="system"] .settings-tabs,
+  :root[data-theme="system"] .setting-row,
+  :root[data-theme="system"] .parser-item {
+    background: var(--color-bg-secondary) !important;
+    border-color: var(--border-color) !important;
+  }
+
+  :root[data-theme="system"] .dialog-title,
+  :root[data-theme="system"] .panel-title,
+  :root[data-theme="system"] .row-label,
+  :root[data-theme="system"] .parser-name,
+  :root[data-theme="system"] .card-title,
+  :root[data-theme="system"] .target-title,
+  :root[data-theme="system"] .brand-title {
+    color: var(--color-text-primary) !important;
+  }
+
+  :root[data-theme="system"] .panel-subtitle,
+  :root[data-theme="system"] .row-desc,
+  :root[data-theme="system"] .card-meta,
+  :root[data-theme="system"] .tab-btn {
+    color: var(--color-text-secondary) !important;
+  }
+}
+
+/* Global native select & form control readability */
+select,
+input,
+textarea {
+  color-scheme: inherit;
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-primary);
+  border-color: var(--border-color);
+}
+
+select option {
+  color-scheme: inherit;
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-primary);
+}
+
+/* Accessible focus visible outlines */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
 }
 
 *,
@@ -160,10 +230,10 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--scrollbar-thumb);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.22);
+  background: var(--scrollbar-thumb-hover);
 }
