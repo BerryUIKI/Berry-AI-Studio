@@ -31,7 +31,7 @@ Baseline at preparation: `4f57246`. Start from current approved `dev`, record th
 - #134 migration progress/source-choice/cleanup UI: proposed APIs are not registered. Backend preview tokens, receipts and cleanup revalidation must exist first.
 - #128 automatic NSFW classification: persistent manual-override provenance must be specified before automatic writes.
 - File collision/retry UI: stable per-file partial-result DTO from L6/#100 is required; do not parse rejection strings.
-- Identity/crate/setting/database rename: only after the lead's migration activation gate. Do not perform a global replace as a standalone branding task.
+- Identity/crate/setting/database rename: follow [OMERA_RENAME_EXECUTION.md](OMERA_RENAME_EXECUTION.md). R1 visible branding can be assigned now; active identity and data-path changes wait for the lead's migration activation gate. Do not perform a global replace as a standalone branding task.
 - Release publishing: blocked on signing, installer/upgrade matrix and native qualification.
 
 ## Lead review queue

@@ -1,5 +1,7 @@
 # Engineer handoff prompts
 
+For the complete Berry AI Studio → Omera rename, use [OMERA_RENAME_EXECUTION.md](OMERA_RENAME_EXECUTION.md). Dispatch R1 user-visible branding first; its later packages have explicit lead-owned migration and release gates. The older baseline notes below were written before PR #138 merged; always fetch current `dev` and record its exact commit before assigning work.
+
 Use one prompt per assignment. Replace `BASELINE_COMMIT` with the maintainer-provided implementation commit before dispatch. Do not substitute the documentation-only PR commit. Read [ENGINEERING_HANDOFF.md](ENGINEERING_HANDOFF.md) for task cards and [DELIVERY_ROADMAP.md](DELIVERY_ROADMAP.md) for dependencies.
 
 Use [TASK_ASSIGNMENT_BOARD.md](TASK_ASSIGNMENT_BOARD.md) to choose a ready assignment and its baseline. `4f57246` is the current `dev` starting point for independent tasks; `5fabdd8` is an unmerged review snapshot, not automatically approved for integration. If `dev` has advanced, record its new exact SHA and check overlap before dispatch. Validation evidence is in [VALIDATION_STATUS.md](VALIDATION_STATUS.md).
