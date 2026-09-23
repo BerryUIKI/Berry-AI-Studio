@@ -1,5 +1,7 @@
 //! ComfyUI metadata parsing from node graph JSON (`prompt` or `workflow` chunks).
 
+use std::collections::HashSet;
+
 use berry_domain::{ExtractedMetadata, MetadataFormat};
 use serde_json::Value;
 
@@ -162,9 +164,9 @@ pub fn parse_comfyui(json_str: &str) -> Option<ExtractedMetadata> {
         }
     }
 
-    // Fallback: search for prompt / text encode nodes (CLIPTextEncode, WanVideoTextEncode, HyVideoTextEncode, CogVideoTextEncode, etc.)
+    // Fallback: search for prompt / text encode nodes (CLIPTextEncode, CLIPTextEncodeFlux, WanVideoTextEncode, HyVideoTextEncode, CogVideoTextEncode, etc.)
     if prompt.is_none() || negative_prompt.is_none() {
-        for (_node_id, node) in nodes_map {
+        for (node_id, node) in nodes_map {
             let class_type = node
                 .get("class_type")
                 .and_then(|c| c.as_str())
@@ -173,26 +175,16 @@ pub fn parse_comfyui(json_str: &str) -> Option<ExtractedMetadata> {
                 || class_type.contains("TextEncode")
                 || class_type.contains("Prompt");
             if is_text_node {
-                if let Some(inputs) = node.get("inputs") {
-                    let text = inputs
-                        .get("text")
-                        .or_else(|| inputs.get("prompt"))
-                        .or_else(|| inputs.get("astext"))
-                        .or_else(|| inputs.get("positive_prompt"))
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.trim().to_string());
-
-                    if let Some(t) = text {
-                        if !t.is_empty() {
-                            let is_negative = class_type.to_lowercase().contains("negative")
-                                || inputs.get("negative").is_some();
-                            if is_negative && negative_prompt.is_none() {
-                                negative_prompt = Some(t);
-                            } else if prompt.is_none() {
-                                prompt = Some(t);
-                            } else if negative_prompt.is_none() && prompt.as_deref() != Some(&t) {
-                                negative_prompt = Some(t);
-                            }
+                if let Some(t) = extract_clip_text(nodes_map, node_id) {
+                    if !t.is_empty() {
+                        let is_negative = class_type.to_lowercase().contains("negative")
+                            || node.get("inputs").and_then(|i| i.get("negative")).is_some();
+                        if is_negative && negative_prompt.is_none() {
+                            negative_prompt = Some(t);
+                        } else if prompt.is_none() {
+                            prompt = Some(t);
+                        } else if negative_prompt.is_none() && prompt.as_deref() != Some(&t) {
+                            negative_prompt = Some(t);
                         }
                     }
                 }
@@ -224,34 +216,194 @@ pub fn parse_comfyui(json_str: &str) -> Option<ExtractedMetadata> {
     })
 }
 
-/// Recursively or directly extract text from a CLIPTextEncode node in the map.
+/// Recursively or directly extract text from a prompt/conditioning/text node in the map.
 fn extract_clip_text(nodes_map: &serde_json::Map<String, Value>, node_id: &str) -> Option<String> {
-    let node = nodes_map.get(node_id)?;
-    let inputs = node.get("inputs")?;
+    let mut visited = HashSet::new();
+    resolve_node_text(nodes_map, node_id, &mut visited, 0)
+}
 
-    // Direct text input
-    if let Some(text) = inputs.get("text").and_then(|v| v.as_str()) {
+fn resolve_value_or_link(
+    nodes_map: &serde_json::Map<String, Value>,
+    val: &Value,
+    visited: &mut HashSet<String>,
+    depth: usize,
+) -> Option<String> {
+    if depth > 10 {
+        return None;
+    }
+    if let Some(text) = val.as_str() {
         let trimmed = text.trim();
         if !trimmed.is_empty() {
             return Some(trimmed.to_string());
         }
+    } else if let Some(arr) = val.as_array() {
+        if let Some(target_id) = arr.first().and_then(|v| v.as_str()) {
+            return resolve_node_text(nodes_map, target_id, visited, depth + 1);
+        }
+    }
+    None
+}
+
+fn resolve_node_text(
+    nodes_map: &serde_json::Map<String, Value>,
+    node_id: &str,
+    visited: &mut HashSet<String>,
+    depth: usize,
+) -> Option<String> {
+    if depth > 10 || !visited.insert(node_id.to_string()) {
+        return None;
     }
 
-    // SDXL dual clip text
-    if let (Some(text_g), Some(text_l)) = (
-        inputs.get("text_g").and_then(|v| v.as_str()),
-        inputs.get("text_l").and_then(|v| v.as_str()),
-    ) {
-        let combined = format!("{text_g}, {text_l}").trim().to_string();
-        if !combined.is_empty() {
-            return Some(combined);
+    let node = nodes_map.get(node_id)?;
+    let inputs = node.get("inputs")?;
+    let class_type = node
+        .get("class_type")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default();
+
+    // 1. Direct text input or linked text input (e.g. CLIPTextEncode, WanVideoTextEncode)
+    if let Some(text_val) = inputs
+        .get("text")
+        .or_else(|| inputs.get("prompt"))
+        .or_else(|| inputs.get("astext"))
+    {
+        if let Some(text) = resolve_value_or_link(nodes_map, text_val, visited, depth) {
+            return Some(text);
         }
     }
 
-    // Conditioning link (e.g. ConditioningSetArea, ConditioningConcat)
-    if let Some(cond_link) = inputs.get("conditioning").and_then(|v| v.as_array()) {
-        if let Some(next_id) = cond_link.first().and_then(|v| v.as_str()) {
-            return extract_clip_text(nodes_map, next_id);
+    // 2. Flux CLIPTextEncodeFlux (clip_l, t5xxl, guidance, clip)
+    if class_type.contains("Flux")
+        || inputs.get("clip_l").is_some()
+        || inputs.get("t5xxl").is_some()
+    {
+        let clip_l = inputs
+            .get("clip_l")
+            .and_then(|v| resolve_value_or_link(nodes_map, v, visited, depth));
+        let t5xxl = inputs
+            .get("t5xxl")
+            .and_then(|v| resolve_value_or_link(nodes_map, v, visited, depth));
+        match (clip_l, t5xxl) {
+            (Some(l), Some(t5)) => {
+                if l == t5 || t5.is_empty() {
+                    return Some(l);
+                }
+                if l.is_empty() {
+                    return Some(t5);
+                }
+                return Some(format!("{l}, {t5}"));
+            }
+            (Some(l), None) => return Some(l),
+            (None, Some(t5)) => return Some(t5),
+            (None, None) => {}
+        }
+    }
+
+    // 3. SDXL dual clip text (text_g, text_l)
+    let text_g = inputs
+        .get("text_g")
+        .and_then(|v| resolve_value_or_link(nodes_map, v, visited, depth));
+    let text_l = inputs
+        .get("text_l")
+        .and_then(|v| resolve_value_or_link(nodes_map, v, visited, depth));
+    match (text_g, text_l) {
+        (Some(g), Some(l)) => {
+            if g == l || l.is_empty() {
+                return Some(g);
+            }
+            if g.is_empty() {
+                return Some(l);
+            }
+            return Some(format!("{g}, {l}"));
+        }
+        (Some(g), None) => return Some(g),
+        (None, Some(l)) => return Some(l),
+        (None, None) => {}
+    }
+
+    // 4. ComfyUI-Easy-Use concatenation & string manipulation nodes (easy promptConcat, PromptConcat, etc.)
+    if class_type.contains("promptConcat")
+        || class_type.contains("PromptConcat")
+        || class_type.contains("StringConcatenate")
+        || class_type.contains("Text Concatenate")
+        || class_type.contains("Concat")
+    {
+        let p1 = inputs
+            .get("prompt1")
+            .or_else(|| inputs.get("text1"))
+            .or_else(|| inputs.get("string1"))
+            .or_else(|| inputs.get("str1"))
+            .or_else(|| inputs.get("a"))
+            .and_then(|v| resolve_value_or_link(nodes_map, v, visited, depth));
+
+        let p2 = inputs
+            .get("prompt2")
+            .or_else(|| inputs.get("text2"))
+            .or_else(|| inputs.get("string2"))
+            .or_else(|| inputs.get("str2"))
+            .or_else(|| inputs.get("b"))
+            .and_then(|v| resolve_value_or_link(nodes_map, v, visited, depth));
+
+        let sep = inputs
+            .get("separator")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+
+        match (p1, p2) {
+            (Some(s1), Some(s2)) => {
+                if s1.is_empty() {
+                    return Some(s2);
+                }
+                if s2.is_empty() {
+                    return Some(s1);
+                }
+                return Some(format!("{s1}{sep}{s2}"));
+            }
+            (Some(s1), None) => return Some(s1),
+            (None, Some(s2)) => return Some(s2),
+            (None, None) => {}
+        }
+    }
+
+    // 5. easy positive / easy negative
+    if let Some(pos) = inputs
+        .get("positive")
+        .and_then(|v| resolve_value_or_link(nodes_map, v, visited, depth))
+    {
+        return Some(pos);
+    }
+    if let Some(neg) = inputs
+        .get("negative")
+        .and_then(|v| resolve_value_or_link(nodes_map, v, visited, depth))
+    {
+        return Some(neg);
+    }
+
+    // 6. PrimitiveNode / StringLiteral / String / Text values
+    if let Some(val) = inputs
+        .get("value")
+        .or_else(|| inputs.get("string"))
+        .or_else(|| inputs.get("positive_prompt"))
+    {
+        if let Some(text) = resolve_value_or_link(nodes_map, val, visited, depth) {
+            return Some(text);
+        }
+    }
+
+    // 7. Conditioning links (ConditioningSetArea, ConditioningConcat, ConditioningAverage, ConditioningCombine)
+    for cond_key in [
+        "conditioning",
+        "conditioning_to",
+        "conditioning_from",
+        "conditioning_1",
+        "conditioning_2",
+    ] {
+        if let Some(cond_link) = inputs.get(cond_key).and_then(|v| v.as_array()) {
+            if let Some(next_id) = cond_link.first().and_then(|v| v.as_str()) {
+                if let Some(text) = resolve_node_text(nodes_map, next_id, visited, depth + 1) {
+                    return Some(text);
+                }
+            }
         }
     }
 
@@ -436,5 +588,99 @@ mod tests {
         );
         assert_eq!(meta.width, Some(768));
         assert_eq!(meta.height, Some(512));
+    }
+
+    #[test]
+    fn parses_comfyui_flux_and_easyuse_nodes() {
+        let json = r#"{
+            "3": {
+                "class_type": "KSampler",
+                "inputs": {
+                    "seed": 1234567,
+                    "steps": 20,
+                    "cfg": 3.5,
+                    "sampler_name": "euler",
+                    "scheduler": "simple",
+                    "positive": ["5", 0],
+                    "negative": ["8", 0]
+                }
+            },
+            "4": {
+                "class_type": "UNETLoader",
+                "inputs": {
+                    "unet_name": "flux1-dev.sft"
+                }
+            },
+            "5": {
+                "class_type": "CLIPTextEncodeFlux",
+                "inputs": {
+                    "clip_l": ["68", 0],
+                    "t5xxl": ["68", 0],
+                    "guidance": 3.5
+                }
+            },
+            "8": {
+                "class_type": "CLIPTextEncode",
+                "inputs": {
+                    "text": "ugly, watermark"
+                }
+            },
+            "68": {
+                "class_type": "easy promptConcat",
+                "inputs": {
+                    "prompt1": ["70", 0],
+                    "prompt2": ["69", 0],
+                    "separator": ", "
+                }
+            },
+            "69": {
+                "class_type": "easy positive",
+                "inputs": {
+                    "positive": "masterpiece, best quality"
+                }
+            },
+            "70": {
+                "class_type": "easy positive",
+                "inputs": {
+                    "positive": "1girl, solo, cherry blossoms"
+                }
+            }
+        }"#;
+
+        let meta = parse_comfyui(json).expect("parsed flux and easy-use workflow");
+        assert_eq!(
+            meta.prompt.as_deref(),
+            Some("1girl, solo, cherry blossoms, masterpiece, best quality")
+        );
+        assert_eq!(meta.negative_prompt.as_deref(), Some("ugly, watermark"));
+        assert_eq!(meta.model_name.as_deref(), Some("flux1-dev.sft"));
+        assert_eq!(meta.steps, Some(20));
+    }
+
+    #[test]
+    fn handles_comfyui_graph_cycle_without_overflow() {
+        let json = r#"{
+            "3": {
+                "class_type": "KSampler",
+                "inputs": {
+                    "positive": ["10", 0]
+                }
+            },
+            "10": {
+                "class_type": "CLIPTextEncode",
+                "inputs": {
+                    "text": ["11", 0]
+                }
+            },
+            "11": {
+                "class_type": "easy promptConcat",
+                "inputs": {
+                    "prompt1": ["10", 0],
+                    "prompt2": "safe fallback text"
+                }
+            }
+        }"#;
+
+        let _meta = parse_comfyui(json);
     }
 }
