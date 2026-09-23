@@ -132,7 +132,7 @@ function handleOpenUpdatesFolder() {
       <!-- Header -->
       <div class="dialog-header">
         <div class="header-left">
-          <img src="../assets/logo.png" alt="Berry" width="20" height="20" class="dialog-logo" />
+          <img src="../assets/logo.png" alt="Omera" width="20" height="20" class="dialog-logo" />
           <h3 class="dialog-title">{{ t.updater.title }}</h3>
         </div>
         <button type="button" class="close-btn" @click="emit('close')">✕</button>
@@ -143,7 +143,7 @@ function handleOpenUpdatesFolder() {
         <!-- 1. Checking State -->
         <div v-if="checking" class="state-container">
           <div class="spinner-pulse">
-            <img src="../assets/logo.png" alt="Berry" width="40" height="40" class="pulsing-logo" />
+            <img src="../assets/logo.png" alt="Omera" width="40" height="40" class="pulsing-logo" />
           </div>
           <h4 class="state-title">{{ t.updater.checkingTitle }}</h4>
           <p class="state-desc">{{ t.updater.checkingDesc }}</p>

@@ -370,7 +370,7 @@ onUnmounted(() => {
         <div class="menu-divider"></div>
         <button type="button" class="dropdown-item" @click="handleAction(() => emit('openAbout'))">
           <span class="item-icon">
-            <img src="../assets/logo.png" alt="Berry" width="14" height="14" style="display:block; object-fit:contain;" />
+            <img src="../assets/logo.png" alt="Omera" width="14" height="14" style="display:block; object-fit:contain;" />
           </span>
           <span class="item-title">{{ t.menu.about }}</span>
         </button>

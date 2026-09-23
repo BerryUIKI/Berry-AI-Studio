@@ -434,7 +434,7 @@ where
             .html_title
             .as_deref()
             .filter(|s| !s.trim().is_empty())
-            .unwrap_or("Berry AI Studio Showcase");
+            .unwrap_or("Omera Showcase");
         let html_content = generate_html_showcase(title, &showcase_items);
         let html_bytes = html_content.as_bytes();
         let html_len = html_bytes.len() as u64;

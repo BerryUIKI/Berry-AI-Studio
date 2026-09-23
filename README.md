@@ -43,7 +43,7 @@ Organize, search, compare, and export tens of thousands of AIGC artworks — all
 ## 🚀 Quick Start
 
 1. **Download** — Grab the [latest release](https://github.com/BerryUIKI/Omera/releases/latest) for your platform.
-2. **Add a Folder** — Point Berry at your WebUI / ComfyUI / NovelAI output directory. Choose *External Link* (zero-copy) or *AIGC Pipeline* (auto-harvest) mode.
+2. **Add a Folder** — Point Omera at your WebUI / ComfyUI / NovelAI output directory. Choose *External Link* (zero-copy) or *AIGC Pipeline* (auto-harvest) mode.
 3. **Browse & Create** — Your library is instantly searchable. Rate, tag, compare, and export with full metadata preserved.
 
 ---
@@ -294,7 +294,7 @@ Omera is built on the shoulders of these excellent open-source projects:
 
 <div align="center">
 
-**[⬆ Back to Top](#-berry-ai-studio)**
+**[⬆ Back to Top](#-omera)**
 
 If you find Omera useful, please consider giving it a ⭐ — it helps others discover the project!
 

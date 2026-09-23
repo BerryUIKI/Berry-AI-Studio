@@ -1015,7 +1015,7 @@ async function saveSettings() {
                   v-model="remoteConnectionUrl"
                   type="text"
                   class="url-input"
-                  :placeholder="storageBackend === 'mysql' ? 'mysql://user:pass@192.168.1.100:3306/berry' : 'postgres://user:pass@192.168.1.100:5432/berry'"
+                  :placeholder="storageBackend === 'mysql' ? 'mysql://user:pass@192.168.1.100:3306/omera' : 'postgres://user:pass@192.168.1.100:5432/omera'"
                 />
                 <button
                   type="button"
@@ -1139,7 +1139,7 @@ async function saveSettings() {
                   type="text"
                   class="url-input"
                   style="flex: 1;"
-                  placeholder="D:\Backups or \\nas\berry_backups"
+                  placeholder="D:\Backups or \\nas\omera_backups"
                 />
                 <button type="button" class="btn-browse-mapping" @click="handleBrowseLocalBackupPath">
                   {{ t.settings.cloudBackup.browse }}
@@ -1205,7 +1205,7 @@ async function saveSettings() {
                   v-model="cloudS3Bucket"
                   type="text"
                   class="url-input"
-                  placeholder="my-berry-backups"
+                  placeholder="my-omera-backups"
                 />
               </div>
               <div class="setting-row">
@@ -1590,10 +1590,10 @@ async function saveSettings() {
 
             <div class="about-card">
               <div class="about-logo">
-                <img src="../assets/logo.png" alt="Berry Logo" width="48" height="48" class="about-logo-img" />
+                <img src="../assets/logo.png" alt="Omera Logo" width="48" height="48" class="about-logo-img" />
               </div>
               <div class="about-details">
-                <h5 class="about-name">Berry AI Studio</h5>
+                <h5 class="about-name">Omera</h5>
                 <p class="about-ver">v{{ info?.app_version || '0.1.3' }}</p>
                 <p class="about-desc">{{ t.settings.aboutDesc }}</p>
               </div>
