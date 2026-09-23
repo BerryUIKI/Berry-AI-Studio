@@ -3,6 +3,7 @@
 ## Omera Identity Migration
 
 - Use `docs/ENGINEERING_HANDOFF.md` for ownership boundaries and task acceptance, and `docs/DELIVERY_ROADMAP.md` for dependency order. High-impact persistence, identity, cleanup, security and release changes are lead-owned; general-engineer assignments are explicitly listed there.
+- Read `docs/API_CONTRACTS.md` and `docs/IPC_REFERENCE.md` before changing IPC. Use `docs/HANDOFF_PROMPTS.md` for human engineering assignments. Proposed migration APIs are not implemented commands. Regenerate the IPC inventory after command changes and validate DTO compatibility separately.
 
 - The target identity is Omera, `com.berryuiki.omera`, repository `BerryUIKI/Omera`, database `omera.db`, and local settings prefix `omera_`.
 - Follow `docs/OMERA_MIGRATION.md` and `docs/STORAGE_EVOLUTION.md`. Current `berry-*` paths below remain valid until the coordinated source rename.
