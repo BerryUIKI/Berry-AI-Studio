@@ -1476,6 +1476,7 @@ async function loadFiles() {
           files.value = semanticSearchFiles.value;
           galleryTotal.value = files.value.length;
         } catch (clipErr) {
+          if (requestVersion !== libraryRequestVersion) return;
           // If no model loaded, open CLIP modal so user can load one
           console.warn("Semantic search failed or model not loaded:", clipErr);
           clipModalOpen.value = true;
@@ -1645,18 +1646,23 @@ function onSimilarityLimitChange() {
   }
 }
 
+let similarityRequestVersion = 0;
+
 async function handleFindSimilar(file: ImageFile) {
   if (!file.id) return;
+  const requestVersion = ++similarityRequestVersion;
   filesLoading.value = true;
   try {
     const items = await invoke<SimilarFileItem[]>("find_similar_to_file", {
       fileId: file.id,
       limit: similarityLimit.value,
     });
+    if (requestVersion !== similarityRequestVersion) return;
     if (items.length === 0) {
       const models = await invoke<string[]>("get_file_embedding_models", {
         fileId: file.id,
       });
+      if (requestVersion !== similarityRequestVersion) return;
       if (models.length === 0) {
         alert(t.value.preview.noEmbeddingFound);
         return;
@@ -1674,14 +1680,18 @@ async function handleFindSimilar(file: ImageFile) {
       lightboxFile.value = null;
     }
   } catch (err) {
+    if (requestVersion !== similarityRequestVersion) return;
     console.error("Find similar error:", err);
     error.value = String(err);
   } finally {
-    filesLoading.value = false;
+    if (requestVersion === similarityRequestVersion) {
+      filesLoading.value = false;
+    }
   }
 }
 
 function exitSimilaritySearch() {
+  similarityRequestVersion++;
   similaritySourceFile.value = null;
   rawSimilarityFiles.value = [];
   similarityThreshold.value = 0;

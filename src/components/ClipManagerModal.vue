@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, onUnmounted, computed } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { t } from "../i18n";
-import type { ClipModelSummary, ClipIndexStatus, ClipBatchIndexResult } from "../types";
+import type { ClipModelSummary, ClipIndexStatus } from "../types";
+import { ClipIndexingController } from "../utils/clip-indexing";
 
 defineProps<{
   show: boolean;
@@ -20,9 +21,10 @@ const loadedModel = ref<{ name: string; model_id: string } | null>(null);
 const indexStatus = ref<ClipIndexStatus | null>(null);
 
 const batchSize = ref<number>(20);
+const controller = new ClipIndexingController();
 const isIndexing = ref<boolean>(false);
-const shouldStopIndexing = ref<boolean>(false);
-const message = ref<{ type: "success" | "error"; text: string } | null>(null);
+const failureCount = ref<number>(0);
+const message = ref<{ type: "success" | "error" | "warning" | "info"; text: string } | null>(null);
 
 const percentIndexed = computed(() => {
   if (!indexStatus.value || indexStatus.value.total_images === 0) return 0;
@@ -68,6 +70,9 @@ async function refreshIndexStatus() {
 async function onSelectModel(model: ClipModelSummary) {
   try {
     message.value = null;
+    controller.reset(true);
+    isIndexing.value = false;
+    failureCount.value = 0;
     selectedDirPath.value = model.dir_path;
     const info = await invoke<{ name: string; model_id: string }>("load_clip_model", {
       dirPath: model.dir_path,
@@ -93,6 +98,9 @@ async function onBrowseFolder() {
 
     if (selected && typeof selected === "string") {
       message.value = null;
+      controller.reset(true);
+      isIndexing.value = false;
+      failureCount.value = 0;
       const info = await invoke<{ name: string; model_id: string }>("load_clip_model", {
         dirPath: selected,
       });
@@ -105,43 +113,66 @@ async function onBrowseFolder() {
   }
 }
 
-async function runBatchIndexingLoop() {
+async function runBatchIndexingLoop(retryFailed = false) {
   if (!loadedModel.value) return;
   isIndexing.value = true;
-  shouldStopIndexing.value = false;
   message.value = null;
 
   try {
-    while (isIndexing.value && !shouldStopIndexing.value) {
-      const res = await invoke<ClipBatchIndexResult>("index_clip_images_batch", {
-        batchSize: batchSize.value,
-      });
+    await controller.startIndexing({
+      batchSize: batchSize.value,
+      retryFailed,
+      onBatchIndexed: async () => {
+        failureCount.value = controller.failedCount;
+        await refreshIndexStatus();
+        emit("indexed");
+      },
+      delayMs: 80,
+    });
 
-      await refreshIndexStatus();
-      emit("indexed");
+    failureCount.value = controller.failedCount;
+    await refreshIndexStatus();
 
-      if (res.indexed_count === 0 || res.remaining_count === 0) {
-        message.value = { type: "success", text: t.value.clipModal.indexingComplete };
-        break;
+    if (controller.status === "completed") {
+      if (failureCount.value > 0) {
+        message.value = {
+          type: "warning",
+          text: t.value.clipModal.completedWithFailures.replace("{count}", String(failureCount.value)),
+        };
+      } else {
+        message.value = {
+          type: "success",
+          text: t.value.clipModal.indexingComplete,
+        };
       }
-
-      // Small delay to allow UI render
-      await new Promise((r) => setTimeout(r, 80));
+    } else if (controller.status === "canceled") {
+      message.value = {
+        type: "info",
+        text: t.value.clipModal.indexingCanceled,
+      };
+    } else if (controller.status === "error") {
+      message.value = {
+        type: "error",
+        text: controller.errorMessage || "Indexing error",
+      };
     }
   } catch (err: any) {
     message.value = { type: "error", text: String(err) };
   } finally {
     isIndexing.value = false;
-    shouldStopIndexing.value = false;
   }
 }
 
 function stopIndexing() {
-  shouldStopIndexing.value = true;
+  void controller.stopIndexing();
 }
 
 onMounted(() => {
   loadModelsAndStatus();
+});
+
+onUnmounted(() => {
+  controller.reset(false);
 });
 </script>
 
@@ -217,6 +248,9 @@ onMounted(() => {
                   .replace('{total}', String(indexStatus?.total_images ?? 0))
                   .replace('{percent}', String(percentIndexed))
               }}
+              <span v-if="failureCount > 0" class="failure-stat">
+                ({{ t.clipModal.failuresCount.replace('{count}', String(failureCount)) }})
+              </span>
             </div>
           </div>
 
@@ -235,13 +269,21 @@ onMounted(() => {
               <button
                 v-if="!isIndexing"
                 class="action-btn primary"
-                :disabled="!loadedModel || Boolean(indexStatus && indexStatus.indexed_images >= indexStatus.total_images)"
-                @click="runBatchIndexingLoop"
+                :disabled="!loadedModel || Boolean(indexStatus && indexStatus.indexed_images + failureCount >= indexStatus.total_images && failureCount === 0)"
+                @click="runBatchIndexingLoop(false)"
               >
                 ⚡ {{ t.clipModal.startIndexing }}
               </button>
               <button
-                v-else
+                v-if="!isIndexing && failureCount > 0"
+                class="action-btn secondary"
+                :disabled="!loadedModel"
+                @click="runBatchIndexingLoop(true)"
+              >
+                🔄 {{ t.clipModal.retryFailed }}
+              </button>
+              <button
+                v-else-if="isIndexing"
                 class="action-btn danger"
                 @click="stopIndexing"
               >
@@ -522,6 +564,12 @@ onMounted(() => {
   border-radius: 0 4px 4px 0;
 }
 
+.failure-stat {
+  color: #f87171;
+  margin-left: 6px;
+  font-weight: 500;
+}
+
 .alert-message {
   padding: 8px 12px;
   border-radius: 6px;
@@ -532,6 +580,18 @@ onMounted(() => {
   background: rgba(16, 185, 129, 0.15);
   border: 1px solid rgba(16, 185, 129, 0.3);
   color: #34d399;
+}
+
+.alert-message.warning {
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+}
+
+.alert-message.info {
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: #60a5fa;
 }
 
 .alert-message.error {

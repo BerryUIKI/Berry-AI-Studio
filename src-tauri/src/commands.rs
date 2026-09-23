@@ -2012,6 +2012,8 @@ pub struct ClipBatchIndexResult {
     pub indexed_count: usize,
     pub remaining_count: usize,
     pub total_count: usize,
+    #[serde(default)]
+    pub failed_count: usize,
 }
 
 /// Scan for available CLIP / SigLIP models.
@@ -2157,10 +2159,18 @@ pub fn get_clip_index_status(
     })
 }
 
+/// Cooperatively cancel ongoing CLIP batch indexing between images.
+#[tauri::command]
+pub fn cancel_clip_indexing(state: State<'_, AppState>) -> Result<(), String> {
+    state.clip_cancel.store(true, Ordering::SeqCst);
+    Ok(())
+}
+
 /// Process a batch of unindexed images using the active CLIP vision model and save embeddings to database.
 #[tauri::command]
 pub fn index_clip_images_batch(
-    batch_size: usize,
+    batch_size: Option<usize>,
+    retry_failed: Option<bool>,
     state: State<'_, AppState>,
 ) -> Result<ClipBatchIndexResult, String> {
     let guard = clip_guard(&state)?;
@@ -2169,22 +2179,51 @@ pub fn index_clip_images_batch(
         .ok_or_else(|| "No CLIP model loaded. Please load a model first.".to_string())?;
 
     let model_id = engine.info.model_id.clone();
-    let limit = if batch_size == 0 { 20 } else { batch_size };
+    let limit = batch_size.unwrap_or(20).clamp(1, 20);
+
+    // Reset cancel flag at start of new batch
+    state.clip_cancel.store(false, Ordering::SeqCst);
+
+    if retry_failed.unwrap_or(false) {
+        if let Ok(mut failures) = state.clip_failures.lock() {
+            failures.remove(&model_id);
+        }
+    }
+
+    let mut failed_set = state
+        .clip_failures
+        .lock()
+        .map_err(|e| e.to_string())?
+        .get(&model_id)
+        .cloned()
+        .unwrap_or_default();
 
     let unindexed = {
         let database = db(&state)?;
-        database
-            .get_unindexed_files(&model_id, limit)
-            .map_err(|e| e.to_string())?
+        // Fetch candidates with offset for known failures so failed images do not starve subsequent ones
+        let fetch_limit = limit.saturating_add(failed_set.len());
+        let candidates = database
+            .get_unindexed_files(&model_id, fetch_limit)
+            .map_err(|e| e.to_string())?;
+        candidates
+            .into_iter()
+            .filter(|f| f.id.is_some_and(|id| !failed_set.contains(&id)))
+            .take(limit)
+            .collect::<Vec<_>>()
     };
 
     let mut indexed_count = 0;
     for file in &unindexed {
+        if state.clip_cancel.load(Ordering::SeqCst) {
+            break;
+        }
+
         let file_id = match file.id {
             Some(id) => id,
             None => continue,
         };
 
+        let mut success = false;
         if let Ok(img) = image::open(&file.path) {
             if let Ok(embedding) = engine.encode_image(&img) {
                 let database = db(&state)?;
@@ -2193,9 +2232,19 @@ pub fn index_clip_images_batch(
                     .is_ok()
                 {
                     indexed_count += 1;
+                    success = true;
                 }
             }
         }
+
+        if !success {
+            failed_set.insert(file_id);
+        }
+    }
+
+    let failed_count = failed_set.len();
+    if let Ok(mut failures) = state.clip_failures.lock() {
+        failures.insert(model_id.clone(), failed_set);
     }
 
     let database = db(&state)?;
@@ -2203,10 +2252,15 @@ pub fn index_clip_images_batch(
         .get_embedding_index_stats(&model_id)
         .map_err(|e| e.to_string())?;
 
+    let remaining_count = total_images
+        .saturating_sub(indexed_total)
+        .saturating_sub(failed_count);
+
     Ok(ClipBatchIndexResult {
         indexed_count,
-        remaining_count: total_images.saturating_sub(indexed_total),
+        remaining_count,
         total_count: total_images,
+        failed_count,
     })
 }
 
@@ -2216,7 +2270,7 @@ pub fn search_by_text_prompt(
     prompt: String,
     limit: usize,
     state: State<'_, AppState>,
-) -> Result<Vec<SimilarityMatch>, String> {
+) -> Result<Vec<SimilarFileItem>, String> {
     if prompt.trim().is_empty() {
         return Ok(vec![]);
     }
@@ -2230,9 +2284,22 @@ pub fn search_by_text_prompt(
     let query_vector = engine.encode_text(&prompt).map_err(|e| e.to_string())?;
 
     let database = db(&state)?;
-    let results = database
+    let matches = database
         .search_similar_files(&model_id, &query_vector, limit)
         .map_err(|e| e.to_string())?;
+
+    let mut results = Vec::with_capacity(matches.len());
+    for m in matches {
+        if let Some(file) = database
+            .get_file_by_id(m.file_id)
+            .map_err(|e| e.to_string())?
+        {
+            results.push(SimilarFileItem {
+                file,
+                score: m.score,
+            });
+        }
+    }
 
     Ok(results)
 }
@@ -3685,5 +3752,45 @@ mod tests {
         });
         let payload2 = prepare_comfyui_prompt_payload(&wrapped);
         assert_eq!(payload2["prompt"]["4"]["class_type"], "VAEDecode");
+    }
+
+    #[test]
+    fn test_clip_batch_index_result_serde_and_default() {
+        let json_without_failed = r#"{"indexed_count":5,"remaining_count":10,"total_count":15}"#;
+        let res: ClipBatchIndexResult = serde_json::from_str(json_without_failed).unwrap();
+        assert_eq!(res.indexed_count, 5);
+        assert_eq!(res.remaining_count, 10);
+        assert_eq!(res.total_count, 15);
+        assert_eq!(res.failed_count, 0);
+
+        let json_with_failed =
+            r#"{"indexed_count":3,"remaining_count":7,"total_count":15,"failed_count":5}"#;
+        let res2: ClipBatchIndexResult = serde_json::from_str(json_with_failed).unwrap();
+        assert_eq!(res2.indexed_count, 3);
+        assert_eq!(res2.remaining_count, 7);
+        assert_eq!(res2.total_count, 15);
+        assert_eq!(res2.failed_count, 5);
+    }
+
+    #[test]
+    fn test_clip_remaining_count_arithmetic() {
+        let total_images = 100usize;
+        let indexed_total = 80usize;
+        let failed_count = 20usize;
+        let remaining = total_images
+            .saturating_sub(indexed_total)
+            .saturating_sub(failed_count);
+        assert_eq!(
+            remaining, 0,
+            "No remaining images when all are accounted for"
+        );
+
+        let total_images = 10usize;
+        let indexed_total = 3usize;
+        let failed_count = 2usize;
+        let remaining = total_images
+            .saturating_sub(indexed_total)
+            .saturating_sub(failed_count);
+        assert_eq!(remaining, 5);
     }
 }
