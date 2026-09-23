@@ -1,6 +1,8 @@
 pub mod cloud_backup;
 pub mod cloud_sync;
 mod commands;
+mod config_store;
+mod update_verification;
 mod watcher;
 
 use std::collections::{HashMap, HashSet};
@@ -44,8 +46,14 @@ pub fn run() {
             let _ = std::fs::create_dir_all(data_dir.join("thumbnails"));
             let _ = std::fs::create_dir_all(data_dir.join("models"));
             let database_path = data_dir.join("berry.db");
+            berry_storage::recovery::apply_pending_restore(&database_path)
+                .map_err(std::io::Error::other)?;
             let db = Database::connect(&database_path)?;
             let folders = db.list_folders()?;
+            for folder in &folders {
+                app.asset_protocol_scope()
+                    .allow_directory(&folder.path, true)?;
+            }
             let filesystem_watcher =
                 match watcher::LibraryWatcher::new(app.handle().clone(), database_path.clone()) {
                     Ok(watcher) => Some(watcher),

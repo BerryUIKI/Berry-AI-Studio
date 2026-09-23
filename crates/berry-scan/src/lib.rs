@@ -7,6 +7,7 @@
 //! files that disappeared from disk. The Tauri shell only wires this up.
 
 pub mod export;
+pub mod file_operations;
 pub mod html_showcase;
 pub mod scanner;
 pub mod thumbnail;

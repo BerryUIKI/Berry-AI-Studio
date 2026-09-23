@@ -37,6 +37,9 @@ uuid = { version = "1", features = ["v4"] }
 notify = "8.2.0"
 sha2 = "0.10"
 hex = "0.4"
+tempfile = "3"
+minisign-verify = "0.2.5"
+keyring = { version = "3.6.3", features = ["apple-native", "windows-native", "sync-secret-service", "crypto-rust", "vendored"] }
 base64 = "0.22"
 zip = { version = "2.2", default-features = false, features = ["deflate"] }
 

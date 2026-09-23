@@ -11,6 +11,7 @@ mod db;
 mod engine;
 mod migration_export;
 mod migrations;
+pub mod recovery;
 
 pub use db::{Database, DatabaseError, ThumbnailCacheEntry};
 pub use engine::{DatabaseDialect, StorageEngine};

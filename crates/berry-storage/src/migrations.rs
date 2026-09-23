@@ -216,6 +216,16 @@ pub const MIGRATIONS: &[&str] = &[
 
     CREATE INDEX idx_change_log_sync ON change_log(id, client_id);
     "#,
+    // v15: revision-aware inference failures do not starve later images.
+    r#"
+    CREATE TABLE embedding_failures (
+        file_id INTEGER NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+        model_id TEXT NOT NULL,
+        modified_at INTEGER NOT NULL,
+        error TEXT NOT NULL,
+        PRIMARY KEY(file_id, model_id)
+    ) STRICT;
+    "#,
 ];
 
 /// The schema version the current code migrates databases to.

@@ -1,6 +1,6 @@
 //! SQLite database connection and migration runner.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use berry_domain::{
@@ -91,6 +91,26 @@ pub enum DatabaseError {
     CorruptStoredVectorValue { file_id: i64 },
     #[error("stored embedding for file {file_id} has zero norm")]
     CorruptStoredZeroNorm { file_id: i64 },
+    #[error("unsupported database schema version {found}, latest supported is {latest}")]
+    UnsupportedSchema { found: i64, latest: i64 },
+}
+
+#[derive(PartialEq)]
+struct RankedMatch(SimilarityMatch);
+impl Eq for RankedMatch {}
+impl Ord for RankedMatch {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        other
+            .0
+            .score
+            .total_cmp(&self.0.score)
+            .then_with(|| self.0.file_id.cmp(&other.0.file_id))
+    }
+}
+impl PartialOrd for RankedMatch {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 /// SQL that inserts or updates a file row keyed by its unique path.
@@ -140,6 +160,15 @@ impl Database {
     }
 
     fn init(conn: Connection, path: Option<PathBuf>) -> Result<Self, DatabaseError> {
+        // Check before any persistent PRAGMA or migration: release builds must
+        // reject databases written by a newer application too.
+        let version: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+        if !(0..=LATEST_VERSION).contains(&version) {
+            return Err(DatabaseError::UnsupportedSchema {
+                found: version,
+                latest: LATEST_VERSION,
+            });
+        }
         conn.pragma_update(None, "foreign_keys", "ON")?;
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "synchronous", "NORMAL")?;
@@ -166,10 +195,12 @@ impl Database {
     /// Apply any pending migrations, advancing `PRAGMA user_version`.
     fn migrate(&mut self) -> Result<(), DatabaseError> {
         let current = self.user_version()?;
-        debug_assert!(
-            current <= LATEST_VERSION,
-            "database schema (v{current}) is newer than this build (v{LATEST_VERSION})"
-        );
+        if !(0..=LATEST_VERSION).contains(&current) {
+            return Err(DatabaseError::UnsupportedSchema {
+                found: current,
+                latest: LATEST_VERSION,
+            });
+        }
 
         for (i, sql) in MIGRATIONS.iter().enumerate().skip(current as usize) {
             let target = i as i64 + 1;
@@ -2420,7 +2451,7 @@ impl Database {
             "SELECT file_id, dimensions, embedding FROM file_embeddings WHERE model_id = ?1",
         )?;
         let mut rows = stmt.query([model_id])?;
-        let mut matches = Vec::new();
+        let mut matches = BinaryHeap::new();
 
         while let Some(row) = rows.next()? {
             let file_id: i64 = row.get(0)?;
@@ -2500,20 +2531,38 @@ impl Database {
                 (dot_product / denom).clamp(-1.0, 1.0)
             };
 
-            matches.push(SimilarityMatch {
+            matches.push(RankedMatch(SimilarityMatch {
                 file_id,
                 score: cosine_sim as f32,
-            });
+            }));
+            if matches.len() > limit {
+                matches.pop();
+            }
         }
 
+        let mut matches: Vec<_> = matches.into_iter().map(|item| item.0).collect();
         matches.sort_by(|a, b| {
             b.score
                 .total_cmp(&a.score)
                 .then_with(|| a.file_id.cmp(&b.file_id))
         });
-        matches.truncate(limit);
 
         Ok(matches)
+    }
+
+    /// Hydrate IDs in bounded batches without one query per result.
+    pub fn get_files_by_ids(&self, ids: &[i64]) -> Result<Vec<ImageFile>, DatabaseError> {
+        let mut files = Vec::new();
+        for chunk in ids.chunks(400) {
+            let placeholders = vec!["?"; chunk.len()].join(",");
+            let sql = format!("SELECT id, folder_id, path, container, size_bytes, modified_at, metadata, rating, aesthetic_score, is_favorite, is_nsfw, stack_id, stack_order FROM files WHERE id IN ({placeholders})");
+            let mut statement = self.conn.prepare(&sql)?;
+            let mut rows = statement.query(rusqlite::params_from_iter(chunk))?;
+            while let Some(row) = rows.next()? {
+                files.push(Self::map_row(row)?);
+            }
+        }
+        Ok(files)
     }
 
     /// Retrieve the stored embedding vector for a given file and model.
@@ -2667,6 +2716,25 @@ impl Database {
         Ok((indexed_count as usize, total_count as usize))
     }
 
+    pub fn record_embedding_failure(
+        &self,
+        id: i64,
+        model: &str,
+        revision: i64,
+        error: &str,
+    ) -> Result<(), DatabaseError> {
+        self.conn.execute("INSERT INTO embedding_failures(file_id, model_id, modified_at, error) VALUES (?1, ?2, ?3, ?4) ON CONFLICT(file_id, model_id) DO UPDATE SET modified_at=excluded.modified_at, error=excluded.error", params![id, model, revision, error])?;
+        Ok(())
+    }
+    pub fn clear_embedding_failures(&self, model: &str) -> Result<(), DatabaseError> {
+        self.conn
+            .execute("DELETE FROM embedding_failures WHERE model_id=?1", [model])?;
+        Ok(())
+    }
+    pub fn embedding_failure_count(&self, model: &str) -> Result<usize, DatabaseError> {
+        Ok(self.conn.query_row("SELECT count(*) FROM embedding_failures e JOIN files f ON f.id=e.file_id AND f.modified_at=e.modified_at WHERE e.model_id=?1 AND NOT EXISTS (SELECT 1 FROM file_embeddings v WHERE v.file_id=e.file_id AND v.model_id=e.model_id)", [model], |row| row.get::<_, i64>(0))? as usize)
+    }
+
     /// Returns files that have not yet been indexed by `model_id`, up to `limit`.
     pub fn get_unindexed_files(
         &self,
@@ -2683,7 +2751,9 @@ impl Database {
         let mut stmt = self.conn.prepare_cached(
             "SELECT id, folder_id, path, container, size_bytes, modified_at, metadata, rating, aesthetic_score, is_favorite, is_nsfw, stack_id, stack_order
              FROM files
-             WHERE id NOT IN (SELECT file_id FROM file_embeddings WHERE model_id = ?1)
+             WHERE container IN ('png', 'jpg', 'webp')
+             AND id NOT IN (SELECT file_id FROM file_embeddings WHERE model_id = ?1)
+             AND NOT EXISTS (SELECT 1 FROM embedding_failures e WHERE e.file_id = files.id AND e.model_id = ?1 AND e.modified_at = files.modified_at)
              ORDER BY id ASC
              LIMIT ?2",
         )?;
@@ -4325,10 +4395,13 @@ mod tests {
     // --- File Embeddings and Similarity Search Tests ---
 
     #[test]
-    fn migration_reaches_schema_version_14() {
+    fn migration_creates_revision_aware_embedding_failures() {
         let db = Database::connect_in_memory().unwrap();
-        assert_eq!(db.user_version().unwrap(), 14);
-        assert_eq!(LATEST_VERSION, 14);
+        assert_eq!(db.user_version().unwrap(), LATEST_VERSION);
+        assert_eq!(LATEST_VERSION, 15);
+        db.connection()
+            .prepare("SELECT file_id, model_id, modified_at, error FROM embedding_failures LIMIT 0")
+            .unwrap();
     }
 
     #[test]

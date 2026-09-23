@@ -3,6 +3,8 @@ import type { AppTheme } from "./theme";
 import type { CloudBackupConfig } from "../types";
 
 export interface AppConfig {
+  config_revision: number;
+  legacy_migration_complete: boolean;
   locale: string;
   auto_scan: boolean;
   startup_scan_interval_minutes: number;
@@ -42,6 +44,8 @@ export interface StoragePaths {
 }
 
 const DEFAULT_CONFIG: AppConfig = {
+  config_revision: 0,
+  legacy_migration_complete: false,
   locale: "auto",
   auto_scan: false,
   startup_scan_interval_minutes: 360,
@@ -92,81 +96,80 @@ export async function loadAppConfig(): Promise<AppConfig> {
     const config = await invoke<AppConfig>("get_app_config");
 
     // Seamless migration from localStorage for existing users
-    let modified = false;
-    const legacyLocale = localStorage.getItem("berry_locale");
-    if (legacyLocale && config.locale === "auto") {
-      config.locale = legacyLocale;
-      modified = true;
-    }
-
-    const legacyAutoScan = localStorage.getItem("berry_autoscan");
-    if (legacyAutoScan !== null) {
-      config.auto_scan = legacyAutoScan !== "false";
-    }
-
-    const legacyTheme = localStorage.getItem("berry_theme");
-    if (
-      legacyTheme === "system" || legacyTheme === "midnight" || legacyTheme === "graphite" ||
-      legacyTheme === "light" || legacyTheme === "violet"
-    ) {
-      config.theme = legacyTheme;
-    }
-
-    const legacyBlur = localStorage.getItem("berry_blur_nsfw");
-    if (legacyBlur !== null) {
-      config.blur_nsfw = legacyBlur !== "false";
-    }
-
-    const legacyBadges = localStorage.getItem("berry_card_badges");
-    if (legacyBadges !== null) {
-      config.show_card_badges = legacyBadges !== "false";
-    }
-
-    const legacyView = localStorage.getItem("berry_default_view");
-    if (legacyView === "grid" || legacyView === "masonry" || legacyView === "table") {
-      config.default_view = legacyView;
-    }
-
-    const legacyThumb = localStorage.getItem("berry_thumbnail_max_edge");
-    if (legacyThumb) {
-      const parsed = parseInt(legacyThumb, 10);
-      if (!isNaN(parsed) && parsed > 0) {
-        config.thumbnail_max_edge = parsed;
+    if (!config.legacy_migration_complete) {
+      const legacyLocale = localStorage.getItem("berry_locale");
+      if (legacyLocale && config.locale === "auto") {
+        config.locale = legacyLocale;
       }
-    }
 
-    const legacyThumbnailBudget = localStorage.getItem("berry_thumbnail_cache_budget_mb");
-    if (legacyThumbnailBudget) {
-      const parsed = parseInt(legacyThumbnailBudget, 10);
-      if (!isNaN(parsed) && parsed >= 256) {
-        config.thumbnail_cache_budget_mb = parsed;
+      const legacyAutoScan = localStorage.getItem("berry_autoscan");
+      if (legacyAutoScan !== null) {
+        config.auto_scan = legacyAutoScan !== "false";
       }
-    }
 
-    const legacySim = localStorage.getItem("berry_similarity_limit");
-    if (legacySim) {
-      const parsed = parseInt(legacySim, 10);
-      if (!isNaN(parsed) && parsed > 0) {
-        config.similarity_limit = parsed;
+      const legacyTheme = localStorage.getItem("berry_theme");
+      if (
+        legacyTheme === "system" || legacyTheme === "midnight" || legacyTheme === "graphite" ||
+        legacyTheme === "light" || legacyTheme === "violet"
+      ) {
+        config.theme = legacyTheme;
       }
-    }
 
-    const legacyComfy = localStorage.getItem("berry_comfyui_url");
-    if (legacyComfy) {
-      config.comfyui_url = legacyComfy;
-    } else if (!config.comfyui_url) {
-      config.comfyui_url = DEFAULT_CONFIG.comfyui_url;
-    }
+      const legacyBlur = localStorage.getItem("berry_blur_nsfw");
+      if (legacyBlur !== null) {
+        config.blur_nsfw = legacyBlur !== "false";
+      }
 
-    const legacyWebui = localStorage.getItem("berry_webui_url");
-    if (legacyWebui) {
-      config.webui_url = legacyWebui;
-    } else if (!config.webui_url) {
-      config.webui_url = DEFAULT_CONFIG.webui_url;
-    }
+      const legacyBadges = localStorage.getItem("berry_card_badges");
+      if (legacyBadges !== null) {
+        config.show_card_badges = legacyBadges !== "false";
+      }
 
-    if (modified) {
-      void saveAppConfig(config);
+      const legacyView = localStorage.getItem("berry_default_view");
+      if (legacyView === "grid" || legacyView === "masonry" || legacyView === "table") {
+        config.default_view = legacyView;
+      }
+
+      const legacyThumb = localStorage.getItem("berry_thumbnail_max_edge");
+      if (legacyThumb) {
+        const parsed = parseInt(legacyThumb, 10);
+        if (!isNaN(parsed) && parsed > 0) {
+          config.thumbnail_max_edge = parsed;
+        }
+      }
+
+      const legacyThumbnailBudget = localStorage.getItem("berry_thumbnail_cache_budget_mb");
+      if (legacyThumbnailBudget) {
+        const parsed = parseInt(legacyThumbnailBudget, 10);
+        if (!isNaN(parsed) && parsed >= 256) {
+          config.thumbnail_cache_budget_mb = parsed;
+        }
+      }
+
+      const legacySim = localStorage.getItem("berry_similarity_limit");
+      if (legacySim) {
+        const parsed = parseInt(legacySim, 10);
+        if (!isNaN(parsed) && parsed > 0) {
+          config.similarity_limit = parsed;
+        }
+      }
+
+      const legacyComfy = localStorage.getItem("berry_comfyui_url");
+      if (legacyComfy) {
+        config.comfyui_url = legacyComfy;
+      } else if (!config.comfyui_url) {
+        config.comfyui_url = DEFAULT_CONFIG.comfyui_url;
+      }
+
+      const legacyWebui = localStorage.getItem("berry_webui_url");
+      if (legacyWebui) {
+        config.webui_url = legacyWebui;
+      } else if (!config.webui_url) {
+        config.webui_url = DEFAULT_CONFIG.webui_url;
+      }
+
+      config.legacy_migration_complete = true;
+      await saveAppConfig(config);
     }
 
     // Mirror to localStorage for any synchronous instant fallbacks
@@ -184,7 +187,8 @@ export async function loadAppConfig(): Promise<AppConfig> {
  */
 export async function saveAppConfig(config: AppConfig): Promise<void> {
   try {
-    await invoke("save_app_config", { config });
+    const saved = await invoke<AppConfig>("save_app_config", { config });
+    Object.assign(config, saved);
     syncConfigToLocalStorage(config);
   } catch (err) {
     console.error("Failed to save app config:", err);
