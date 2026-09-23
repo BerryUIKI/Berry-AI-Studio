@@ -1,36 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { LruThumbnailCache } from "../src/utils/lru-cache.ts";
 
 test("LruThumbnailCache strictly bounds entry count to limit across 20,000 items", () => {
-  class LruThumbnailCache {
-    constructor(maxSize = 3000) {
-      this.cache = new Map();
-      this.maxSize = maxSize;
-    }
-    get(key) {
-      const val = this.cache.get(key);
-      if (val !== undefined) {
-        this.cache.delete(key);
-        this.cache.set(key, val);
-      }
-      return val;
-    }
-    set(key, value) {
-      if (this.cache.has(key)) {
-        this.cache.delete(key);
-      } else if (this.cache.size >= this.maxSize) {
-        const oldestKey = this.cache.keys().next().value;
-        if (oldestKey !== undefined) {
-          this.cache.delete(oldestKey);
-        }
-      }
-      this.cache.set(key, value);
-    }
-    get size() {
-      return this.cache.size;
-    }
-  }
-
   const cache = new LruThumbnailCache(3000);
   for (let i = 0; i < 20000; i++) {
     cache.set(`item_${i}`, `asset://localhost/thumb_${i}.webp`);
@@ -41,6 +13,33 @@ test("LruThumbnailCache strictly bounds entry count to limit across 20,000 items
   assert.equal(cache.get("item_16999"), undefined, "Item 16999 must have been evicted");
   assert.ok(cache.get("item_17000") !== undefined, "Item 17000 must still be present");
   assert.ok(cache.get("item_19999") !== undefined, "Latest item 19999 must still be present");
+});
+
+test("LruThumbnailCache promotes accessed items and supports delete and clear", () => {
+  const cache = new LruThumbnailCache(3);
+  cache.set("a", "url_a");
+  cache.set("b", "url_b");
+  cache.set("c", "url_c");
+
+  // Read "a" to promote it to most recently used
+  assert.equal(cache.get("a"), "url_a");
+
+  // Insert "d", which should evict "b" (oldest unaccessed) rather than "a"
+  cache.set("d", "url_d");
+  assert.equal(cache.get("b"), undefined);
+  assert.equal(cache.get("a"), "url_a");
+  assert.equal(cache.get("c"), "url_c");
+  assert.equal(cache.get("d"), "url_d");
+
+  // Delete
+  assert.equal(cache.delete("a"), true);
+  assert.equal(cache.get("a"), undefined);
+  assert.equal(cache.size, 2);
+
+  // Clear
+  cache.clear();
+  assert.equal(cache.size, 0);
+  assert.equal(cache.get("c"), undefined);
 });
 
 test("batchReadyKeys pruning maintains bounded memory footprint under continuous imports", () => {
@@ -108,3 +107,32 @@ test("simulates 50 folder switches with 500 images each without memory leaks", (
   assert.equal(globalListeners.size, 0, "Zero hanging global event listeners after unmount");
   assert.equal(activeViews.size, 0, "Zero hanging view instances after unmount");
 });
+
+test("thumbnail invalidation and failure contract across Grid and Table", async () => {
+  const fs = await import("node:fs/promises");
+  const thumbSource = await fs.readFile(new URL("../src/utils/thumbnail.ts", import.meta.url), "utf8");
+  const gridSource = await fs.readFile(new URL("../src/components/VirtualGrid.vue", import.meta.url), "utf8");
+  const listSource = await fs.readFile(new URL("../src/components/FileList.vue", import.meta.url), "utf8");
+
+  // 1. getThumbnailUrl rethrows error without caching fallback original
+  assert.doesNotMatch(thumbSource, /const fallbackUrl = assetUrl\(file\.path\);\s*memoryCache\.set/);
+  assert.match(thumbSource, /export function invalidateThumbnail\(file: ImageFile, tier: number\): void/);
+
+  // 2. clearThumbnailCache increments epoch to prevent old in-flight requests from populating cleared cache
+  assert.match(thumbSource, /cacheEpoch\+\+;\s*const generation = beginThumbnailRequestCycle\(\);/);
+  assert.match(thumbSource, /if \(epoch === cacheEpoch\) memoryCache\.set\(cacheKey, url\);/);
+
+  // 3. VirtualGrid preserves failure state, invalidates thumbnail on retry, and never mounts original for failed files
+  assert.match(gridSource, /invalidateThumbnail\(file, getThumbnailTier\(edge\)\);/);
+  assert.match(gridSource, /if \(failedImages\.value\.has\(file\.path\)\) return null;/);
+  assert.match(gridSource, /class="thumbnail-fallback thumbnail-failed"/);
+  assert.match(gridSource, /class="retry-thumb-btn"/);
+
+  // 4. FileList (Table) preserves failure state, offers retry, and never mounts full original for library files
+  assert.match(listSource, /invalidateThumbnail\(file, getThumbnailTier\(ROW_THUMBNAIL_EDGE\)\);/);
+  assert.match(listSource, /if \(failedImages\.value\.has\(file\.path\)\) return null;/);
+  assert.doesNotMatch(listSource, /return file\.id \? null : assetUrl\(file\.path\);/);
+  assert.match(listSource, /class="thumb-placeholder thumb-failed"/);
+  assert.match(listSource, /class="retry-thumb-btn table-retry-btn"/);
+});
+
