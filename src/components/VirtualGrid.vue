@@ -22,7 +22,7 @@ import {
 } from "../utils/thumbnail";
 import { t } from "../i18n";
 import { resolveStackHeroPaths } from "../utils/stack";
-import { calculateGalleryColumns } from "../utils/gallery-layout";
+import { calculateGalleryColumns, calculateGalleryTrackOffset } from "../utils/gallery-layout";
 import { hasActiveDialog, isEditableTarget } from "../utils/dialog";
 import { useGalleryNavigation } from "../utils/gallery-navigation";
 
@@ -177,6 +177,11 @@ const cols = computed(() => {
   return calculateGalleryColumns(containerWidth.value, props.itemMinWidth, props.gap);
 });
 
+// Calculate symmetrical horizontal offset to center columns and eliminate right-hand whitespace gaps
+const horizontalOffset = computed(() => {
+  return calculateGalleryTrackOffset(containerWidth.value, cols.value, itemWidth.value, props.gap);
+});
+
 // Keep the user's chosen card width stable. Resizing the window changes the
 // number of columns, not the image size (matching Eagle's gallery behavior).
 const itemWidth = computed(() => {
@@ -214,7 +219,7 @@ const masonryItems = computed<MasonryItem[]>(() => {
       file,
       index,
       top: columnHeights[column],
-      left: column * (itemWidth.value + props.gap),
+      left: horizontalOffset.value + column * (itemWidth.value + props.gap),
       width: itemWidth.value,
       height,
       imageHeight,
@@ -673,6 +678,7 @@ function onDragStart(e: DragEvent, file: ImageFile) {
             transform: layout === 'grid' ? `translateY(${translateY}px)` : undefined,
             gridTemplateColumns: layout === 'grid' ? `repeat(${cols}, ${itemWidth}px)` : undefined,
             gap: layout === 'grid' ? `${gap}px` : undefined,
+            justifyContent: layout === 'grid' ? 'safe center' : undefined,
           }"
         >
           <div
@@ -1041,6 +1047,7 @@ function onDragStart(e: DragEvent, file: ImageFile) {
   position: absolute;
   top: 0;
   left: 0;
+  justify-content: safe center;
 }
 
 .virtual-content.masonry-content {
