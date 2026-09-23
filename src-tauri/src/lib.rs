@@ -2,6 +2,7 @@ pub mod cloud_backup;
 pub mod cloud_sync;
 mod commands;
 mod config_store;
+pub mod legacy_migration;
 mod update_verification;
 mod watcher;
 
@@ -31,6 +32,8 @@ pub struct AppState {
     pub clip_failures: Arc<Mutex<HashMap<String, HashSet<i64>>>>,
     /// Cooperative cancellation flag for CLIP batch indexing.
     pub clip_cancel: Arc<AtomicBool>,
+    /// Coordinator for legacy Berry data discovery, migration and cleanup.
+    pub migration_coordinator: Arc<Mutex<legacy_migration::MigrationCoordinator>>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -71,6 +74,9 @@ pub fn run() {
                 cloud_sync: Arc::new(Mutex::new(cloud_sync::CloudSyncState::default())),
                 clip_failures: Arc::new(Mutex::new(HashMap::new())),
                 clip_cancel: Arc::new(AtomicBool::new(false)),
+                migration_coordinator: Arc::new(Mutex::new(
+                    legacy_migration::MigrationCoordinator::new(),
+                )),
             });
             let app_handle = app.handle().clone();
             std::thread::spawn(move || {
@@ -249,6 +255,13 @@ pub fn run() {
             commands::cloud_sync_cancel,
             commands::cloud_sync_get_progress,
             commands::cloud_sync_get_summary,
+            commands::get_legacy_migration_status,
+            commands::preview_legacy_migration,
+            commands::start_legacy_migration,
+            commands::get_legacy_migration_job,
+            commands::preview_legacy_cleanup,
+            commands::confirm_legacy_cleanup,
+            commands::defer_legacy_cleanup,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

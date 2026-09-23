@@ -378,6 +378,7 @@ dependencies = [
  "hex",
  "image",
  "keyring",
+ "libc",
  "minisign-verify",
  "notify",
  "serde",
