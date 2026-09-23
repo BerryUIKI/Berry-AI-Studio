@@ -17,6 +17,7 @@ import {
   getThumbnailTier,
   getThumbnailUrl,
   getThumbnailUrlSync,
+  invalidateThumbnail,
   requestBatchThumbnails,
   THUMBNAIL_PRIORITY,
 } from "../utils/thumbnail";
@@ -87,8 +88,11 @@ function onImageError(path: string) {
 }
 
 function retryImage(file: ImageFile) {
+  const item = visibleItems.value.find((item) => item.file.id === file.id);
+  const edge = Math.max(item?.width || itemWidth.value, item?.imageHeight || itemWidth.value);
+  invalidateThumbnail(file, getThumbnailTier(edge));
   failedImages.value.delete(file.path);
-  getThumbnailUrl(file, Math.max(itemWidth.value, rowHeight.value)).catch(() => {});
+  void loadThumbnailFor(file, edge, beginThumbnailRequestCycle());
 }
 
 
@@ -368,6 +372,7 @@ const thumbnailRevision = ref(0);
 
 function getCardImageSrc(file: ImageFile, displayEdge: number): string | null {
   void thumbnailRevision.value;
+  if (failedImages.value.has(file.path)) return null;
   if (!file.id) return assetUrl(file.path);
   return getThumbnailUrlSync(file, getThumbnailTier(displayEdge));
 }
@@ -378,8 +383,10 @@ async function loadThumbnailFor(file: ImageFile, displayEdge: number, generation
   try {
     await getThumbnailUrl(file, thumbnailTier, generation);
     thumbnailRevision.value += 1;
-  } catch {
-    // The viewport moved before this queued request began decoding.
+  } catch (error) {
+    if (!String(error).includes("thumbnail request canceled") && !isVideoContainer(file.container)) {
+      failedImages.value.add(file.path);
+    }
   }
 }
 

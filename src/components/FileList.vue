@@ -16,6 +16,7 @@ import {
   getThumbnailTier,
   getThumbnailUrl,
   getThumbnailUrlSync,
+  invalidateThumbnail,
 } from "../utils/thumbnail";
 import { t } from "../i18n";
 import { useGalleryNavigation } from "../utils/gallery-navigation";
@@ -116,13 +117,34 @@ watch(
 
 // Keep the table reactive without duplicating the shared bounded thumbnail LRU.
 const thumbnailRevision = ref(0);
+const failedImages = ref<Set<string>>(new Set());
+
+function onImageError(path: string) {
+  failedImages.value.add(path);
+}
+
+function retryImage(file: ImageFile) {
+  invalidateThumbnail(file, getThumbnailTier(ROW_THUMBNAIL_EDGE));
+  failedImages.value.delete(file.path);
+  const generation = beginThumbnailRequestCycle();
+  void getThumbnailUrl(file, getThumbnailTier(ROW_THUMBNAIL_EDGE), generation)
+    .then(() => {
+      thumbnailRevision.value += 1;
+    })
+    .catch((error) => {
+      if (!String(error).includes("thumbnail request canceled")) {
+        failedImages.value.add(file.path);
+      }
+    });
+}
 
 // Fast sync or async lookup for row image
 function getRowImageSrc(file: ImageFile): string | null {
   void thumbnailRevision.value;
+  if (failedImages.value.has(file.path)) return null;
   const syncCached = getThumbnailUrlSync(file, getThumbnailTier(ROW_THUMBNAIL_EDGE));
   if (syncCached) return syncCached;
-  return file.id ? null : assetUrl(file.path);
+  return null;
 }
 
 // Prefetch thumbnails for visible rows
@@ -140,8 +162,10 @@ watch(
           .then(() => {
             thumbnailRevision.value += 1;
           })
-          .catch(() => {
-            // The row left the visible window before decoding began.
+          .catch((error) => {
+            if (!String(error).includes("thumbnail request canceled") && !isVideoContainer(file.container)) {
+              failedImages.value.add(file.path);
+            }
           });
       }
     }
@@ -277,7 +301,22 @@ function size(meta: ImageFile["metadata"]): string {
                 class="thumb"
                 loading="lazy"
                 decoding="async"
+                @error="onImageError(file.path)"
               />
+              <div
+                v-else-if="failedImages.has(file.path)"
+                class="thumb-placeholder thumb-failed"
+              >
+                <button
+                  type="button"
+                  class="retry-thumb-btn table-retry-btn"
+                  :title="t.preview.retryThumbnail"
+                  :aria-label="t.preview.retryThumbnail"
+                  @click.stop="retryImage(file)"
+                >
+                  ↻
+                </button>
+              </div>
               <div
                 v-else-if="!isVideoContainer(file.container) && file.container !== 'txt'"
                 class="thumb-placeholder thumb-pending"
@@ -474,6 +513,34 @@ function size(meta: ImageFile["metadata"]): string {
   color: #999;
   background: rgba(0, 0, 0, 0.04);
   border-radius: 4px;
+}
+
+.thumb-failed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px dashed rgba(239, 68, 68, 0.4);
+}
+
+.table-retry-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #fff;
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.table-retry-btn:hover {
+  background: var(--color-primary);
+  border-color: var(--color-primary-hover);
 }
 
 .thumb-pending {
