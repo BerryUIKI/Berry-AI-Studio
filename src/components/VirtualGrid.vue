@@ -495,7 +495,7 @@ function isCollapsedStack(file: ImageFile): boolean {
 
 const stackHeroPaths = computed(() => resolveStackHeroPaths(props.files, props.stackMap ?? {}));
 
-function isStackCover(file: ImageFile): boolean {
+function isStackCover(file: ImageFile): file is ImageFile & { stack_id: string } {
   return Boolean(
     file.stack_id &&
     isStacked(file) &&
@@ -886,11 +886,7 @@ function onDragStart(e: DragEvent, file: ImageFile) {
 
                 <!-- Stacking badge -->
                 <button
-                  v-if="
-                    file.stack_id &&
-                    (stackMap?.[file.stack_id]?.count ?? 1) > 1 &&
-                    (!expandedStacks?.has(file.stack_id) || file.stack_order === 0)
-                  "
+                  v-if="isStackCover(file)"
                   type="button"
                   class="card-badge badge-stack"
                   :class="{ expanded: expandedStacks?.has(file.stack_id) }"
@@ -906,7 +902,7 @@ function onDragStart(e: DragEvent, file: ImageFile) {
 
                 <!-- Stack compare trigger button -->
                 <button
-                  v-if="file.stack_id && (stackMap?.[file.stack_id]?.count ?? 1) > 1"
+                  v-if="isStackCover(file)"
                   type="button"
                   class="card-stack-compare-btn"
                   :title="t.compare.title || 'Compare Stack'"
@@ -917,7 +913,7 @@ function onDragStart(e: DragEvent, file: ImageFile) {
 
                 <!-- Stack cull drafts trigger button -->
                 <button
-                  v-if="file.stack_id && (stackMap?.[file.stack_id]?.count ?? 1) > 1"
+                  v-if="isStackCover(file)"
                   type="button"
                   class="card-stack-cull-btn"
                   :title="t.stack.cullDrafts || 'Cull Lower-Rated Drafts'"
@@ -1407,16 +1403,23 @@ function onDragStart(e: DragEvent, file: ImageFile) {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  background: rgba(15, 23, 42, 0.86);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   color: #e0f2fe;
-  font-weight: 700;
+  font-weight: 600;
   font-size: 0.72em;
   padding: 0.15rem 0.45rem;
   border-radius: 4px;
   cursor: pointer;
   z-index: 2;
+  opacity: 0.85;
   transition: all 0.15s ease;
+}
+
+.grid-card:hover .badge-stack,
+.grid-card:focus-within .badge-stack,
+.badge-stack:focus-visible {
+  opacity: 1;
 }
 
 .stack-badge-icon {
@@ -1449,15 +1452,24 @@ function onDragStart(e: DragEvent, file: ImageFile) {
   opacity: 0.7;
 }
 
-.badge-stack:hover {
+.badge-stack:hover,
+.badge-stack:focus-visible {
   background: #0284c7;
   color: #fff;
   border-color: #38bdf8;
+  outline: 2px solid #38bdf8;
+  outline-offset: 1px;
 }
 
 .badge-stack.expanded {
+  background: rgba(37, 99, 235, 0.75);
+  color: #f0f9ff;
+  border-color: rgba(96, 165, 250, 0.55);
+}
+
+.badge-stack.expanded:hover,
+.badge-stack.expanded:focus-visible {
   background: #2563eb;
-  color: #fff;
   border-color: #60a5fa;
 }
 
@@ -1481,8 +1493,15 @@ function onDragStart(e: DragEvent, file: ImageFile) {
   transition: all 0.15s ease;
 }
 
-.grid-card:hover .card-stack-compare-btn {
+.grid-card:hover .card-stack-compare-btn,
+.grid-card:focus-within .card-stack-compare-btn,
+.card-stack-compare-btn:focus-visible {
   opacity: 1;
+}
+
+.card-stack-compare-btn:focus-visible {
+  outline: 2px solid #818cf8;
+  outline-offset: 1px;
 }
 
 .card-stack-compare-btn:hover {
@@ -1510,8 +1529,15 @@ function onDragStart(e: DragEvent, file: ImageFile) {
   transition: all 0.15s ease;
 }
 
-.grid-card:hover .card-stack-cull-btn {
+.grid-card:hover .card-stack-cull-btn,
+.grid-card:focus-within .card-stack-cull-btn,
+.card-stack-cull-btn:focus-visible {
   opacity: 1;
+}
+
+.card-stack-cull-btn:focus-visible {
+  outline: 2px solid #f59e0b;
+  outline-offset: 1px;
 }
 
 .card-stack-cull-btn:hover {
