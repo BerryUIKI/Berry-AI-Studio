@@ -572,6 +572,11 @@ function reset() {
   background: rgba(128, 128, 128, 0.12);
 }
 
+.form-select option {
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+}
+
 .range-inputs {
   display: flex;
   align-items: center;

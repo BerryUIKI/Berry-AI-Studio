@@ -1892,13 +1892,18 @@ async function saveSettings() {
 
 .select-input {
   background: var(--color-bg-primary);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #e2e8f0;
+  border: 1px solid var(--border-color);
+  color: var(--color-text-primary);
   border-radius: 5px;
   min-width: 178px;
   padding: 7px 30px 7px 10px;
   font-size: 0.75rem;
   outline: none;
+}
+
+.select-input option {
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
 }
 
 .toggle-checkbox {
@@ -2184,8 +2189,8 @@ async function saveSettings() {
 
 .url-input {
   background: var(--color-bg-primary);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  color: #e2e8f0;
+  border: 1px solid var(--border-color);
+  color: var(--color-text-primary);
   border-radius: 5px;
   padding: 6px 10px;
   font-size: 0.78rem;
@@ -2194,25 +2199,26 @@ async function saveSettings() {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
-.url-input:focus {
-  border-color: rgba(139, 92, 246, 0.5);
+.url-input:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
 }
 
 .btn-test-conn {
   padding: 6px 12px;
   font-size: 0.75rem;
   border-radius: 5px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(255, 255, 255, 0.05);
-  color: #f1f5f9;
+  border: 1px solid var(--border-color);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
   cursor: pointer;
   white-space: nowrap;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .btn-test-conn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.25);
+  background: var(--color-bg-tertiary);
+  border-color: var(--border-color-strong);
 }
 
 .btn-test-conn:disabled {

@@ -314,6 +314,13 @@ function onTrash() {
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
+:root[data-theme="light"] .batch-bar {
+  background: #ffffff;
+  color: #1a1a1a;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
 @media (prefers-color-scheme: light) {
   .batch-bar {
     background: #ffffff;
@@ -350,6 +357,10 @@ function onTrash() {
   border-radius: 4px;
   transition: all 0.15s ease;
   white-space: nowrap;
+}
+
+:root[data-theme="light"] .btn-text {
+  color: #666;
 }
 
 @media (prefers-color-scheme: light) {
@@ -416,6 +427,13 @@ function onTrash() {
   gap: 0.25rem;
   width: 220px;
   z-index: 101;
+}
+
+:root[data-theme="light"] .rating-menu {
+  background: #ffffff;
+  color: #222;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
 }
 
 @media (prefers-color-scheme: light) {

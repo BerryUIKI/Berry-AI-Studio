@@ -114,7 +114,7 @@ async function onClose() {
         <!-- Restore down icon -->
         <svg v-else viewBox="0 0 12 12" width="11" height="11">
           <rect x="3.5" y="1.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1" rx="0.5" />
-          <path d="M 1.5 4.5 L 1.5 10.5 L 7.5 10.5 L 7.5 4.5 Z" fill="#18181b" stroke="currentColor" stroke-width="1" />
+          <path d="M 1.5 4.5 L 1.5 10.5 L 7.5 10.5 L 7.5 4.5 Z" fill="var(--color-bg-app)" stroke="currentColor" stroke-width="1" />
         </svg>
       </button>
 
@@ -138,7 +138,7 @@ async function onClose() {
   height: 38px;
   min-height: 38px;
   background: var(--color-bg-app);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid var(--border-color);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -182,7 +182,7 @@ async function onClose() {
   font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: -0.01em;
-  color: #f1f5f9;
+  color: var(--color-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -222,15 +222,15 @@ async function onClose() {
   justify-content: center;
   background: transparent;
   border: none;
-  color: #94a3b8;
+  color: var(--color-text-muted);
   cursor: pointer;
   transition: background-color 0.15s, color 0.15s;
   outline: none;
 }
 
 .control-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  color: #f8fafc;
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
 }
 
 .control-btn.close:hover {
@@ -239,10 +239,15 @@ async function onClose() {
 }
 
 .control-btn:active {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--color-bg-active);
 }
 
 .control-btn.close:active {
   background: #dc2626;
+}
+
+.control-btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
 }
 </style>
