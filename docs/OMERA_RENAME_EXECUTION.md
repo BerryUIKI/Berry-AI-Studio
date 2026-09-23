@@ -2,6 +2,8 @@
 
 Status: implementation plan for [#134](https://github.com/BerryUIKI/Omera/issues/134), not evidence that the runtime identity or migration has shipped. This document is the single entry point for the **entire** Berry AI Studio → Omera rename. The safety protocol is specified in [OMERA_MIGRATION.md](OMERA_MIGRATION.md); API status is in [API_CONTRACTS.md](API_CONTRACTS.md); release gates are in [RELEASING.md](RELEASING.md). Read those contracts before changing code.
 
+For the latest merged-PR state and immediate to-do list, see [OMERA_RENAME_STATUS.md](OMERA_RENAME_STATUS.md). The baseline below is the original audit snapshot, not the current implementation baseline.
+
 Last audited against `dev` commit `232d1e20` on 2026-09-23. Always fetch current `dev`, record its exact SHA, inspect later changes, and use an isolated branch/worktree. Earlier handoff documents still contain historical baseline references (`4f57246`, draft PR #138); #138 has since merged. Do not base new work on those historical references.
 
 ## Target identity and compatibility boundary
