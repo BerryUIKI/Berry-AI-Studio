@@ -43,7 +43,7 @@
 ## 🚀 快速上手
 
 1. **下載安裝** — 前往 **[GitHub Releases 官方發佈頁面](https://github.com/BerryUIKI/Omera/releases/latest)** 下載相應作業系統的安裝檔。
-2. **加入目錄** — 將 Berry 指向您的 WebUI、ComfyUI 或 NovelAI 輸出目錄。選擇 *外鏈模式*（零拷貝就地引用）或 *AIGC 管線模式*（背景防抖自動收割）。
+2. **加入目錄** — 將 Omera 指向您的 WebUI、ComfyUI 或 NovelAI 輸出目錄。選擇 *外鏈模式*（零拷貝就地引用）或 *AIGC 管線模式*（背景防抖自動收割）。
 3. **瀏覽與創作** — 您的海量圖庫已即時完成索引。打星評分、打標管理、多圖對比、分詞提取與無損匯出皆在指尖。
 
 ---
@@ -293,7 +293,7 @@ Omera 的誕生離不開以下優秀的開源專案：
 
 <div align="center">
 
-**[⬆ 返回頂部](#-berry-ai-studio)**
+**[⬆ 返回頂部](#-omera)**
 
 如果您覺得 Omera 對您的創作有所幫助，請為我們點亮一顆 ⭐，這能讓更多創作者發現這個專案！
 

@@ -112,7 +112,7 @@ const previewFilename = computed(() => {
 async function handleBrowseDestination() {
   try {
     if (asZip.value) {
-      const defaultName = `berry_export_${new Date().toISOString().slice(0, 10)}.zip`;
+      const defaultName = `omera_export_${new Date().toISOString().slice(0, 10)}.zip`;
       const selected = await save({
         defaultPath: defaultName,
         filters: [{ name: "ZIP Archive", extensions: ["zip"] }],
