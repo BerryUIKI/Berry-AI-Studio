@@ -59,8 +59,10 @@ test("VirtualGrid enforces fixed card width and centered alignment across Grid a
   assert.match(gridSource, /justifyContent:\s*layout === ["']grid["'] \? ["']safe center["'] : undefined/);
   assert.match(gridSource, /\.virtual-content\s*\{[^}]*justify-content:\s*safe center;/s);
 
-  // 4. Masonry mode applies horizontalOffset to item left positions
-  assert.match(gridSource, /left:\s*horizontalOffset\.value \+ column \* \(itemWidth\.value \+ props\.gap\)/);
+  // 4. Masonry mode passes horizontalOffset to WaterfallGeometry
+  assert.match(gridSource, /geometry\.update\([^)]*horizontalOffset\.value[^)]*\)/);
+  const stateSource = await fs.readFile(new URL("../src/utils/gallery-state.ts", import.meta.url), "utf8");
+  assert.match(stateSource, /left:\s*offset \+ column \* \(width \+ gap\)/);
 });
 
 

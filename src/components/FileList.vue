@@ -76,20 +76,23 @@ const startRow = computed(() => {
 });
 
 const endRow = computed(() => {
+  void props.fileRevision;
   const visibleCount = Math.ceil(containerHeight.value / ROW_HEIGHT);
   const raw = startRow.value + visibleCount + OVERSCAN * 2;
   return Math.min(props.files.length - 1, raw);
 });
 
 const visibleFiles = computed(() => {
+  void props.fileRevision;
   if (props.files.length === 0) return [];
   return props.files.slice(startRow.value, endRow.value + 1);
 });
 
 const topSpacerHeight = computed(() => startRow.value * ROW_HEIGHT);
-const bottomSpacerHeight = computed(() =>
-  Math.max(0, (props.files.length - (endRow.value + 1)) * ROW_HEIGHT),
-);
+const bottomSpacerHeight = computed(() => {
+  void props.fileRevision;
+  return Math.max(0, (props.files.length - (endRow.value + 1)) * ROW_HEIGHT);
+});
 
 function onScroll(e: Event) {
   const target = e.target as HTMLElement;

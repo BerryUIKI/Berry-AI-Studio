@@ -26,6 +26,7 @@ import { resolveStackHeroPaths } from "../utils/stack";
 import { calculateGalleryColumns, calculateGalleryTrackOffset } from "../utils/gallery-layout";
 import { hasActiveDialog, isEditableTarget } from "../utils/dialog";
 import { useGalleryNavigation } from "../utils/gallery-navigation";
+import { WaterfallGeometry, visibleWaterfallItems } from "../utils/gallery-state";
 
 const props = withDefaults(
   defineProps<{
@@ -198,55 +199,38 @@ const CARD_INFO_HEIGHT = 56;
 const cardHeight = computed(() => itemWidth.value + CARD_INFO_HEIGHT);
 const rowHeight = computed(() => cardHeight.value + props.gap);
 
-interface MasonryItem {
-  file: ImageFile;
-  index: number;
-  top: number;
-  left: number;
-  width: number;
-  height: number;
-  imageHeight: number;
-  column: number;
-}
+const geometry = new WaterfallGeometry();
 
-const masonryItems = computed<MasonryItem[]>(() => {
+const masonryItems = computed(() => {
+  void props.fileRevision;
   if (props.layout !== "masonry") return [];
-  const columnHeights = Array.from({ length: cols.value }, () => 0);
-  return props.files.map((file, index) => {
-    const column = columnHeights.indexOf(Math.min(...columnHeights));
-    const sourceWidth = file.metadata?.width ?? 1;
-    const sourceHeight = file.metadata?.height ?? 1;
-    const ratio = sourceWidth > 0 && sourceHeight > 0 ? sourceHeight / sourceWidth : 1;
-    const imageHeight = Math.max(96, Math.round(itemWidth.value * ratio));
-    const height = imageHeight + CARD_INFO_HEIGHT;
-    const item = {
-      file,
-      index,
-      top: columnHeights[column],
-      left: horizontalOffset.value + column * (itemWidth.value + props.gap),
-      width: itemWidth.value,
-      height,
-      imageHeight,
-      column,
-    };
-    columnHeights[column] += height + props.gap;
-    return item;
-  });
+  return geometry.update(
+    props.files,
+    cols.value,
+    itemWidth.value,
+    props.gap,
+    horizontalOffset.value,
+  ).items;
 });
 
 const masonryColumns = computed(() => {
-  const columns = Array.from({ length: cols.value }, () => [] as MasonryItem[]);
-  for (const item of masonryItems.value) columns[item.column].push(item);
-  return columns;
+  void props.fileRevision;
+  void masonryItems.value;
+  return geometry.columns;
 });
 
 const masonryHeight = computed(() => {
-  if (!masonryItems.value.length) return 0;
-  return Math.max(...masonryItems.value.map((item) => item.top + item.height));
+  void props.fileRevision;
+  void masonryItems.value;
+  return geometry.height;
 });
 
 // Total grid rows and phantom scroll height
-const totalRows = computed(() => Math.ceil(props.files.length / cols.value));
+const totalRows = computed(() => {
+  void props.fileRevision;
+  return Math.ceil(props.files.length / cols.value);
+});
+
 const totalHeight = computed(() => {
   if (props.layout === "masonry") return masonryHeight.value;
   if (totalRows.value === 0) return 0;
@@ -285,33 +269,18 @@ const endIndex = computed(() =>
 );
 
 const visibleFiles = computed(() => {
+  void props.fileRevision;
   if (props.files.length === 0) return [];
   return props.files.slice(startIndex.value, endIndex.value + 1);
 });
 
 const visibleMasonryItems = computed(() => {
+  void props.fileRevision;
   if (props.layout !== "masonry") return [];
   const buffer = Math.max(itemWidth.value, props.overscan * 100);
   const top = Math.max(0, scrollTop.value - buffer);
   const bottom = scrollTop.value + containerHeight.value + buffer;
-  const visible: MasonryItem[] = [];
-
-  for (const column of masonryColumns.value) {
-    let low = 0;
-    let high = column.length;
-    while (low < high) {
-      const mid = (low + high) >>> 1;
-      if (column[mid].top + column[mid].height < top) low = mid + 1;
-      else high = mid;
-    }
-    for (let index = low; index < column.length; index += 1) {
-      const item = column[index];
-      if (item.top > bottom) break;
-      visible.push(item);
-    }
-  }
-
-  return visible.sort((a, b) => a.index - b.index);
+  return visibleWaterfallItems(masonryColumns.value, top, bottom);
 });
 
 const visibleItems = computed(() => {

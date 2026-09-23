@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, shallowRef, watch } from "vue";
+import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, shallowRef, triggerRef, watch } from "vue";
+import { GalleryPages } from "./utils/gallery-state";
 import { invoke } from "@tauri-apps/api/core";
 import { open as openFolderDialog } from "@tauri-apps/plugin-dialog";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
@@ -741,6 +742,7 @@ const targetTitle = computed(() => {
   }
 });
 
+const galleryPages = new GalleryPages();
 const galleryRevision = ref(0);
 watch(files, () => {
   galleryRevision.value++;
@@ -1524,13 +1526,6 @@ function currentPagedCriteria(offset: number, cursor?: PageCursor | null): Searc
   return criteria;
 }
 
-function collapseInactiveStacks(items: ImageFile[]): ImageFile[] {
-  const collapsedMap = Object.fromEntries(
-    Object.entries(stackMap.value).filter(([stackId]) => !expandedStacks.value.has(stackId)),
-  );
-  return collapseStackMembers(items, collapsedMap);
-}
-
 async function loadMoreFiles() {
   if (
     filesLoading.value || filesLoadingMore.value || !galleryHasMore.value ||
@@ -1561,9 +1556,15 @@ async function loadMoreFiles() {
 
     if (requestVersion !== libraryRequestVersion || offset !== nextGalleryOffset.value) return;
 
-    const seen = new Set(files.value.map((file) => file.id ?? file.path));
-    const appended = page.items.filter((file) => !seen.has(file.id ?? file.path));
-    files.value = collapseInactiveStacks([...files.value, ...appended]);
+    const replaced = galleryPages.append(
+      files.value,
+      page.items,
+      stackMap.value,
+      expandedStacks.value,
+    );
+    if (replaced) files.value = [...files.value];
+    else triggerRef(files);
+    galleryRevision.value++;
     if ("next_cursor" in page) {
       nextGalleryCursor.value = page.next_cursor ?? null;
     }
