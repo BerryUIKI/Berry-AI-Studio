@@ -124,7 +124,7 @@ function startEditing(album: Album) {
 </script>
 
 <template>
-  <div v-if="open" class="modal-backdrop" @click="emit('update:open', false)">
+  <div v-if="open" class="modal-backdrop" @click="emit('update:open', false)" v-dialog="() => emit('update:open', false)">
     <div class="modal-dialog" role="dialog" aria-modal="true" @click.stop>
       <div class="modal-header">
         <h2>

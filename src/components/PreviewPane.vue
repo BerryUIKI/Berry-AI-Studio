@@ -207,7 +207,7 @@ watch(
 </script>
 
 <template>
-  <div class="preview-backdrop" @click.self="emit('close')">
+  <div class="preview-backdrop" @click.self="emit('close')" v-dialog="() => emit('close')">
     <div class="preview-dialog">
       <!-- Top header bar -->
       <header class="dialog-header">

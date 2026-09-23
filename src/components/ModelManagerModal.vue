@@ -104,7 +104,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div v-if="show" class="modal-backdrop" @click.self="emit('close')">
+  <div v-if="show" class="modal-backdrop" @click.self="emit('close')" v-dialog="() => emit('close')">
     <div class="modal-container">
       <div class="modal-header">
         <div class="header-left">

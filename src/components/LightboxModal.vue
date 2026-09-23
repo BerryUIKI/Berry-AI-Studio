@@ -327,6 +327,7 @@ onUnmounted(() => {
     @mousemove="onMouseMove"
     @mouseup="onMouseUp"
     @click.self="emit('close')"
+    v-dialog="() => emit('close')"
   >
     <!-- Top HUD Bar -->
     <header class="lightbox-header">

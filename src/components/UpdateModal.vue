@@ -127,7 +127,7 @@ function handleOpenUpdatesFolder() {
 </script>
 
 <template>
-  <div v-if="show" class="modal-overlay" @click.self="emit('close')">
+  <div v-if="show" class="modal-overlay" @click.self="emit('close')" v-dialog="() => emit('close')">
     <div class="update-dialog">
       <!-- Header -->
       <div class="dialog-header">

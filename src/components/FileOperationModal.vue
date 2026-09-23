@@ -65,7 +65,7 @@ async function handleConfirm() {
 </script>
 
 <template>
-  <div v-if="open" class="modal-backdrop" @click.self="emit('close')">
+  <div v-if="open" class="modal-backdrop" @click.self="emit('close')" v-dialog="() => emit('close')">
     <div class="modal-container">
       <div class="modal-header">
         <div class="modal-title-wrap">

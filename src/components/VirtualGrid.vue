@@ -23,6 +23,7 @@ import {
 import { t } from "../i18n";
 import { resolveStackHeroPaths } from "../utils/stack";
 import { calculateGalleryColumns } from "../utils/gallery-layout";
+import { hasActiveDialog, isEditableTarget } from "../utils/dialog";
 
 const props = withDefaults(
   defineProps<{
@@ -537,9 +538,14 @@ watch(
 
 // Keyboard navigation
 function handleKeyDown(e: KeyboardEvent) {
-  // Only handle navigation if active element is not an input or textarea
-  const tag = (document.activeElement?.tagName ?? "").toLowerCase();
-  if (tag === "input" || tag === "textarea") return;
+  if (
+    e.defaultPrevented ||
+    hasActiveDialog() ||
+    isEditableTarget(e.target) ||
+    isEditableTarget(document.activeElement)
+  ) {
+    return;
+  }
 
   if (!props.files.length) return;
 

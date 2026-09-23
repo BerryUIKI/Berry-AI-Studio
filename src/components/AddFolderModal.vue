@@ -111,7 +111,7 @@ function close() {
 </script>
 
 <template>
-  <div class="modal-backdrop" @click.self="close">
+  <div class="modal-backdrop" @click.self="close" v-dialog="close">
     <div class="modal-dialog">
       <!-- Header -->
       <div class="modal-header">

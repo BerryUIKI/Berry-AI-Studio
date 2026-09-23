@@ -75,7 +75,7 @@ function skip() {
 </script>
 
 <template>
-  <div class="modal-backdrop" @click.self="skip">
+  <div class="modal-backdrop" @click.self="skip" v-dialog="skip">
     <div class="modal-dialog">
       <!-- Close button -->
       <button type="button" class="btn-modal-close" aria-label="Close" @click="skip">✕</button>
