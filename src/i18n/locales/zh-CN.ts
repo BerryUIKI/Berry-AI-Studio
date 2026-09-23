@@ -1,6 +1,21 @@
 import type { en } from "./en";
 
 export const zhCN: typeof en = {
+  review: {
+    indexFailures: "{count} 张图像处理失败。再次运行索引以重试。",
+    gallery: "图像库",
+    noMatches: "没有匹配的图像",
+    clearFilters: "清除筛选",
+    retry: "重试",
+    minimize: "最小化",
+    maximize: "最大化",
+    restoreWindow: "还原窗口",
+    close: "关闭",
+    emptyLibrary: "添加文件夹以开始使用图库。",
+    emptyFolder: "此文件夹为空。",
+    restartRestore: "恢复将重新启动应用程序。",
+    remoteUnavailable: "尚不支持远程存储；仍可导出迁移文件。",
+  },
   app: {
     title: "Berry AI Studio",
     tagline: "AI 生成图像的元数据索引与查看器",

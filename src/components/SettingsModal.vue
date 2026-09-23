@@ -405,7 +405,7 @@ async function loadSettingsAndPaths() {
     void checkComfyConnection();
     void checkWebuiConnection();
 
-    storageBackend.value = config.storage_backend || "sqlite";
+    storageBackend.value = "sqlite";
     remoteConnectionUrl.value = config.remote_connection_url || "";
     clientIdentifier.value = config.client_identifier || "local_client";
     rootMappings.value = config.root_mappings ? { ...config.root_mappings } : {};
@@ -537,7 +537,7 @@ async function saveSettings() {
       allow_multiple_open_stacks: allowMultipleStacksOpen.value,
       comfyui_url: comfyuiUrl.value,
       webui_url: webuiUrl.value,
-      storage_backend: storageBackend.value,
+      storage_backend: "sqlite",
       remote_connection_url: remoteConnectionUrl.value,
       client_identifier: clientIdentifier.value,
       root_mappings: rootMappings.value,
@@ -981,12 +981,12 @@ async function saveSettings() {
             <div class="setting-row">
               <div class="row-info">
                 <span class="row-label">{{ t.settings.storageBackend }}</span>
-                <span class="row-desc">{{ t.settings.storageBackendDesc }}</span>
+                <span class="row-desc">{{ t.review.remoteUnavailable }}</span>
               </div>
               <select v-model="storageBackend" class="select-input">
                 <option value="sqlite">{{ t.settings.backendSqlite }}</option>
-                <option value="mysql">{{ t.settings.backendMysql }}</option>
-                <option value="postgres">{{ t.settings.backendPostgres }}</option>
+                <option value="mysql" disabled>{{ t.settings.backendMysql }}</option>
+                <option value="postgres" disabled>{{ t.settings.backendPostgres }}</option>
               </select>
             </div>
 

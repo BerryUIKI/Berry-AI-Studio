@@ -1,4 +1,19 @@
 export const en = {
+  review: {
+    indexFailures: "{count} images failed. Run indexing again to retry.",
+    gallery: "Image gallery",
+    noMatches: "No matching images",
+    clearFilters: "Clear filters",
+    retry: "Retry",
+    minimize: "Minimize",
+    maximize: "Maximize",
+    restoreWindow: "Restore window",
+    close: "Close",
+    emptyLibrary: "Add a folder to start your library.",
+    emptyFolder: "This folder is empty.",
+    restartRestore: "Restore will restart the application.",
+    remoteUnavailable: "Remote storage is not yet supported; migration export remains available.",
+  },
   app: {
     title: "Berry AI Studio",
     tagline: "Metadata indexer and viewer for AI-generated images",
