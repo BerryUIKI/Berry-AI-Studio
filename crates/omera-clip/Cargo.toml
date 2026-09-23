@@ -1,0 +1,18 @@
+[package]
+name = "omera-clip"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Local CLIP/SigLIP multi-modal embedding and text-to-image semantic search for Omera"
+
+[dependencies]
+omera-domain = { path = "../omera-domain" }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
+ort = { version = "2.0.0-rc.13", features = ["download-binaries"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokenizers = { version = "0.22", default-features = false, features = ["fancy-regex"] }
+
+[dev-dependencies]
+tempfile = "3"

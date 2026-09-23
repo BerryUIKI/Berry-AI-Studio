@@ -5,10 +5,10 @@ use std::path::{Path, PathBuf};
 use std::sync::{mpsc, Arc, RwLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use berry_domain::{FilesystemChange, Folder};
-use berry_scan::{ScanStats, Scanner};
-use berry_storage::Database;
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+use omera_domain::{FilesystemChange, Folder};
+use omera_scan::{ScanStats, Scanner};
+use omera_storage::Database;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
 

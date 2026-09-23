@@ -12,11 +12,11 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use berry_domain::{
+use omera_domain::{
     CloudBackupConfig, CloudStorageProvider, CloudSyncOptions, CloudSyncPhase, CloudSyncProgress,
     CloudSyncResult, CloudSyncStrategy,
 };
-use berry_storage::Database;
+use omera_storage::Database;
 use tauri::{AppHandle, Emitter};
 
 use crate::cloud_backup::{sha256_file, sha256_hex, S3Client, WebDavClient};

@@ -1,0 +1,15 @@
+[package]
+name = "omera-metadata"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Metadata detection and extraction for AI-generated image formats"
+
+[dependencies]
+omera-domain = { path = "../omera-domain" }
+kamadak-exif = "0.6.1"
+serde_json = "1"
+
+[dev-dependencies]
+tempfile = "3"
+

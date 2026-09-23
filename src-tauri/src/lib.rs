@@ -10,7 +10,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::{Arc, Mutex};
 
-use berry_storage::Database;
+use omera_storage::Database;
 use tauri::Manager;
 
 /// Application-wide state managed by Tauri.
@@ -18,9 +18,9 @@ pub struct AppState {
     /// The migrated SQLite database, opened in the app data directory.
     pub db: Mutex<Database>,
     /// Optional active WD14 ONNX Tagger instance.
-    pub tagger: Mutex<Option<berry_tagger::Wd14Tagger>>,
+    pub tagger: Mutex<Option<omera_tagger::Wd14Tagger>>,
     /// Optional active CLIP / SigLIP text & image embedding engine.
-    pub clip: Mutex<Option<berry_clip::ClipEngine>>,
+    pub clip: Mutex<Option<omera_clip::ClipEngine>>,
     /// Optional cross-platform watcher. Failure to initialize it must not
     /// prevent the SQLite-backed library from opening.
     pub watcher: Mutex<Option<watcher::LibraryWatcher>>,
@@ -49,7 +49,7 @@ pub fn run() {
             let _ = std::fs::create_dir_all(data_dir.join("thumbnails"));
             let _ = std::fs::create_dir_all(data_dir.join("models"));
             let database_path = data_dir.join("berry.db");
-            berry_storage::recovery::apply_pending_restore(&database_path)
+            omera_storage::recovery::apply_pending_restore(&database_path)
                 .map_err(std::io::Error::other)?;
             let db = Database::connect(&database_path)?;
             let folders = db.list_folders()?;
@@ -101,7 +101,7 @@ pub fn run() {
             if let Err(error) = std::thread::Builder::new()
                 .name("berry-thumbnail-manifest".to_string())
                 .spawn(move || {
-                    if let Err(error) = berry_scan::synchronize_thumbnail_manifest(
+                    if let Err(error) = omera_scan::synchronize_thumbnail_manifest(
                         &thumbnail_data_dir,
                         &thumbnail_database_path,
                         commands::thumbnail_budget_bytes(thumbnail_budget_mb),

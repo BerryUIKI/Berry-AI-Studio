@@ -6,11 +6,11 @@ use std::path::Path;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use base64::Engine;
-use berry_domain::{
+use omera_domain::{
     CloudBackupConfig, CloudBackupResult, CloudPingResult, CloudRestoreResult, CloudSnapshotMeta,
     CloudStorageProvider,
 };
-use berry_storage::Database;
+use omera_storage::Database;
 use sha2::{Digest, Sha256};
 use zip::write::SimpleFileOptions;
 use zip::{ZipArchive, ZipWriter};

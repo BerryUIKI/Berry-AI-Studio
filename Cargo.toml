@@ -2,12 +2,12 @@
 resolver = "2"
 members = [
     "src-tauri",
-    "crates/berry-domain",
-    "crates/berry-metadata",
-    "crates/berry-scan",
-    "crates/berry-storage",
-    "crates/berry-tagger",
-    "crates/berry-clip",
+    "crates/omera-domain",
+    "crates/omera-metadata",
+    "crates/omera-scan",
+    "crates/omera-storage",
+    "crates/omera-tagger",
+    "crates/omera-clip",
 ]
 
 [workspace.package]

@@ -9,8 +9,8 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, MutexGuard};
 
-use berry_clip::{ClipEngine, ClipModelInfo};
-use berry_domain::{
+use omera_clip::{ClipEngine, ClipModelInfo};
+use omera_domain::{
     plan_prompt_stacks, Album, ChangeLogEntry, ChangeLogSyncQuery, CheckpointModelStat,
     CleanupQueueItem, CursorFilePage, DatabasePingResult, DatabaseStats, DetectedLora,
     ExportOptions, ExportSummary, FilePage, FileSortField, Folder, ImageFile, LoraModel,
@@ -18,9 +18,9 @@ use berry_domain::{
     PathResolver, PipelineDetectedPath, PromptStackCandidate, PromptStat, SearchCriteria,
     SimilarityMatch, SortDirection, StackSummary, StorageRoot, Tag,
 };
-use berry_scan::{execute_batch_export, ScanStats, Scanner};
-use berry_storage::Database;
-use berry_tagger::{ModelInfo, TagPrediction, TaggerConfig, Wd14Tagger};
+use omera_scan::{execute_batch_export, ScanStats, Scanner};
+use omera_storage::Database;
+use omera_tagger::{ModelInfo, TagPrediction, TaggerConfig, Wd14Tagger};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State};
 
@@ -446,7 +446,7 @@ fn criteria_with_query_context(query: &str, context: SearchCriteria) -> SearchCr
 #[cfg(test)]
 mod search_context_tests {
     use super::*;
-    use berry_domain::PageCursor;
+    use omera_domain::PageCursor;
 
     #[test]
     fn query_context_preserves_navigation_scope_and_paging() {
@@ -822,15 +822,15 @@ pub fn import_files_to_managed_vault_inner(
         }
 
         let container = match ext.as_str() {
-            "png" => berry_domain::Container::Png,
-            "jpg" | "jpeg" => berry_domain::Container::Jpeg,
-            "webp" => berry_domain::Container::WebP,
-            "mp4" => berry_domain::Container::Mp4,
-            "webm" => berry_domain::Container::Webm,
+            "png" => omera_domain::Container::Png,
+            "jpg" | "jpeg" => omera_domain::Container::Jpeg,
+            "webp" => omera_domain::Container::WebP,
+            "mp4" => omera_domain::Container::Mp4,
+            "webm" => omera_domain::Container::Webm,
             _ => continue,
         };
 
-        let metadata = berry_metadata::extract_metadata(container, &dest_path);
+        let metadata = omera_metadata::extract_metadata(container, &dest_path);
         let tgt_str = {
             let canonical = dest_path
                 .canonicalize()
@@ -1228,11 +1228,11 @@ pub async fn move_files(
         .ok_or("Database has no path")?
         .to_path_buf();
     tauri::async_runtime::spawn_blocking(move || {
-        berry_scan::file_operations::execute(
+        omera_scan::file_operations::execute(
             &database_path,
             &file_paths,
             Some(target_folder_id),
-            berry_scan::file_operations::Operation::Move,
+            omera_scan::file_operations::Operation::Move,
         )
     })
     .await
@@ -1252,11 +1252,11 @@ pub async fn copy_files(
         .ok_or("Database has no path")?
         .to_path_buf();
     tauri::async_runtime::spawn_blocking(move || {
-        berry_scan::file_operations::execute(
+        omera_scan::file_operations::execute(
             &database_path,
             &file_paths,
             Some(target_folder_id),
-            berry_scan::file_operations::Operation::Copy,
+            omera_scan::file_operations::Operation::Copy,
         )
     })
     .await
@@ -1275,11 +1275,11 @@ pub async fn trash_files(
         .ok_or("Database has no path")?
         .to_path_buf();
     tauri::async_runtime::spawn_blocking(move || {
-        berry_scan::file_operations::execute(
+        omera_scan::file_operations::execute(
             &database_path,
             &file_paths,
             None,
-            berry_scan::file_operations::Operation::Trash,
+            omera_scan::file_operations::Operation::Trash,
         )
     })
     .await
@@ -1358,7 +1358,7 @@ pub async fn restore_database(source_path: String, app_handle: AppHandle) -> Res
         .map_err(|e| e.to_string())?
         .join("berry.db");
     tauri::async_runtime::spawn_blocking(move || {
-        berry_storage::recovery::stage_restore(Path::new(&source_path), &active)
+        omera_storage::recovery::stage_restore(Path::new(&source_path), &active)
     })
     .await
     .map_err(|e| e.to_string())??;
@@ -1645,10 +1645,10 @@ pub async fn get_or_create_thumbnail(
     }
     tauri::async_runtime::spawn_blocking(move || {
         let worker_generation_tracker = generation_tracker.clone();
-        berry_scan::ensure_thumbnail(
+        omera_scan::ensure_thumbnail(
             &data_dir,
             &db_path,
-            berry_scan::ThumbnailRequest {
+            omera_scan::ThumbnailRequest {
                 file_id,
                 file_path: &file_path,
                 modified_at,
@@ -1705,8 +1705,8 @@ pub async fn save_video_thumbnail(
             .map(|d| d.as_secs() as i64)
             .unwrap_or(0);
 
-        if let Ok(db) = berry_storage::Database::connect(&db_path) {
-            let entry = berry_storage::ThumbnailCacheEntry {
+        if let Ok(db) = omera_storage::Database::connect(&db_path) {
+            let entry = omera_storage::ThumbnailCacheEntry {
                 file_id,
                 modified_at,
                 max_edge,
@@ -1740,7 +1740,7 @@ pub async fn batch_generate_thumbnails(
     cache_budget_mb: Option<u64>,
     generation: Option<u64>,
     state: State<'_, AppState>,
-) -> Result<berry_scan::ThumbnailBatchResult, String> {
+) -> Result<omera_scan::ThumbnailBatchResult, String> {
     let data_dir = app_handle
         .path()
         .app_data_dir()
@@ -1760,7 +1760,7 @@ pub async fn batch_generate_thumbnails(
     let app_clone = app_handle.clone();
     let worker_generation_tracker = generation_tracker.clone();
     let count = tauri::async_runtime::spawn_blocking(move || {
-        berry_scan::batch_generate_thumbnails(
+        omera_scan::batch_generate_thumbnails(
             &data_dir,
             &db_path,
             tuples,
@@ -1769,7 +1769,7 @@ pub async fn batch_generate_thumbnails(
             Some(move |current: usize, total: usize| {
                 let _ = app_clone.emit(
                     "thumbnail-progress",
-                    berry_scan::ThumbnailProgress {
+                    omera_scan::ThumbnailProgress {
                         current,
                         total,
                         done: current >= total,
@@ -1784,7 +1784,7 @@ pub async fn batch_generate_thumbnails(
 
     let _ = app_handle.emit(
         "thumbnail-progress",
-        berry_scan::ThumbnailProgress {
+        omera_scan::ThumbnailProgress {
             current: total,
             total,
             done: true,
@@ -1806,8 +1806,8 @@ pub fn cancel_thumbnail_requests(generation: u64, state: State<'_, AppState>) {
 #[tauri::command]
 pub fn get_thumbnail_queue_diagnostics(
     state: State<'_, AppState>,
-) -> berry_scan::ThumbnailQueueDiagnostics {
-    let mut diag = berry_scan::get_thumbnail_queue_diagnostics();
+) -> omera_scan::ThumbnailQueueDiagnostics {
+    let mut diag = omera_scan::get_thumbnail_queue_diagnostics();
     diag.active_generation = state.thumbnail_generation.load(Ordering::Acquire);
     diag
 }
@@ -1815,7 +1815,7 @@ pub fn get_thumbnail_queue_diagnostics(
 /// Reset runtime thumbnail queue diagnostics counters.
 #[tauri::command]
 pub fn reset_thumbnail_queue_diagnostics() {
-    berry_scan::reset_thumbnail_queue_diagnostics();
+    omera_scan::reset_thumbnail_queue_diagnostics();
 }
 
 /// Get filesystem watcher status and health metrics.
@@ -1840,7 +1840,7 @@ pub fn get_watcher_status(state: State<'_, AppState>) -> crate::watcher::Watcher
 pub async fn get_thumbnail_cache_stats(
     app_handle: AppHandle,
     cache_budget_mb: Option<u64>,
-) -> Result<berry_scan::ThumbnailCacheStats, String> {
+) -> Result<omera_scan::ThumbnailCacheStats, String> {
     let data_dir = app_handle
         .path()
         .app_data_dir()
@@ -1848,7 +1848,7 @@ pub async fn get_thumbnail_cache_stats(
     let db_path = data_dir.join("berry.db");
     let budget_bytes = thumbnail_budget_bytes(cache_budget_mb);
     tauri::async_runtime::spawn_blocking(move || {
-        berry_scan::get_thumbnail_cache_stats(&data_dir, &db_path, budget_bytes)
+        omera_scan::get_thumbnail_cache_stats(&data_dir, &db_path, budget_bytes)
     })
     .await
     .map_err(|error| format!("Thumbnail cache statistics task failed: {error}"))?
@@ -1863,7 +1863,7 @@ pub async fn clear_thumbnail_cache(app_handle: AppHandle) -> Result<usize, Strin
         .map_err(|e| format!("Failed to get app data dir: {e}"))?;
     let db_path = data_dir.join("berry.db");
     tauri::async_runtime::spawn_blocking(move || {
-        berry_scan::clear_thumbnail_cache(&data_dir, &db_path)
+        omera_scan::clear_thumbnail_cache(&data_dir, &db_path)
     })
     .await
     .map_err(|error| format!("Thumbnail cache clearing task failed: {error}"))?
@@ -2538,7 +2538,7 @@ pub fn get_image_detected_loras(
 
     let mut detected = Vec::new();
     if let Some(ref meta) = file.metadata {
-        detected = berry_metadata::lora::extract_loras_full(
+        detected = omera_metadata::lora::extract_loras_full(
             meta.prompt.as_deref(),
             meta.raw.as_deref(),
             meta.parameters.as_deref(),
@@ -2586,13 +2586,13 @@ pub fn import_lora_civitai_info(
                 .and_then(|v| v.as_str())
         })
         .or_else(|| root.get("name").and_then(|v| v.as_str()))
-        .map(berry_metadata::lora::clean_lora_name)
+        .map(omera_metadata::lora::clean_lora_name)
         .unwrap_or_else(|| {
             let stem = path
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("unknown_lora");
-            berry_metadata::lora::clean_lora_name(stem)
+            omera_metadata::lora::clean_lora_name(stem)
         });
 
     if name.is_empty() {
@@ -2772,7 +2772,7 @@ pub struct AppConfig {
     #[serde(default)]
     pub root_mappings: HashMap<String, String>,
     #[serde(default)]
-    pub cloud_backup: berry_domain::CloudBackupConfig,
+    pub cloud_backup: omera_domain::CloudBackupConfig,
 }
 
 fn default_comfyui_url() -> String {
@@ -2848,7 +2848,7 @@ impl Default for AppConfig {
             remote_connection_url: String::new(),
             client_identifier: default_client_identifier(),
             root_mappings: HashMap::new(),
-            cloud_backup: berry_domain::CloudBackupConfig::default(),
+            cloud_backup: omera_domain::CloudBackupConfig::default(),
         }
     }
 }
@@ -3441,14 +3441,14 @@ pub fn harvest_pipeline_folder(
         }
 
         let container = match ext.as_str() {
-            "png" => berry_domain::Container::Png,
-            "jpg" | "jpeg" => berry_domain::Container::Jpeg,
-            "webp" => berry_domain::Container::WebP,
-            "mp4" => berry_domain::Container::Mp4,
+            "png" => omera_domain::Container::Png,
+            "jpg" | "jpeg" => omera_domain::Container::Jpeg,
+            "webp" => omera_domain::Container::WebP,
+            "mp4" => omera_domain::Container::Mp4,
             _ => continue,
         };
 
-        let metadata = berry_metadata::extract_metadata(container, &target_path);
+        let metadata = omera_metadata::extract_metadata(container, &target_path);
 
         let image_file = ImageFile {
             id: None,
@@ -3810,19 +3810,19 @@ pub fn send_to_webui(
 /// Test connectivity and latency to the configured cloud backup provider.
 #[tauri::command]
 pub fn cloud_backup_test_connection(
-    config: berry_domain::CloudBackupConfig,
-) -> Result<berry_domain::CloudPingResult, String> {
+    config: omera_domain::CloudBackupConfig,
+) -> Result<omera_domain::CloudPingResult, String> {
     Ok(crate::cloud_backup::test_cloud_connection(&config))
 }
 
 /// Create a full point-in-time library snapshot archive and upload to cloud storage.
 #[tauri::command]
 pub async fn cloud_backup_create_snapshot(
-    config: berry_domain::CloudBackupConfig,
+    config: omera_domain::CloudBackupConfig,
     description: Option<String>,
     app_handle: AppHandle,
     state: State<'_, AppState>,
-) -> Result<berry_domain::CloudBackupResult, String> {
+) -> Result<omera_domain::CloudBackupResult, String> {
     let data_dir = app_handle
         .path()
         .app_data_dir()
@@ -3842,18 +3842,18 @@ pub async fn cloud_backup_create_snapshot(
 /// List all available snapshot archives from the cloud storage backend.
 #[tauri::command]
 pub fn cloud_backup_list_snapshots(
-    config: berry_domain::CloudBackupConfig,
-) -> Result<Vec<berry_domain::CloudSnapshotMeta>, String> {
+    config: omera_domain::CloudBackupConfig,
+) -> Result<Vec<omera_domain::CloudSnapshotMeta>, String> {
     crate::cloud_backup::list_cloud_snapshots(&config)
 }
 
 /// Restore a cloud snapshot into the active SQLite database.
 #[tauri::command]
 pub async fn cloud_backup_restore_snapshot(
-    config: berry_domain::CloudBackupConfig,
+    config: omera_domain::CloudBackupConfig,
     snapshot_filename: String,
     app_handle: AppHandle,
-) -> Result<berry_domain::CloudRestoreResult, String> {
+) -> Result<omera_domain::CloudRestoreResult, String> {
     let active = app_handle
         .path()
         .app_data_dir()
@@ -3870,8 +3870,8 @@ pub async fn cloud_backup_restore_snapshot(
 #[tauri::command]
 pub async fn cloud_sync_start(
     app_handle: AppHandle,
-    config: berry_domain::CloudBackupConfig,
-    options: berry_domain::CloudSyncOptions,
+    config: omera_domain::CloudBackupConfig,
+    options: omera_domain::CloudSyncOptions,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let sync_state = Arc::clone(&state.cloud_sync);
@@ -3908,7 +3908,7 @@ pub fn cloud_sync_cancel(state: State<'_, AppState>) -> Result<(), String> {
 #[tauri::command]
 pub fn cloud_sync_get_progress(
     state: State<'_, AppState>,
-) -> Result<berry_domain::CloudSyncProgress, String> {
+) -> Result<omera_domain::CloudSyncProgress, String> {
     let st = state
         .cloud_sync
         .lock()
@@ -3919,7 +3919,7 @@ pub fn cloud_sync_get_progress(
 #[tauri::command]
 pub fn cloud_sync_get_summary(
     state: State<'_, AppState>,
-) -> Result<Option<berry_domain::CloudSyncResult>, String> {
+) -> Result<Option<omera_domain::CloudSyncResult>, String> {
     let st = state
         .cloud_sync
         .lock()
@@ -3931,7 +3931,7 @@ pub fn cloud_sync_get_summary(
 pub fn get_legacy_migration_status(
     app: AppHandle,
     state: State<'_, AppState>,
-) -> Result<berry_domain::LegacyMigrationStatus, String> {
+) -> Result<omera_domain::LegacyMigrationStatus, String> {
     let mut coordinator = state
         .migration_coordinator
         .lock()
@@ -3944,7 +3944,7 @@ pub fn preview_legacy_migration(
     app: AppHandle,
     state: State<'_, AppState>,
     source_id: String,
-) -> Result<berry_domain::LegacyMigrationPreview, String> {
+) -> Result<omera_domain::LegacyMigrationPreview, String> {
     let mut coordinator = state
         .migration_coordinator
         .lock()
@@ -3957,7 +3957,7 @@ pub fn start_legacy_migration(
     app: AppHandle,
     state: State<'_, AppState>,
     plan_id: String,
-) -> Result<berry_domain::LegacyMigrationJob, String> {
+) -> Result<omera_domain::LegacyMigrationJob, String> {
     let mut coordinator = state
         .migration_coordinator
         .lock()
@@ -3969,7 +3969,7 @@ pub fn start_legacy_migration(
 pub fn get_legacy_migration_job(
     state: State<'_, AppState>,
     job_id: String,
-) -> Result<berry_domain::LegacyMigrationJob, String> {
+) -> Result<omera_domain::LegacyMigrationJob, String> {
     let coordinator = state
         .migration_coordinator
         .lock()
@@ -3982,7 +3982,7 @@ pub fn preview_legacy_cleanup(
     app: AppHandle,
     state: State<'_, AppState>,
     receipt_id: String,
-) -> Result<berry_domain::LegacyCleanupPreview, String> {
+) -> Result<omera_domain::LegacyCleanupPreview, String> {
     let mut coordinator = state
         .migration_coordinator
         .lock()
@@ -3996,7 +3996,7 @@ pub fn confirm_legacy_cleanup(
     state: State<'_, AppState>,
     preview_id: String,
     confirmed: bool,
-) -> Result<berry_domain::LegacyCleanupResult, String> {
+) -> Result<omera_domain::LegacyCleanupResult, String> {
     let mut coordinator = state
         .migration_coordinator
         .lock()
@@ -4164,7 +4164,7 @@ mod tests {
             path: subsub.join("img.png").to_string_lossy().to_string(),
             size_bytes: 10,
             modified_at: 100,
-            container: berry_domain::Container::Png,
+            container: omera_domain::Container::Png,
             metadata: None,
             rating: None,
             aesthetic_score: None,
