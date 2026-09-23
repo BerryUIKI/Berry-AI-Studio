@@ -33,6 +33,8 @@ Current public wiki content still has many old product-name references (181 matc
 
 R0/R2 are the immediate lead-owned critical path. The documentation Agent can work independently now. R3 may be researched but not integrated before the lead approves its baseline and migration contract. The later image-compression work ([#158](https://github.com/BerryUIKI/Omera/issues/158), [#159](https://github.com/BerryUIKI/Omera/issues/159), [#160](https://github.com/BerryUIKI/Omera/issues/160)) remains after rename stabilization.
 
+Other open work at this snapshot: [#102](https://github.com/BerryUIKI/Omera/issues/102) long-running command/lock ownership, [#107](https://github.com/BerryUIKI/Omera/issues/107) WebView asset/CSP boundaries, and [#124](https://github.com/BerryUIKI/Omera/issues/124) single-instance lifecycle are safety-related and should be coordinated with R2/R4. [#135](https://github.com/BerryUIKI/Omera/issues/135) is measured SQLite evolution, not a reason to replace the engine during the rename. [#128](https://github.com/BerryUIKI/Omera/issues/128) automatic NSFW classification and [#137](https://github.com/BerryUIKI/Omera/issues/137) in-app help are separate product/UI assignments. Recheck issue states before dispatch; this list is a dated snapshot, not an automatic assignment.
+
 ## Non-negotiable acceptance for the identity switch
 
 - Preserve and read old databases, config, `berry_*` preferences, credentials and backup archives before writing new Omera locations. New Omera values win even when `false`, `0` or empty. A changed WebView origin cannot be assumed to expose old localStorage; provide a bridge/import path.
