@@ -42,4 +42,4 @@ Baseline at preparation: `4f57246`. Start from current approved `dev`, record th
 4. Evaluate measured schema/index changes, not engine replacement by assumption.
 5. Qualify signing and real platform installers before release.
 
-The lead should provide contracts, review and small high-impact changes. Routine implementation is dispatched through [HANDOFF_PROMPTS.md](HANDOFF_PROMPTS.md), with acceptance in [ENGINEERING_HANDOFF.md](ENGINEERING_HANDOFF.md). #118 and remote collaboration remain deferred product work.
+The lead should provide contracts, review and small high-impact changes. Routine implementation is dispatched through [HANDOFF_PROMPTS.md](HANDOFF_PROMPTS.md), with acceptance in [ENGINEERING_HANDOFF.md](ENGINEERING_HANDOFF.md). The #118 product direction is approved in [IMAGE_TRANSFORM_PLAN.md](IMAGE_TRANSFORM_PLAN.md) for post-stabilization Phase 6; no implementation package is ready to dispatch until its safety gates and exact baseline are approved. Remote collaboration remains deferred product work.
