@@ -64,3 +64,48 @@ test("result summaries count and select heroes only among matching members", () 
   assert.equal(summary["stack-a"].count, 2);
   assert.equal(summary["stack-b"], undefined);
 });
+
+test("expanded stack hero-only gating prevents badge and control spam across 23 members", () => {
+  const members = Array.from({ length: 23 }, (_, i) => image(i + 1, `img_${i + 1}.png`, i));
+  const stackMap = { "stack-a": { count: 23, heroId: 1 } };
+  const heroPaths = resolveStackHeroPaths(members, stackMap);
+
+  function isStackCover(file) {
+    return Boolean(
+      file.stack_id &&
+      (stackMap[file.stack_id]?.count ?? 1) > 1 &&
+      heroPaths.get(file.stack_id) === file.path,
+    );
+  }
+
+  const covers = members.filter(isStackCover);
+  assert.equal(covers.length, 1, "Only 1 item among 23 expanded members must be the stack cover");
+  assert.equal(covers[0].path, "img_1.png");
+
+  // Non-cover members must NOT display stack controls
+  const nonCovers = members.filter((m) => !isStackCover(m));
+  assert.equal(nonCovers.length, 22, "22 members must not be marked as stack cover");
+});
+
+test("VirtualGrid enforces hero-only stack controls and keyboard-accessible hover/focus styling", async () => {
+  const fs = await import("node:fs/promises");
+  const gridSource = await fs.readFile(new URL("../src/components/VirtualGrid.vue", import.meta.url), "utf8");
+
+  // 1. Gating verification: badge-stack, compare-btn, cull-btn are only rendered on isStackCover(file)
+  assert.match(gridSource, /<button\s+v-if="isStackCover\(file\)"\s+type="button"\s+class="card-badge badge-stack"/);
+  assert.match(gridSource, /<button\s+v-if="isStackCover\(file\)"\s+type="button"\s+class="card-stack-compare-btn"/);
+  assert.match(gridSource, /<button\s+v-if="isStackCover\(file\)"\s+type="button"\s+class="card-stack-cull-btn"/);
+
+  // 2. Visual noise reduction: default badge-stack opacity is softened
+  assert.match(gridSource, /\.badge-stack\s*\{[^}]*opacity:\s*0\.85/s);
+
+  // 3. Hover / focus behavior: reveals on card hover, focus-within, and button focus-visible
+  assert.match(gridSource, /\.grid-card:hover\s+\.badge-stack,\s*\.grid-card:focus-within\s+\.badge-stack,\s*\.badge-stack:focus-visible\s*\{/s);
+  assert.match(gridSource, /\.grid-card:hover\s+\.card-stack-compare-btn,\s*\.grid-card:focus-within\s+\.card-stack-compare-btn,\s*\.card-stack-compare-btn:focus-visible\s*\{/s);
+  assert.match(gridSource, /\.grid-card:hover\s+\.card-stack-cull-btn,\s*\.grid-card:focus-within\s+\.card-stack-cull-btn,\s*\.card-stack-cull-btn:focus-visible\s*\{/s);
+
+  // 4. Focus rings for accessibility
+  assert.match(gridSource, /\.card-stack-compare-btn:focus-visible\s*\{\s*outline:/);
+  assert.match(gridSource, /\.card-stack-cull-btn:focus-visible\s*\{\s*outline:/);
+  assert.match(gridSource, /\.badge-stack:focus-visible\s*\{/);
+});
