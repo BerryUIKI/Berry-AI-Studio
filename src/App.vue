@@ -741,29 +741,68 @@ const targetTitle = computed(() => {
   }
 });
 
-const galleryContextKey = computed(() => {
-  if (similaritySourceFile.value) {
-    return `similarity-${similaritySourceFile.value.id ?? similaritySourceFile.value.path}`;
-  }
-  if (searchQuery.value.trim()) {
-    return `search-${searchQuery.value.trim()}`;
-  }
-  switch (activeTarget.value.type) {
-    case "folder":
-      return `folder-${activeTarget.value.folder.id}`;
-    case "album":
-      return `album-${activeTarget.value.album.id}`;
-    case "tag":
-      return `tag-${activeTarget.value.tag.id}`;
-    case "favorites":
-      return "favorites";
-    case "nsfw":
-      return "nsfw";
-    case "all":
-    default:
-      return "all";
-  }
+const galleryRevision = ref(0);
+watch(files, () => {
+  galleryRevision.value++;
 });
+
+const galleryContextKey = computed(() =>
+  JSON.stringify({
+    target:
+      activeTarget.value.type === "folder"
+        ? ["folder", activeTarget.value.folder.id]
+        : activeTarget.value.type === "album"
+          ? ["album", activeTarget.value.album.id]
+          : activeTarget.value.type === "tag"
+            ? ["tag", activeTarget.value.tag.id]
+            : activeTarget.value.type,
+    query: searchQuery.value.trim(),
+    semantic: isSemanticSearch.value,
+    similarity: similaritySourceFile.value?.id,
+    sort: sortField.value,
+    direction: sortDirection.value,
+    filters: activeCriteria.value,
+  }),
+);
+
+const emptyGalleryMessage = computed(() => {
+  if (error.value) return error.value;
+  if (folders.value.length === 0) return t.value.review.emptyLibrary;
+  if (
+    searchQuery.value.trim() ||
+    activeTarget.value.type !== "folder" ||
+    activeFilterCount.value > 0
+  ) {
+    return t.value.review.noMatches;
+  }
+  return t.value.review.emptyFolder;
+});
+
+const emptyGalleryAction = computed(() => {
+  if (error.value) return t.value.review.retry;
+  if (folders.value.length === 0) return t.value.review.retry;
+  if (searchQuery.value.trim() || activeFilterCount.value > 0) {
+    return t.value.review.clearFilters;
+  }
+  return t.value.review.retry;
+});
+
+function recoverGallery() {
+  selectedFile.value = null;
+  selectedFilePaths.value = new Set();
+  if (error.value) {
+    error.value = "";
+    void loadFiles();
+  } else if (folders.value.length === 0) {
+    addFolderModalOpen.value = true;
+  } else if (searchQuery.value.trim() || activeFilterCount.value > 0) {
+    searchQuery.value = "";
+    activeCriteria.value = {};
+    void loadFiles();
+  } else {
+    void loadFiles();
+  }
+}
 
 async function onFolderScanned(_folderId: number) {
   await refreshCounts();
@@ -2069,6 +2108,10 @@ function onResetZoom() {
           <VirtualGrid
             v-if="viewMode !== 'table'"
             :files="files"
+            :file-revision="galleryRevision"
+            :empty-message="emptyGalleryMessage"
+            :empty-action-text="emptyGalleryAction"
+            @recover="recoverGallery"
             :selected-file="selectedFile"
             :selected-file-paths="selectedFilePaths"
             :loading="filesLoading"
@@ -2093,7 +2136,12 @@ function onResetZoom() {
 
           <FileList
             v-else
+            :context-key="galleryContextKey"
             :files="files"
+            :file-revision="galleryRevision"
+            :empty-message="emptyGalleryMessage"
+            :empty-action-text="emptyGalleryAction"
+            @recover="recoverGallery"
             :selected-file="selectedFile"
             :selected-file-paths="selectedFilePaths"
             :loading="filesLoading"
