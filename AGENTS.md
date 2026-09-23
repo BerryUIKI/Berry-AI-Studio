@@ -22,10 +22,10 @@ This file defines repository-local instructions for coding agents and automated 
 
 - `src/`: Vue 3 and TypeScript UI. Keep expensive filesystem and image work out of the WebView thread.
 - `src-tauri/`: thin Tauri command adapters. Commands validate input, release shared locks quickly, and delegate business logic.
-- `crates/berry-domain/`: shared models with no I/O dependencies.
-- `crates/berry-storage/`: SQLite queries and append-only schema migrations.
-- `crates/berry-metadata/`: metadata parsing.
-- `crates/berry-scan/`: filesystem indexing and thumbnail generation.
+- `crates/omera-domain/`: shared models with no I/O dependencies.
+- `crates/omera-storage/`: SQLite queries and append-only schema migrations.
+- `crates/omera-metadata/`: metadata parsing.
+- `crates/omera-scan/`: filesystem indexing and thumbnail generation.
 - `tests/`: frontend-side Node tests. Rust unit tests live beside their modules.
 
 Do not place business rules in Tauri commands or Vue templates when they belong in a reusable Rust crate or TypeScript utility.
@@ -44,7 +44,7 @@ See `docs/PERFORMANCE.md` for the current performance model, implemented safegua
 
 ## Database and Configuration Changes
 
-- SQLite migrations are append-only in `crates/berry-storage/src/migrations.rs`. Never edit an applied migration.
+- SQLite migrations are append-only in `crates/omera-storage/src/migrations.rs`. Never edit an applied migration.
 - New configuration fields require compatible defaults in both `src/utils/config.ts` and `src-tauri/src/commands.rs`.
 - Keep legacy configuration readable with Serde defaults and localStorage migration where relevant.
 

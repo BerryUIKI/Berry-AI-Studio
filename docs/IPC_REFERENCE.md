@@ -86,12 +86,12 @@ The generator validates command coverage, not Serde field compatibility, safety,
 | `open_external_url` | `url: String` | `Result<(), String>` |
 | `get_or_create_thumbnail` | `request: ThumbnailRequestArgs` | `Result<String, String>` |
 | `save_video_thumbnail` | `fileId: i64`<br>`modifiedAt: i64`<br>`maxEdge: u32`<br>`base64Data: String` | `Result<String, String>` |
-| `batch_generate_thumbnails` | `items: Vec<BatchThumbnailItem>`<br>`maxEdge: Option<u32>`<br>`cacheBudgetMb: Option<u64>`<br>`generation: Option<u64>` | `Result<berry_scan::ThumbnailBatchResult, String>` |
+| `batch_generate_thumbnails` | `items: Vec<BatchThumbnailItem>`<br>`maxEdge: Option<u32>`<br>`cacheBudgetMb: Option<u64>`<br>`generation: Option<u64>` | `Result<omera_scan::ThumbnailBatchResult, String>` |
 | `cancel_thumbnail_requests` | `generation: u64` | `()` |
-| `get_thumbnail_queue_diagnostics` | (none) | `berry_scan::ThumbnailQueueDiagnostics` |
+| `get_thumbnail_queue_diagnostics` | (none) | `omera_scan::ThumbnailQueueDiagnostics` |
 | `reset_thumbnail_queue_diagnostics` | (none) | `()` |
 | `get_watcher_status` | (none) | `crate::watcher::WatcherStatus` |
-| `get_thumbnail_cache_stats` | `cacheBudgetMb: Option<u64>` | `Result<berry_scan::ThumbnailCacheStats, String>` |
+| `get_thumbnail_cache_stats` | `cacheBudgetMb: Option<u64>` | `Result<omera_scan::ThumbnailCacheStats, String>` |
 | `clear_thumbnail_cache` | (none) | `Result<usize, String>` |
 | `upsert_file_embedding` | `fileId: i64`<br>`modelId: String`<br>`embedding: Vec<f32>` | `Result<(), String>` |
 | `remove_file_embedding` | `fileId: i64`<br>`modelId: String` | `Result<bool, String>` |
@@ -140,18 +140,18 @@ The generator validates command coverage, not Serde field compatibility, safety,
 | `check_generation_service` | `endpoint: String`<br>`serviceType: String` | `Result<bool, String>` |
 | `send_to_comfyui` | `endpoint: String`<br>`workflowJson: String` | `Result<serde_json::Value, String>` |
 | `send_to_webui` | `endpoint: String`<br>`payload: serde_json::Value` | `Result<serde_json::Value, String>` |
-| `cloud_backup_test_connection` | `config: berry_domain::CloudBackupConfig` | `Result<berry_domain::CloudPingResult, String>` |
-| `cloud_backup_create_snapshot` | `config: berry_domain::CloudBackupConfig`<br>`description: Option<String>` | `Result<berry_domain::CloudBackupResult, String>` |
-| `cloud_backup_list_snapshots` | `config: berry_domain::CloudBackupConfig` | `Result<Vec<berry_domain::CloudSnapshotMeta>, String>` |
-| `cloud_backup_restore_snapshot` | `config: berry_domain::CloudBackupConfig`<br>`snapshotFilename: String` | `Result<berry_domain::CloudRestoreResult, String>` |
-| `cloud_sync_start` | `config: berry_domain::CloudBackupConfig`<br>`options: berry_domain::CloudSyncOptions` | `Result<(), String>` |
+| `cloud_backup_test_connection` | `config: omera_domain::CloudBackupConfig` | `Result<omera_domain::CloudPingResult, String>` |
+| `cloud_backup_create_snapshot` | `config: omera_domain::CloudBackupConfig`<br>`description: Option<String>` | `Result<omera_domain::CloudBackupResult, String>` |
+| `cloud_backup_list_snapshots` | `config: omera_domain::CloudBackupConfig` | `Result<Vec<omera_domain::CloudSnapshotMeta>, String>` |
+| `cloud_backup_restore_snapshot` | `config: omera_domain::CloudBackupConfig`<br>`snapshotFilename: String` | `Result<omera_domain::CloudRestoreResult, String>` |
+| `cloud_sync_start` | `config: omera_domain::CloudBackupConfig`<br>`options: omera_domain::CloudSyncOptions` | `Result<(), String>` |
 | `cloud_sync_cancel` | (none) | `Result<(), String>` |
-| `cloud_sync_get_progress` | (none) | `Result<berry_domain::CloudSyncProgress, String>` |
-| `cloud_sync_get_summary` | (none) | `Result<Option<berry_domain::CloudSyncResult>, String>` |
-| `get_legacy_migration_status` | (none) | `Result<berry_domain::LegacyMigrationStatus, String>` |
-| `preview_legacy_migration` | `sourceId: String` | `Result<berry_domain::LegacyMigrationPreview, String>` |
-| `start_legacy_migration` | `planId: String` | `Result<berry_domain::LegacyMigrationJob, String>` |
-| `get_legacy_migration_job` | `jobId: String` | `Result<berry_domain::LegacyMigrationJob, String>` |
-| `preview_legacy_cleanup` | `receiptId: String` | `Result<berry_domain::LegacyCleanupPreview, String>` |
-| `confirm_legacy_cleanup` | `previewId: String`<br>`confirmed: bool` | `Result<berry_domain::LegacyCleanupResult, String>` |
+| `cloud_sync_get_progress` | (none) | `Result<omera_domain::CloudSyncProgress, String>` |
+| `cloud_sync_get_summary` | (none) | `Result<Option<omera_domain::CloudSyncResult>, String>` |
+| `get_legacy_migration_status` | (none) | `Result<omera_domain::LegacyMigrationStatus, String>` |
+| `preview_legacy_migration` | `sourceId: String` | `Result<omera_domain::LegacyMigrationPreview, String>` |
+| `start_legacy_migration` | `planId: String` | `Result<omera_domain::LegacyMigrationJob, String>` |
+| `get_legacy_migration_job` | `jobId: String` | `Result<omera_domain::LegacyMigrationJob, String>` |
+| `preview_legacy_cleanup` | `receiptId: String` | `Result<omera_domain::LegacyCleanupPreview, String>` |
+| `confirm_legacy_cleanup` | `previewId: String`<br>`confirmed: bool` | `Result<omera_domain::LegacyCleanupResult, String>` |
 | `defer_legacy_cleanup` | `receiptId: String` | `Result<(), String>` |

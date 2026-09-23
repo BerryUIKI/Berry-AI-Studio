@@ -1,11 +1,11 @@
 //! Migration coordinator, state management, and platform cleanup for Berry -> Omera.
 use crate::config_store;
-use berry_domain::{
+use omera_domain::{
     CleanupItem, LegacyCleanupPreview, LegacyCleanupResult, LegacyMigrationJob,
     LegacyMigrationPreview, LegacyMigrationStatus, MigratedArtifact, MigrationError,
     MigrationReceipt,
 };
-use berry_storage::legacy_migration as storage_migration;
+use omera_storage::legacy_migration as storage_migration;
 use sha2::{Digest, Sha256};
 use std::{
     collections::HashMap,

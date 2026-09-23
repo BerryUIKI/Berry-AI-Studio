@@ -1,0 +1,12 @@
+[package]
+name = "omera-domain"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Core domain types shared across Omera crates"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"

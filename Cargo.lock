@@ -365,115 +365,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
 
 [[package]]
-name = "berry-ai-studio"
-version = "0.3.0"
-dependencies = [
- "base64 0.22.1",
- "berry-clip",
- "berry-domain",
- "berry-metadata",
- "berry-scan",
- "berry-storage",
- "berry-tagger",
- "hex",
- "image",
- "keyring",
- "libc",
- "minisign-verify",
- "notify",
- "serde",
- "serde_json",
- "sha2",
- "tauri",
- "tauri-build",
- "tauri-plugin-dialog",
- "tauri-plugin-opener",
- "tempfile",
- "trash",
- "ureq 2.12.1",
- "uuid",
- "zip",
-]
-
-[[package]]
-name = "berry-clip"
-version = "0.3.0"
-dependencies = [
- "berry-domain",
- "image",
- "ort",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.20",
- "tokenizers",
-]
-
-[[package]]
-name = "berry-domain"
-version = "0.3.0"
-dependencies = [
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "berry-metadata"
-version = "0.3.0"
-dependencies = [
- "berry-domain",
- "kamadak-exif",
- "serde_json",
- "tempfile",
-]
-
-[[package]]
-name = "berry-scan"
-version = "0.3.0"
-dependencies = [
- "berry-domain",
- "berry-metadata",
- "berry-storage",
- "image",
- "rayon",
- "rusqlite",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.20",
- "trash",
- "walkdir",
- "zip",
-]
-
-[[package]]
-name = "berry-storage"
-version = "0.3.0"
-dependencies = [
- "berry-domain",
- "rusqlite",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.20",
- "uuid",
-]
-
-[[package]]
-name = "berry-tagger"
-version = "0.3.0"
-dependencies = [
- "berry-domain",
- "csv",
- "image",
- "ort",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.20",
-]
-
-[[package]]
 name = "bit-set"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3465,6 +3356,115 @@ dependencies = [
  "objc2-app-kit",
  "objc2-core-foundation",
  "objc2-foundation",
+]
+
+[[package]]
+name = "omera"
+version = "0.3.0"
+dependencies = [
+ "base64 0.22.1",
+ "hex",
+ "image",
+ "keyring",
+ "libc",
+ "minisign-verify",
+ "notify",
+ "omera-clip",
+ "omera-domain",
+ "omera-metadata",
+ "omera-scan",
+ "omera-storage",
+ "omera-tagger",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-dialog",
+ "tauri-plugin-opener",
+ "tempfile",
+ "trash",
+ "ureq 2.12.1",
+ "uuid",
+ "zip",
+]
+
+[[package]]
+name = "omera-clip"
+version = "0.3.0"
+dependencies = [
+ "image",
+ "omera-domain",
+ "ort",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokenizers",
+]
+
+[[package]]
+name = "omera-domain"
+version = "0.3.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "omera-metadata"
+version = "0.3.0"
+dependencies = [
+ "kamadak-exif",
+ "omera-domain",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "omera-scan"
+version = "0.3.0"
+dependencies = [
+ "image",
+ "omera-domain",
+ "omera-metadata",
+ "omera-storage",
+ "rayon",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
+ "trash",
+ "walkdir",
+ "zip",
+]
+
+[[package]]
+name = "omera-storage"
+version = "0.3.0"
+dependencies = [
+ "omera-domain",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
+ "uuid",
+]
+
+[[package]]
+name = "omera-tagger"
+version = "0.3.0"
+dependencies = [
+ "csv",
+ "image",
+ "omera-domain",
+ "ort",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.20",
 ]
 
 [[package]]

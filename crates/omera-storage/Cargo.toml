@@ -1,0 +1,16 @@
+[package]
+name = "omera-storage"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "SQLite persistence with schema versioning for Omera"
+
+[dependencies]
+omera-domain = { path = "../omera-domain" }
+rusqlite = { version = "0.40.2", features = ["bundled", "backup"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+uuid = { version = "1", features = ["v4"] }
+tempfile = "3"
+

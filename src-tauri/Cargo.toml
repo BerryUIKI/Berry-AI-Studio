@@ -1,5 +1,5 @@
 [package]
-name = "berry-ai-studio"
+name = "omera"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -12,19 +12,19 @@ authors = ["Berry Wahlberg"]
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
-name = "berry_ai_studio_lib"
+name = "omera_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-berry-domain = { path = "../crates/berry-domain" }
-berry-metadata = { path = "../crates/berry-metadata" }
-berry-scan = { path = "../crates/berry-scan" }
-berry-storage = { path = "../crates/berry-storage" }
-berry-tagger = { path = "../crates/berry-tagger" }
-berry-clip = { path = "../crates/berry-clip" }
+omera-domain = { path = "../crates/omera-domain" }
+omera-metadata = { path = "../crates/omera-metadata" }
+omera-scan = { path = "../crates/omera-scan" }
+omera-storage = { path = "../crates/omera-storage" }
+omera-tagger = { path = "../crates/omera-tagger" }
+omera-clip = { path = "../crates/omera-clip" }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
 tauri = { version = "2", features = ["protocol-asset"] }
 serde = { version = "1", features = ["derive"] }

@@ -43,26 +43,26 @@ cargo fmt --all -- --check        # must be clean
 Frontend (src/, Vue 3 + TS) ── invoke() ──► src-tauri/ (app shell, #[tauri::command])
                                               │
                                               ▼
-                              crates/berry-domain   (pure domain types)
-                              crates/berry-metadata (format detection & parsing)
-                              crates/berry-storage  (SQLite + migrations)
+                              crates/omera-domain   (pure domain types)
+                              crates/omera-metadata (format detection & parsing)
+                              crates/omera-storage  (SQLite + migrations)
 ```
 
 A single Cargo workspace (`Cargo.toml`) — run cargo commands from the root.
 
 | Crate | Responsibility | Notes |
 |---|---|---|
-| `berry-ai-studio` (`src-tauri/`) | Tauri shell: window setup, IPC commands, `AppState` | Thin adapters only — **no business logic** |
-| `berry-domain` | `ImageFile`, `Container`, `MetadataFormat` | Depends on nothing in-repo |
-| `berry-metadata` | `detect_container` (magic bytes), `extract_metadata` dispatch: PNGInfo (`parameters` chunk), EXIF (`Software` tag + dimensions), `.txt` sidecar fallback | Depends on domain + kamadak-exif |
-| `berry-scan` | `Scanner`: walk → detect container → extract → batch upsert → orphan cleanup; incremental (size, mtime) skip + forced rebuild | Depends on domain + metadata + storage |
-| `berry-storage` | `Database`, ordered `MIGRATIONS` | Depends on domain + rusqlite(bundled) |
+| `omera` (`src-tauri/`) | Tauri shell: window setup, IPC commands, `AppState` | Thin adapters only — **no business logic** |
+| `omera-domain` | `ImageFile`, `Container`, `MetadataFormat` | Depends on nothing in-repo |
+| `omera-metadata` | `detect_container` (magic bytes), `extract_metadata` dispatch: PNGInfo (`parameters` chunk), EXIF (`Software` tag + dimensions), `.txt` sidecar fallback | Depends on domain + kamadak-exif |
+| `omera-scan` | `Scanner`: walk → detect container → extract → batch upsert → orphan cleanup; incremental (size, mtime) skip + forced rebuild | Depends on domain + metadata + storage |
+| `omera-storage` | `Database`, ordered `MIGRATIONS` | Depends on domain + rusqlite(bundled) |
 
 **Data flow:** the frontend calls `invoke("get_app_info", …)`; the command locks
 `AppState` (a `Mutex<Database>` opened in `.setup()` from the OS app-data dir),
 calls into a core crate, returns a serde value or `Result<_, String>`.
 
-**Schema versioning:** `crates/berry-storage/src/migrations.rs` holds an ordered
+**Schema versioning:** `crates/omera-storage/src/migrations.rs` holds an ordered
 `MIGRATIONS: &[&str]`; `Database::migrate()` applies each pending migration in a
 transaction and bumps `PRAGMA user_version`. **Never edit/reorder/delete an
 applied migration — append a new one.** No ad-hoc DDL.
