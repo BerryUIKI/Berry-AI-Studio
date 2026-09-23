@@ -561,7 +561,10 @@ function onWorkflowDragStart(e: DragEvent) {
           <div v-for="(lora, idx) in detectedLoras" :key="idx" class="detected-lora-item">
             <div class="detected-lora-header">
               <span class="detected-name" :title="lora.name">{{ lora.name }}</span>
-              <span class="detected-weight">×{{ lora.weight }}</span>
+              <div class="detected-badges">
+                <span v-if="lora.hash" class="detected-hash" :title="lora.hash">#{{ lora.hash }}</span>
+                <span class="detected-weight">×{{ lora.weight }}</span>
+              </div>
             </div>
 
             <!-- Trigger words if known in model catalog -->
@@ -1275,6 +1278,25 @@ function onWorkflowDragStart(e: DragEvent) {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 170px;
+}
+
+.detected-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.detected-hash {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  background: rgba(148, 163, 184, 0.12);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: monospace;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .detected-weight {

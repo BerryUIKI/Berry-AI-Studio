@@ -29,6 +29,9 @@ pub struct DetectedLora {
     pub name: String,
     /// Weight/multiplier applied (e.g. 0.8)
     pub weight: f64,
+    /// Optional model hash (e.g. from WebUI parameter footer)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hash: Option<String>,
     /// Optional match in the local LoRA database (if known)
     pub model: Option<LoraModel>,
 }
