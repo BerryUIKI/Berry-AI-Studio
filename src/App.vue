@@ -313,14 +313,35 @@ let organizeLibraryNoticeTimer: ReturnType<typeof setTimeout> | null = null;
 let unlisten: UnlistenFn | null = null;
 let unlistenLibraryChanges: UnlistenFn | null = null;
 let libraryRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+const pendingChangedFolders = new Set<number>();
 
-function scheduleLibraryRefresh(_event?: LibraryFilesChanged) {
+function scheduleLibraryRefresh(event?: LibraryFilesChanged) {
+  if (event?.folder_id != null) {
+    pendingChangedFolders.add(event.folder_id);
+  }
   if (libraryRefreshTimer) clearTimeout(libraryRefreshTimer);
   libraryRefreshTimer = setTimeout(() => {
     libraryRefreshTimer = null;
-    void Promise.all([refreshCounts(), reloadFiltersMeta(), loadAlbumsAndTags()]).then(() =>
-      loadFiles(),
-    );
+    const changed = new Set(pendingChangedFolders);
+    pendingChangedFolders.clear();
+
+    // Update folder & library count badges in background
+    void refreshCounts();
+
+    // Only reload the gallery if the currently displayed view is affected:
+    // If viewing "all", "favorites", "nsfw", or the specific folder that changed (or general event),
+    // reload files. If viewing a different folder, or viewing an album/tag, do NOT disrupt
+    // the user's active view or scroll position!
+    const affectsActiveView =
+      changed.size === 0 ||
+      activeTarget.value.type === "all" ||
+      activeTarget.value.type === "favorites" ||
+      activeTarget.value.type === "nsfw" ||
+      (activeTarget.value.type === "folder" && changed.has(activeTarget.value.folder.id));
+
+    if (affectsActiveView) {
+      void loadFiles();
+    }
   }, 500);
 }
 
@@ -562,10 +583,13 @@ onMounted(async () => {
     allowMultipleStacksOpen.value = cfg.allow_multiple_open_stacks ?? false;
 
     await reloadFolders();
-    await refreshCounts();
-    await reloadFiltersMeta();
-    await loadAlbumsAndTags();
-    await loadFiles();
+    const initialFilesPromise = loadFiles();
+    void Promise.all([
+      refreshCounts(),
+      reloadFiltersMeta(),
+      loadAlbumsAndTags(),
+    ]);
+    await initialFilesPromise;
 
     if (!cfg.has_completed_onboarding && !onboardingDismissedThisSession) {
       onboardingModalOpen.value = true;
@@ -677,15 +701,14 @@ async function reloadFiltersMeta() {
 
 async function loadAlbumsAndTags() {
   try {
-    albums.value = await invoke<Album[]>("list_albums");
-    const counts: Record<number, number> = {};
-    for (const album of albums.value) {
-      counts[album.id] = await invoke<number>("count_album_files", {
-        albumId: album.id,
-      });
-    }
+    const [fetchedAlbums, counts, fetchedTags] = await Promise.all([
+      invoke<Album[]>("list_albums"),
+      invoke<Record<number, number>>("get_album_counts"),
+      invoke<Tag[]>("list_tags"),
+    ]);
+    albums.value = fetchedAlbums;
     albumCounts.value = counts;
-    tags.value = await invoke<Tag[]>("list_tags");
+    tags.value = fetchedTags;
   } catch (e) {
     console.error("Failed to load albums/tags:", e);
   }
@@ -806,11 +829,14 @@ function recoverGallery() {
   }
 }
 
-async function onFolderScanned(_folderId: number) {
-  await refreshCounts();
-  await reloadFiltersMeta();
-  await loadAlbumsAndTags();
-  await loadFiles();
+async function onFolderScanned(folderId: number) {
+  void refreshCounts();
+  const affectsActiveView =
+    activeTarget.value.type === "all" ||
+    (activeTarget.value.type === "folder" && activeTarget.value.folder.id === folderId);
+  if (affectsActiveView) {
+    await loadFiles();
+  }
 }
 
 function onFileSelected(file: ImageFile, event?: MouseEvent) {

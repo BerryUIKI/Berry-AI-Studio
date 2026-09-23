@@ -1451,6 +1451,17 @@ impl Database {
         Ok(count)
     }
 
+    /// Return file counts grouped by album ID in a single aggregated query.
+    pub fn album_counts(&self) -> Result<HashMap<i64, i64>, DatabaseError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT album_id, count(*) FROM album_files GROUP BY album_id")?;
+        let counts = stmt
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+            .collect::<Result<HashMap<_, _>, _>>()?;
+        Ok(counts)
+    }
+
     /// List all files in an album.
     pub fn list_album_files(&self, album_id: i64) -> Result<Vec<ImageFile>, DatabaseError> {
         let criteria = SearchCriteria {
@@ -4016,6 +4027,8 @@ mod tests {
         db.add_file_to_album(album.id, id1).unwrap();
         db.add_files_to_album(album.id, &[id2, id3]).unwrap();
         assert_eq!(db.count_album_files(album.id).unwrap(), 3);
+        let aggregated_counts = db.album_counts().unwrap();
+        assert_eq!(aggregated_counts.get(&album.id).copied(), Some(3));
 
         // 3. List album files
         let album_files = db.list_album_files(album.id).unwrap();
