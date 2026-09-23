@@ -2,13 +2,14 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { t } from "../i18n";
-import type { PromptKeywordStat, PromptStats } from "../types";
+import type { DatabaseStats, PromptKeywordStat, PromptStat, PromptStats } from "../types";
 
 const props = defineProps<{
   open: boolean;
 }>();
 
 const emit = defineEmits<{
+  close: [];
   "update:open": [value: boolean];
   applySearch: [query: string];
 }>();
@@ -22,7 +23,26 @@ async function loadStats() {
   loading.value = true;
   error.value = "";
   try {
-    stats.value = await invoke<PromptStats>("get_prompt_stats", { limit: 40 });
+    const [pos, neg, dbStats] = await Promise.all([
+      invoke<PromptStat[]>("get_prompt_stats", { isNegative: false, limit: 40 }),
+      invoke<PromptStat[]>("get_prompt_stats", { isNegative: true, limit: 40 }),
+      invoke<DatabaseStats>("get_database_stats").catch(() => null),
+    ]);
+    const positiveWords: PromptKeywordStat[] = (pos || []).map((p) => ({
+      keyword: p.text,
+      count: p.count,
+    }));
+    const negativeWords: PromptKeywordStat[] = (neg || []).map((p) => ({
+      keyword: p.text,
+      count: p.count,
+    }));
+    stats.value = {
+      total_analyzed: dbStats?.file_count ?? positiveWords.reduce((acc, p) => acc + p.count, 0),
+      top_positive_words: positiveWords,
+      top_negative_words: negativeWords,
+      top_models: [],
+      top_samplers: [],
+    };
   } catch (e) {
     error.value = String(e);
   } finally {
@@ -30,17 +50,8 @@ async function loadStats() {
   }
 }
 
-watch(
-  () => props.open,
-  (val) => {
-    if (val) {
-      void loadStats();
-    }
-  },
-  { immediate: true },
-);
-
 function close() {
+  emit("close");
   emit("update:open", false);
 }
 
@@ -52,12 +63,28 @@ function handleBackdrop(e: MouseEvent) {
 
 function handleKeydown(e: KeyboardEvent) {
   if (e.key === "Escape" && props.open) {
+    e.stopPropagation();
     close();
   }
 }
 
+watch(
+  () => props.open,
+  (val) => {
+    if (val) {
+      void loadStats();
+      window.addEventListener("keydown", handleKeydown);
+    } else {
+      window.removeEventListener("keydown", handleKeydown);
+    }
+  },
+  { immediate: true },
+);
+
 onMounted(() => {
-  window.addEventListener("keydown", handleKeydown);
+  if (props.open) {
+    window.addEventListener("keydown", handleKeydown);
+  }
 });
 
 onUnmounted(() => {
@@ -111,7 +138,12 @@ function onSelectKeyword(item: PromptKeywordStat) {
     class="stats-backdrop"
     @click="handleBackdrop"
   >
-    <div class="stats-dialog">
+    <div
+      class="stats-dialog"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="t.promptStatsModal.title"
+    >
       <!-- Header -->
       <header class="stats-header">
         <div class="header-left">
