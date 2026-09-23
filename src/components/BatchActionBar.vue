@@ -71,6 +71,31 @@ function onSetRating(rating: number | null) {
   emit("setRating", rating);
   ratingMenuOpen.value = false;
 }
+
+function onTag() {
+  emit("tagSelected");
+  emit("addTag");
+}
+
+function onMove() {
+  emit("moveSelected");
+  emit("move");
+}
+
+function onCopy() {
+  emit("copySelected");
+  emit("copy");
+}
+
+function onCull() {
+  emit("cullSelectedDrafts");
+  emit("cullDrafts");
+}
+
+function onTrash() {
+  emit("trashSelected");
+  emit("trash");
+}
 </script>
 
 <template>
@@ -144,7 +169,7 @@ function onSetRating(rating: number | null) {
           type="button"
           class="action-btn"
           title="Add tags to selected images"
-          @click="emit('tagSelected')"
+          @click="onTag"
         >
           🏷 {{ t.batch.tag }}
         </button>
@@ -206,7 +231,7 @@ function onSetRating(rating: number | null) {
           type="button"
           class="action-btn"
           title="Move selected files to another folder"
-          @click="emit('moveSelected')"
+          @click="onMove"
         >
           {{ t.batch.move }}
         </button>
@@ -216,7 +241,7 @@ function onSetRating(rating: number | null) {
           type="button"
           class="action-btn"
           title="Copy selected files to another folder"
-          @click="emit('copySelected')"
+          @click="onCopy"
         >
           {{ t.batch.copy }}
         </button>
@@ -237,7 +262,7 @@ function onSetRating(rating: number | null) {
           type="button"
           class="action-btn cull-btn"
           :title="t.stack.cullDrafts"
-          @click="emit('cullSelectedDrafts')"
+          @click="onCull"
         >
           🧹 {{ t.stack.cullDrafts }}
         </button>
@@ -247,7 +272,7 @@ function onSetRating(rating: number | null) {
           type="button"
           class="action-btn trash-btn"
           title="Move selected files to Trash"
-          @click="emit('trashSelected')"
+          @click="onTrash"
         >
           {{ t.batch.trash }}
         </button>
