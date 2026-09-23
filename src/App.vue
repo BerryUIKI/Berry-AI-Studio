@@ -835,7 +835,7 @@ function onFileSelected(file: ImageFile, event?: MouseEvent) {
   if (event?.metaKey || event?.ctrlKey) {
     toggleSelectFile(file, false);
   } else {
-    selectedFilePaths.value = new Set();
+    selectedFilePaths.value = new Set([file.path]);
   }
 }
 
@@ -858,7 +858,8 @@ function onSelectAll() {
 
 function onClearSelection() {
   selectedFilePaths.value = new Set();
-  selectionAnchorPath.value = selectedFile.value?.path ?? null;
+  selectedFile.value = null;
+  selectionAnchorPath.value = null;
 }
 
 function onToggleAll() {

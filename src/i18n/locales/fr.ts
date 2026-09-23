@@ -91,6 +91,7 @@ export const fr: typeof en = {
     copy: "📄 Copier",
     trash: "🗑 Corbeille",
     export: "📤 Exporter...",
+    more: "Plus",
   },
   preview: {
     reveal: "Afficher dans le Finder",

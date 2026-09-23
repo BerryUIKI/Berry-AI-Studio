@@ -89,6 +89,7 @@ export const en = {
     copy: "📄 Copy",
     trash: "🗑 Trash",
     export: "📤 Export...",
+    more: "More",
   },
   preview: {
     reveal: "Reveal",
