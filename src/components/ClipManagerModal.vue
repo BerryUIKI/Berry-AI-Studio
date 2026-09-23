@@ -146,7 +146,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div v-if="show" class="modal-overlay" @click.self="emit('close')">
+  <div v-if="show" class="modal-overlay" @click.self="emit('close')" v-dialog="() => emit('close')">
     <div class="modal-dialog">
       <div class="modal-header">
         <div class="modal-title">

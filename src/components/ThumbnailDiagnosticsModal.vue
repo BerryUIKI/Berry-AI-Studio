@@ -61,7 +61,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div v-if="show" class="diag-overlay" @click.self="emit('close')">
+  <div v-if="show" class="diag-overlay" @click.self="emit('close')" v-dialog="() => emit('close')">
     <div class="diag-dialog">
       <div class="diag-header">
         <div class="diag-title-area">

@@ -132,7 +132,7 @@ function reset() {
 </script>
 
 <template>
-  <div v-if="open" class="drawer-backdrop" @click="handleBackdrop">
+  <div v-if="open" class="drawer-backdrop" @click="handleBackdrop" v-dialog="close">
     <div class="drawer-panel" role="dialog" aria-modal="true">
       <header class="drawer-header">
         <div class="header-title">

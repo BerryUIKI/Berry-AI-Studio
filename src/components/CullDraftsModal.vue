@@ -47,7 +47,7 @@ watch(
 </script>
 
 <template>
-  <div v-if="open" class="modal-overlay" @click.self="emit('close')">
+  <div v-if="open" class="modal-overlay" @click.self="emit('close')" v-dialog="() => emit('close')">
     <div class="cull-modal" role="dialog" aria-modal="true" :aria-label="t.stack.cullDrafts">
       <div class="modal-header">
         <div class="header-icon">🗑️</div>

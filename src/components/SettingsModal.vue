@@ -566,7 +566,7 @@ async function saveSettings() {
 </script>
 
 <template>
-  <div v-if="show" class="modal-overlay" @click.self="emit('close')">
+  <div v-if="show" class="modal-overlay" @click.self="emit('close')" v-dialog="() => emit('close')">
     <div class="settings-dialog" role="dialog" aria-modal="true" :aria-label="t.settings.title">
       <!-- Header -->
       <div class="dialog-header">

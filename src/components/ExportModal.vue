@@ -187,7 +187,7 @@ async function handleOpenOutputFolder() {
 </script>
 
 <template>
-  <div v-if="show" class="modal-overlay" @click.self="emit('close')">
+  <div v-if="show" class="modal-overlay" @click.self="emit('close')" v-dialog="() => emit('close')">
     <div class="modal-dialog">
       <!-- Modal Header -->
       <div class="modal-header">

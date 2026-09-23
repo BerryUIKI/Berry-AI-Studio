@@ -85,7 +85,7 @@ function setHero(img: ImageFile) {
 </script>
 
 <template>
-  <div class="compare-overlay" @click.self="close">
+  <div class="compare-overlay" @click.self="close" v-dialog="close">
     <div class="compare-toolbar">
       <div class="toolbar-left">
         <span class="toolbar-icon">⚖️</span>

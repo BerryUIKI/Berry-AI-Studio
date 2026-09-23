@@ -137,6 +137,7 @@ function onSelectKeyword(item: PromptKeywordStat) {
     v-if="open"
     class="stats-backdrop"
     @click="handleBackdrop"
+    v-dialog="close"
   >
     <div
       class="stats-dialog"

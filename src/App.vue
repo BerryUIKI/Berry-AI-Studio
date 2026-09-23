@@ -54,6 +54,7 @@ import {
 import { checkForUpdates } from "./utils/updater";
 import { applyTheme, normalizeTheme, type AppTheme } from "./utils/theme";
 import { collaborationSync } from "./utils/collaborationSync";
+import { hasActiveDialog, isEditableTarget } from "./utils/dialog";
 
 const LightboxModal = defineAsyncComponent(() => import("./components/LightboxModal.vue"));
 const FilterDrawer = defineAsyncComponent(() => import("./components/FilterDrawer.vue"));
@@ -323,11 +324,14 @@ function scheduleLibraryRefresh(_event?: LibraryFilesChanged) {
 }
 
 function handleWindowKeyDown(e: KeyboardEvent) {
-  const tag = (document.activeElement?.tagName ?? "").toLowerCase();
-  if (tag === "input" || tag === "textarea") {
+  if (isEditableTarget(e.target) || isEditableTarget(document.activeElement)) {
     if (e.key === "Escape") {
       (document.activeElement as HTMLElement)?.blur();
     }
+    return;
+  }
+
+  if (hasActiveDialog()) {
     return;
   }
 

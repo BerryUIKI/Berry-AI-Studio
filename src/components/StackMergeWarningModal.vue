@@ -38,6 +38,7 @@ watch(
     role="presentation"
     @click.self="emit('cancel')"
     @keydown.esc.stop="emit('cancel')"
+    v-dialog="() => emit('cancel')"
   >
     <section
       class="warning-dialog"
