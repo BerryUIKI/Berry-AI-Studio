@@ -3,7 +3,8 @@ pub mod cloud_sync;
 mod commands;
 mod watcher;
 
-use std::sync::atomic::AtomicU64;
+use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicBool, AtomicU64};
 use std::sync::{Arc, Mutex};
 
 use berry_storage::Database;
@@ -24,6 +25,10 @@ pub struct AppState {
     pub thumbnail_generation: Arc<AtomicU64>,
     /// Incremental remote asset mirroring and delta sync state.
     pub cloud_sync: Arc<Mutex<cloud_sync::CloudSyncState>>,
+    /// Recorded indexing failures per CLIP model ID to avoid repeated starvation.
+    pub clip_failures: Arc<Mutex<HashMap<String, HashSet<i64>>>>,
+    /// Cooperative cancellation flag for CLIP batch indexing.
+    pub clip_cancel: Arc<AtomicBool>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -56,6 +61,8 @@ pub fn run() {
                 watcher: Mutex::new(filesystem_watcher),
                 thumbnail_generation: Arc::new(AtomicU64::new(0)),
                 cloud_sync: Arc::new(Mutex::new(cloud_sync::CloudSyncState::default())),
+                clip_failures: Arc::new(Mutex::new(HashMap::new())),
+                clip_cancel: Arc::new(AtomicBool::new(false)),
             });
             let app_handle = app.handle().clone();
             std::thread::spawn(move || {
@@ -193,6 +200,7 @@ pub fn run() {
             commands::get_loaded_clip_model,
             commands::get_clip_index_status,
             commands::index_clip_images_batch,
+            commands::cancel_clip_indexing,
             commands::search_by_text_prompt,
             commands::list_loras,
             commands::get_lora,

@@ -492,6 +492,7 @@ export interface ClipBatchIndexResult {
   indexed_count: number;
   remaining_count: number;
   total_count: number;
+  failed_count?: number;
 }
 
 export interface ClipModelInfo {
