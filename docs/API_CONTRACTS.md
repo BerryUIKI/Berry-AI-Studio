@@ -123,11 +123,11 @@ An `async fn` declaration alone does not ensure work is off the runtime thread. 
 
 The #118 import/batch transformation commands, job receipt, source-disposition authorization and archive/recovery behavior are **proposals**, not registered IPC. See [IMAGE_TRANSFORM_PLAN.md](IMAGE_TRANSFORM_PLAN.md) for the draft shape and gates. `export_files_batch` remains the existing callable command; changes to its DTO, progress event or privacy semantics require a coordinated Rust/TypeScript contract update and [IPC_REFERENCE.md](IPC_REFERENCE.md) update. The lead must approve backend-owned path selection, staged publication, persistent partial results and source cleanup before any UI invokes new commands.
 
-## Proposed migration IPC — NOT IMPLEMENTED
+## Legacy migration IPC — IMPLEMENTED
 
-Owner: lead. These names and DTOs are a design proposal for review, not callable commands. Engineers may create typed UI mocks after confirming the proposal; production calls must wait for registration and contract tests.
+Owner: lead. These 7 commands are registered in `src-tauri` and coordinate WAL-safe SQLite snapshots, configuration and credential migration, durable receipts, and user-confirmed cleanup.
 
-| Proposed command | Request | Response and side effects |
+| Command | Request | Response and side effects |
 | --- | --- | --- |
 | `get_legacy_migration_status` | none | Versioned status, discovered source summaries, current receipt and available actions; no deletion |
 | `preview_legacy_migration` | `{ sourceId }` | Backend-issued plan ID, source/destination summaries, conflicts, space estimate, exclusions and required user action; sourceId is an opaque discovered token, not a caller-selected arbitrary directory |

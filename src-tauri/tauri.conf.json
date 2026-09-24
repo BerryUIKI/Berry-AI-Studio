@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Berry AI Studio",
+  "productName": "Omera",
   "version": "0.3.0",
-  "identifier": "com.berryuiki.berryaistudio",
+  "identifier": "com.berryuiki.omera",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -35,7 +35,7 @@
     "targets": "all",
     "category": "Graphics and Design",
     "shortDescription": "Local asset manager and prompt studio for AI-generated images",
-    "longDescription": "Berry AI Studio is an open-source local asset manager and studio for AI-generated images and workflows supporting AUTOMATIC1111, ComfyUI, NovelAI, InvokeAI, Fooocus, EasyDiffusion, and Stable Swarm.",
+    "longDescription": "Omera is an open-source local asset manager and studio for AI-generated images and workflows supporting AUTOMATIC1111, ComfyUI, NovelAI, InvokeAI, Fooocus, EasyDiffusion, and Stable Swarm.",
     "copyright": "Copyright © 2026 BerryUIKI",
     "macOS": {
       "minimumSystemVersion": "12.0",

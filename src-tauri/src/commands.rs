@@ -1349,14 +1349,19 @@ pub fn get_database_stats(state: State<'_, AppState>) -> Result<DatabaseStats, S
     db(&state)?.get_database_stats().map_err(|e| e.to_string())
 }
 
+/// Resolve the canonical active SQLite library database path for Omera.
+pub fn active_database_path(data_dir: &Path) -> PathBuf {
+    data_dir.join("omera.db")
+}
+
 /// Restore database from a backup file, verifying integrity and reloading connection.
 #[tauri::command]
 pub async fn restore_database(source_path: String, app_handle: AppHandle) -> Result<(), String> {
-    let active = app_handle
+    let data_dir = app_handle
         .path()
         .app_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("berry.db");
+        .map_err(|e| e.to_string())?;
+    let active = active_database_path(&data_dir);
     tauri::async_runtime::spawn_blocking(move || {
         omera_storage::recovery::stage_restore(Path::new(&source_path), &active)
     })
@@ -1591,6 +1596,7 @@ pub async fn export_files_batch(
 ) -> Result<ExportSummary, String> {
     let db_guard = db(&state)?;
     let summary = execute_batch_export(&db_guard, &options, move |progress| {
+        let _ = app_handle.emit("omera://export-progress", &progress);
         let _ = app_handle.emit("berry://export-progress", progress);
     });
     Ok(summary)
@@ -1633,7 +1639,7 @@ pub async fn get_or_create_thumbnail(
         .app_data_dir()
         .map_err(|e| format!("Failed to get app data dir: {e}"))?;
     let max_edge = request.max_edge.unwrap_or(384);
-    let db_path = data_dir.join("berry.db");
+    let db_path = active_database_path(&data_dir);
     let budget_bytes = thumbnail_budget_bytes(request.cache_budget_mb);
     let generation = request.generation;
     let file_id = request.file_id;
@@ -1680,7 +1686,7 @@ pub async fn save_video_thumbnail(
         .path()
         .app_data_dir()
         .map_err(|e| format!("Failed to get app data dir: {e}"))?;
-    let db_path = data_dir.join("berry.db");
+    let db_path = active_database_path(&data_dir);
     tauri::async_runtime::spawn_blocking(move || {
         let thumb_dir = data_dir.join("thumbnails");
         let _ = std::fs::create_dir_all(&thumb_dir);
@@ -1746,7 +1752,7 @@ pub async fn batch_generate_thumbnails(
         .app_data_dir()
         .map_err(|e| format!("Failed to get app data dir: {e}"))?;
     let max_edge = max_edge.unwrap_or(384);
-    let db_path = data_dir.join("berry.db");
+    let db_path = active_database_path(&data_dir);
     let budget_bytes = thumbnail_budget_bytes(cache_budget_mb);
     let generation_tracker = state.thumbnail_generation.clone();
     let generation = generation.unwrap_or_else(|| generation_tracker.load(Ordering::Acquire));
@@ -1845,7 +1851,7 @@ pub async fn get_thumbnail_cache_stats(
         .path()
         .app_data_dir()
         .map_err(|e| format!("Failed to get app data dir: {e}"))?;
-    let db_path = data_dir.join("berry.db");
+    let db_path = active_database_path(&data_dir);
     let budget_bytes = thumbnail_budget_bytes(cache_budget_mb);
     tauri::async_runtime::spawn_blocking(move || {
         omera_scan::get_thumbnail_cache_stats(&data_dir, &db_path, budget_bytes)
@@ -1861,7 +1867,7 @@ pub async fn clear_thumbnail_cache(app_handle: AppHandle) -> Result<usize, Strin
         .path()
         .app_data_dir()
         .map_err(|e| format!("Failed to get app data dir: {e}"))?;
-    let db_path = data_dir.join("berry.db");
+    let db_path = active_database_path(&data_dir);
     tauri::async_runtime::spawn_blocking(move || {
         omera_scan::clear_thumbnail_cache(&data_dir, &db_path)
     })
@@ -2939,7 +2945,9 @@ pub fn get_storage_paths(app: AppHandle) -> Result<StoragePaths, String> {
     Ok(StoragePaths {
         data_dir: data_dir.to_string_lossy().to_string(),
         config_file: data_dir.join("config.json").to_string_lossy().to_string(),
-        database_file: data_dir.join("berry.db").to_string_lossy().to_string(),
+        database_file: active_database_path(&data_dir)
+            .to_string_lossy()
+            .to_string(),
         thumbnails_dir: data_dir.join("thumbnails").to_string_lossy().to_string(),
         models_dir: data_dir.join("models").to_string_lossy().to_string(),
         updates_dir: data_dir.join("updates").to_string_lossy().to_string(),
@@ -2953,7 +2961,7 @@ pub fn open_storage_dir(app: AppHandle, target: String) -> Result<(), String> {
 
     let path_to_open = match target.as_str() {
         "config" => data_dir.join("config.json"),
-        "database" => data_dir.join("berry.db"),
+        "database" => active_database_path(&data_dir),
         "thumbnails" => data_dir.join("thumbnails"),
         "models" => data_dir.join("models"),
         "updates" => data_dir.join("updates"),
@@ -3854,11 +3862,11 @@ pub async fn cloud_backup_restore_snapshot(
     snapshot_filename: String,
     app_handle: AppHandle,
 ) -> Result<omera_domain::CloudRestoreResult, String> {
-    let active = app_handle
+    let data_dir = app_handle
         .path()
         .app_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("berry.db");
+        .map_err(|e| e.to_string())?;
+    let active = active_database_path(&data_dir);
     tauri::async_runtime::spawn_blocking(move || {
         crate::cloud_backup::restore_cloud_snapshot(&active, &config, &snapshot_filename)
     })

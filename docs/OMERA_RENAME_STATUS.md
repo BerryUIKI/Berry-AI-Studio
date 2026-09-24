@@ -4,31 +4,30 @@ Updated: 2026-09-23. This is a handoff snapshot, not a release-readiness stateme
 
 ## Verified repository state
 
-- Integration branch: `dev`, at `05715da44bcf9c50144fd5f58a2624866176f934` when this snapshot was prepared. Fetch and record the newer SHA before starting work.
-- [PR #162](https://github.com/BerryUIKI/Omera/pull/162) (folder navigation), [PR #163](https://github.com/BerryUIKI/Omera/pull/163) (complete rename handoff) and [PR #164](https://github.com/BerryUIKI/Omera/pull/164) (R1 visible branding) are **merged** into `dev`. PR #164 passed the macOS, Ubuntu and Windows checks. The PR branch content matches current `dev`; there are no remaining R1 file differences to push.
-- The two worktrees used for this handoff, `F:/dev/Omera-dev` and `F:/dev/Omera-rename-handoff`, were clean before this documentation change. The old remote R1 branch was deleted after merge. Do not recreate/push it just because a local branch still exists.
-- [Issue #134](https://github.com/BerryUIKI/Omera/issues/134) remains open. R1 is complete **only as a presentation rename**. The agent reported passing `pnpm run build`, `pnpm run test:stack` (102), `cargo fmt --check`, workspace Clippy with warnings denied, `cargo test --workspace` (158), and IPC reference generation (140 signatures). This handoff did not rerun those local commands; the three PR CI jobs were checked on GitHub.
+- Integration branch: `dev`.
+- [PR #164](https://github.com/BerryUIKI/Omera/pull/164) (R1 visible branding), [PR #166](https://github.com/BerryUIKI/Omera/pull/166) (R0 baseline inventory & R2 migration engine), and [PR #167](https://github.com/BerryUIKI/Omera/pull/167) (R3 internal crates and packages rename) are **merged** into `dev`.
+- [Issue #134](https://github.com/BerryUIKI/Omera/issues/134) remains open.
+- R4 (runtime identity activation: Tauri identifier `com.berryuiki.omera`, productName `Omera`, `omera.db`, `omera_*` settings, keyring `Omera` service, `omera_snapshot_*` backups) is prepared with full fallback compatibility and automated startup migration.
 
 ## What users see now, and what still uses Berry identity
 
-R1 changed the document/window title, title bar, About/update/onboarding/export wording, seven UI locales, default new export ZIP prefix, generated showcase branding and four README files. It preserved the runtime and installed identity by design.
+R1 changed the document/window title, title bar, About/update/onboarding/export wording, seven UI locales, default new export ZIP prefix, generated showcase branding and README files.
+R3 completed internal crate renames (`crates/omera-*`), package manifests, and imports.
+R4 activates `com.berryuiki.omera`, `omera.db`, `omera_*` settings writes with fallback reads, and the `Omera` credential service.
+R5 updater and installer qualifications remain before release packaging.
 
-The live configuration still has Tauri `productName: "Berry AI Studio"` and `identifier: "com.berryuiki.berryaistudio"`; the active library is `berry.db`; browser settings still write `berry_*`; the keyring service, Cargo packages/crates, backup archive format, updater source/trust configuration and release workflows still include legacy identifiers. Those are R2–R5 work. A renamed title is **not** a migrated library, qualified installer or safe update.
-
-The app icon has not changed. `src/assets/logo.png` and `src-tauri/icons/` need an owner decision if Omera should have a new mark. The current abstract mark may be retained intentionally; do not generate a replacement without an approved design. Images beside text controls can use empty decorative `alt` text to avoid repeating the Omera name to screen readers; treat that as a small accessibility follow-up, not a migration gate.
-
-Current public wiki content still has many old product-name references (181 matching Markdown files at this audit). README has been updated, but a separate current-docs PR is needed before calling the public-facing rename complete. Preserve historical releases, compatibility examples, author/copyright credit and third-party names.
+The app icon has not changed. `src/assets/logo.png` and `src-tauri/icons/` need an owner decision if Omera should have a new mark. The current abstract mark may be retained intentionally; do not generate a replacement without an approved design.
 
 ## Ordered work queue
 
 | Order | Owner | Work and completion evidence |
 | --- | --- | --- |
-| 1. R0 inventory | Lead, with Agent research help | Capture released Berry version/installer matrix; Windows/macOS/Linux old data and WebView roots; `berry_*` mapping; old credential identifiers; `berry.db` and `berry_snapshot_*` fixtures with WAL data; existing Omera-library precedence. Record an exact current `dev` baseline. |
-| 2. Current-docs follow-up | Documentation Agent; can run beside R0 | Update the live wiki and user guides to Omera in a separate PR, review links and all languages, classify every retained Berry reference. Optional decorative-logo `alt` cleanup in a small UI PR. |
-| 3. R2 migration/recovery service | Lead | Implement backend discovery, source choice, migration lock/receipt, SQLite backup/validation, config/key/credential import, staged activation and separately confirmed cleanup. Add restart/failure fixtures before changing runtime identity. Finalize proposed IPC in [API_CONTRACTS.md](API_CONTRACTS.md) and update [IPC_REFERENCE.md](IPC_REFERENCE.md) only when registered. |
-| 4. R3 internal rename | Code Agent after R2 contract approval; lead review | Rename internal crates/packages/imports and regenerate manifests/lockfiles coherently. Keep persisted names/installer identity unchanged until R4 integration. |
-| 5. R4 runtime activation | Lead | Switch Tauri identifier/productName, executable, active `omera.db`, `omera_*` writes and Omera credential service as one verified activation. Keep old readers and backups. Test failure never creates a misleading empty library. |
-| 6. R5 release/update qualification | Lead with Agent CI help | Canonical Omera updater/release assets, signed installer checks and real Berry → Omera → next Omera upgrades on supported platforms, including skipped versions and documented manual recovery where needed. |
+| 1. R0 inventory | Lead, with Agent research help | **Completed** in `docs/OMERA_RENAME_INVENTORY.md` (PR #166). |
+| 2. R1 visible name | Code Agent | **Merged** in PR #164. |
+| 3. R2 migration/recovery service | Lead | **Merged** in PR #166 (WAL-preserving migration engine, 7 IPC commands). |
+| 4. R3 internal rename | Code Agent; lead review | **Merged** in PR #167 (`crates/omera-*`, Cargo packages, imports). |
+| 5. R4 runtime activation | Lead | **Active / Implemented** (`com.berryuiki.omera`, `omera.db`, `omera_*`, `Omera` credential service, auto-migration on launch, backwards compatible snapshot format). |
+| 6. R5 release/update qualification | Lead with Agent CI help | Canonical Omera updater/release assets, signed installer checks and real Berry → Omera → next Omera upgrades on supported platforms. |
 | 7. R6 final audit | Documentation Agent; lead release review | Update remaining current docs/website/CI examples to match tested behavior; classify intentional legacy strings. Close #134 only after migration and upgrade evidence exists. |
 
 R0/R2 are the immediate lead-owned critical path. The documentation Agent can work independently now. R3 may be researched but not integrated before the lead approves its baseline and migration contract. The later image-compression work ([#158](https://github.com/BerryUIKI/Omera/issues/158), [#159](https://github.com/BerryUIKI/Omera/issues/159), [#160](https://github.com/BerryUIKI/Omera/issues/160)) remains after rename stabilization.

@@ -47,6 +47,8 @@ import BatchActionBar from "./components/BatchActionBar.vue";
 import { t } from "./i18n";
 import { countActiveFilters, criteriaToQuery } from "./utils/search";
 import {
+  getStorageItem,
+  setStorageItem,
   isWarningSuppressed,
   loadAppConfig,
   saveAppConfig,
@@ -109,7 +111,7 @@ const rawSimilarityFiles = shallowRef<ImageFile[]>([]);
 const semanticSearchFiles = shallowRef<ImageFile[]>([]);
 const similarityThreshold = ref<number>(0);
 const similarityLimit = ref<number>(
-  Number(localStorage.getItem("berry_similarity_limit")) || 50
+  Number(getStorageItem("similarity_limit")) || 50
 );
 
 // UI Pane Toggles (Eagle Studio layout)
@@ -247,20 +249,20 @@ const selectedFilesList = computed(() => {
 });
 
 type GalleryViewMode = "grid" | "masonry" | "table";
-const savedViewMode = localStorage.getItem("berry_default_view");
+const savedViewMode = getStorageItem("default_view");
 const viewMode = ref<GalleryViewMode>(
   savedViewMode === "grid" || savedViewMode === "masonry" || savedViewMode === "table"
     ? savedViewMode
     : "grid",
 );
-const blurNsfw = ref(localStorage.getItem("berry_blur_nsfw") !== "false");
-const showCardBadges = ref(localStorage.getItem("berry_card_badges") !== "false");
-const appTheme = ref<AppTheme>(normalizeTheme(localStorage.getItem("berry_theme")));
+const blurNsfw = ref(getStorageItem("blur_nsfw") !== "false");
+const showCardBadges = ref(getStorageItem("card_badges") !== "false");
+const appTheme = ref<AppTheme>(normalizeTheme(getStorageItem("theme")));
 applyTheme(appTheme.value);
 
 function setViewMode(mode: GalleryViewMode) {
   viewMode.value = mode;
-  localStorage.setItem("berry_default_view", mode);
+  setStorageItem("default_view", mode);
 }
 
 function onSettingsSaved(settings: {
@@ -651,14 +653,17 @@ async function reloadFolders() {
   folders.value = await invoke<Folder[]>("list_folders");
 }
 
-const STARTUP_SCAN_STAMP_PREFIX = "berry_last_startup_scan_";
+const STARTUP_SCAN_STAMP_PREFIX = "omera_last_startup_scan_";
+const LEGACY_STARTUP_SCAN_STAMP_PREFIX = "berry_last_startup_scan_";
 
 async function runBackgroundStartupScan(intervalMinutes: number) {
   const minimumAgeMs = Math.max(0, intervalMinutes) * 60_000;
   const now = Date.now();
   for (const f of folders.value) {
     const stampKey = `${STARTUP_SCAN_STAMP_PREFIX}${f.id}`;
-    const lastScan = Number(localStorage.getItem(stampKey)) || 0;
+    const legacyStampKey = `${LEGACY_STARTUP_SCAN_STAMP_PREFIX}${f.id}`;
+    const lastScan =
+      Number(localStorage.getItem(stampKey) || localStorage.getItem(legacyStampKey)) || 0;
     if (minimumAgeMs > 0 && now - lastScan < minimumAgeMs) continue;
     try {
       await invoke("scan_folder", { folderId: f.id });
@@ -1664,7 +1669,7 @@ function onSimilarityThresholdChange() {
 }
 
 function onSimilarityLimitChange() {
-  localStorage.setItem("berry_similarity_limit", String(similarityLimit.value));
+  setStorageItem("similarity_limit", String(similarityLimit.value));
   if (similaritySourceFile.value) {
     void handleFindSimilar(similaritySourceFile.value);
   }

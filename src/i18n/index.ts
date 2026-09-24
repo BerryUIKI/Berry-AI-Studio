@@ -53,7 +53,13 @@ export function getSystemLocale(): LocaleKey {
 
 function getInitialSetting(): LocaleSetting {
   try {
-    const saved = localStorage.getItem("berry_locale") as LocaleSetting;
+    let saved = localStorage.getItem("omera_locale") as LocaleSetting | null;
+    if (!saved) {
+      saved = localStorage.getItem("berry_locale") as LocaleSetting | null;
+      if (saved) {
+        localStorage.setItem("omera_locale", saved);
+      }
+    }
     if (saved && (saved === "auto" || saved in messages)) {
       return saved;
     }
@@ -75,7 +81,7 @@ export const currentLocale = computed<LocaleKey>(() => {
 export function setLocale(setting: LocaleSetting) {
   currentLocaleSetting.value = setting;
   try {
-    localStorage.setItem("berry_locale", setting);
+    localStorage.setItem("omera_locale", setting);
   } catch {
     // ignore
   }

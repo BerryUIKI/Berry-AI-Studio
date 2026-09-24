@@ -78,8 +78,12 @@ pub struct CloudSnapshotMeta {
     pub album_count: i64,
     /// Optional user-provided description for the snapshot.
     pub description: Option<String>,
-    /// Berry AI Studio version that produced the snapshot.
+    /// Legacy Berry version that produced the snapshot (if applicable).
+    #[serde(default)]
     pub berry_version: String,
+    /// Omera version that produced the snapshot.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub omera_version: Option<String>,
 }
 
 /// Connectivity and latency test result for a cloud storage provider.

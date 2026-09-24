@@ -26,8 +26,10 @@ interface ThumbnailBatchOptions {
   priority?: number;
 }
 
-const THUMBNAIL_SETTING_KEY = "berry_thumbnail_max_edge";
-const THUMBNAIL_BUDGET_SETTING_KEY = "berry_thumbnail_cache_budget_mb";
+const THUMBNAIL_SETTING_KEY = "omera_thumbnail_max_edge";
+const LEGACY_THUMBNAIL_SETTING_KEY = "berry_thumbnail_max_edge";
+const THUMBNAIL_BUDGET_SETTING_KEY = "omera_thumbnail_cache_budget_mb";
+const LEGACY_THUMBNAIL_BUDGET_SETTING_KEY = "berry_thumbnail_cache_budget_mb";
 const DEFAULT_MAX_EDGE = 384; // 64 * 6, perfect balanced resolution for 130px~360px grid zoom
 const DEFAULT_CACHE_BUDGET_MB = 2048;
 let configuredThumbnailMaxEdge: number | null = null;
@@ -140,7 +142,13 @@ export function cancelThumbnailRequests(): void {
 export function getThumbnailMaxEdge(): number {
   if (configuredThumbnailMaxEdge !== null) return configuredThumbnailMaxEdge;
   try {
-    const val = localStorage.getItem(THUMBNAIL_SETTING_KEY);
+    let val = localStorage.getItem(THUMBNAIL_SETTING_KEY);
+    if (!val) {
+      val = localStorage.getItem(LEGACY_THUMBNAIL_SETTING_KEY);
+      if (val) {
+        localStorage.setItem(THUMBNAIL_SETTING_KEY, val);
+      }
+    }
     if (val) {
       const parsed = parseInt(val, 10);
       if (parsed >= 128 && parsed <= 1024) {
@@ -180,7 +188,13 @@ export function setThumbnailMaxEdge(maxEdge: number): void {
 /** Read the configured persistent thumbnail disk budget. */
 export function getThumbnailCacheBudgetMb(): number {
   try {
-    const value = localStorage.getItem(THUMBNAIL_BUDGET_SETTING_KEY);
+    let value = localStorage.getItem(THUMBNAIL_BUDGET_SETTING_KEY);
+    if (!value) {
+      value = localStorage.getItem(LEGACY_THUMBNAIL_BUDGET_SETTING_KEY);
+      if (value) {
+        localStorage.setItem(THUMBNAIL_BUDGET_SETTING_KEY, value);
+      }
+    }
     if (value) {
       const parsed = parseInt(value, 10);
       if (parsed >= 256 && parsed <= 65_536) return parsed;
@@ -446,10 +460,12 @@ export async function resetThumbnailDiagnostics(): Promise<void> {
 
 // In development mode, attach diagnostics to window for manual inspections without console noise.
 if (typeof window !== "undefined" && import.meta.env?.DEV) {
-  (window as unknown as { __BERRY_THUMBNAIL_DIAGNOSTICS__?: unknown }).__BERRY_THUMBNAIL_DIAGNOSTICS__ = {
+  const diag = {
     get: getThumbnailDiagnostics,
     reset: resetThumbnailDiagnostics,
   };
+  (window as unknown as { __OMERA_THUMBNAIL_DIAGNOSTICS__?: unknown }).__OMERA_THUMBNAIL_DIAGNOSTICS__ = diag;
+  (window as unknown as { __BERRY_THUMBNAIL_DIAGNOSTICS__?: unknown }).__BERRY_THUMBNAIL_DIAGNOSTICS__ = diag;
 }
 
 /**
