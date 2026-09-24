@@ -2,16 +2,18 @@ use minisign_verify::{PublicKey, Signature};
 use std::{fs::File, io::Read, path::Path};
 
 pub fn trusted_key() -> Result<PublicKey, String> {
-    PublicKey::from_base64(option_env!("BERRY_UPDATE_PUBLIC_KEY")
-        .filter(|key| !key.is_empty()).ok_or("Signed automatic updates are not configured. Use the release page for manual installation.")?)
-        .map_err(|e| format!("Invalid embedded update key: {e}"))
+    let key_str = option_env!("OMERA_UPDATE_PUBLIC_KEY")
+        .or(option_env!("BERRY_UPDATE_PUBLIC_KEY"))
+        .filter(|key| !key.is_empty())
+        .ok_or("Signed automatic updates are not configured. Use the release page for manual installation.")?;
+    PublicKey::from_base64(key_str).map_err(|e| format!("Invalid embedded update key: {e}"))
 }
 
 pub fn validate_url(url: &str) -> Result<(), String> {
     let parsed = tauri::Url::parse(url).map_err(|e| e.to_string())?;
     let path = parsed.path();
-    let is_valid_repo = path.starts_with("/BerryUIKI/Berry-AI-Studio/releases/download/")
-        || path.starts_with("/BerryUIKI/Omera/releases/download/");
+    let is_valid_repo = path.starts_with("/BerryUIKI/Omera/releases/download/")
+        || path.starts_with("/BerryUIKI/Berry-AI-Studio/releases/download/");
     if parsed.scheme() != "https"
         || parsed.host_str() != Some("github.com")
         || !is_valid_repo
@@ -50,18 +52,22 @@ mod tests {
     #[test]
     fn rejects_untrusted_update_origins() {
         assert!(validate_url(
+            "https://github.com/BerryUIKI/Omera/releases/download/v0.3.0/Omera_Windows_x64.exe"
+        )
+        .is_ok());
+        assert!(validate_url(
             "https://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v1/setup.exe"
         )
         .is_ok());
         assert!(validate_url(
-            "http://github.com/BerryUIKI/Berry-AI-Studio/releases/download/v1/setup.exe"
+            "http://github.com/BerryUIKI/Omera/releases/download/v0.3.0/Omera_Windows_x64.exe"
         )
         .is_err());
         assert!(
             validate_url("https://github.com/other/repo/releases/download/v1/setup.exe").is_err()
         );
         assert!(validate_url(
-            "https://github.com.evil.test/BerryUIKI/Berry-AI-Studio/releases/download/v1/setup.exe"
+            "https://github.com.evil.test/BerryUIKI/Omera/releases/download/v0.3.0/Omera_Windows_x64.exe"
         )
         .is_err());
     }
