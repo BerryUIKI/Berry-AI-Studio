@@ -1,6 +1,6 @@
 # Documentation Française (French)
 
-Bienvenue dans la documentation officielle en français de **Berry AI Studio** !
+Bienvenue dans la documentation officielle en français de **Omera** !
 
 👉 **[Accéder à l'Accueil de la documentation française (Home)](Home.md)**
 

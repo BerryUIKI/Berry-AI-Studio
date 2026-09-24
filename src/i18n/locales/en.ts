@@ -554,7 +554,7 @@ export const en = {
     dbPath: "Local SQLite Database Path",
     storageTitle: "Data & Configuration Directories (Preserved Across Updates)",
     configFile: "Preferences Configuration (config.json)",
-    databaseFile: "Primary SQLite Database (berry.db)",
+    databaseFile: "Primary SQLite Database (omera.db)",
     thumbnailsDir: "WebP Thumbnail Cache Directory (thumbnails/)",
     openFolder: "Open Folder",
     storageNotice: "All user databases, tags, albums, and configurations are permanently stored in the AppData directory above, completely isolated from binary updates.",

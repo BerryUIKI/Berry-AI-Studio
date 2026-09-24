@@ -1,12 +1,12 @@
 # Video & Motion Media Support
 
-As AI generation expands into video (AnimateDiff, SVD, Wan2.1, HunyuanVideo, CogVideoX, LTX-Video), Berry AI Studio provides native, first-class support for animated and video artworks in **MP4** and **WebM** formats.
+As AI generation expands into video (AnimateDiff, SVD, Wan2.1, HunyuanVideo, CogVideoX, LTX-Video), Omera provides native, first-class support for animated and video artworks in **MP4** and **WebM** formats.
 
 ---
 
 ## 1. Supported Video Formats & Containers
 
-Berry AI Studio parses video containers directly in native Rust (`berry-metadata`):
+Omera parses video containers directly in native Rust (`omera-metadata`):
 
 - **MP4 (`.mp4`)**: Parses the ISOBMFF box hierarchy (`ftyp`, `moov`, `trak`, `mdia`, `minf`, `stbl`).
   - Automatically extracts video dimensions (`Width × Height`), framerate (FPS), playtime duration, and video codec (`H.264`, `H.265 / HEVC`, `AV1`).
@@ -22,7 +22,7 @@ In the gallery canvas, video files are clearly distinguished from static images:
 - **Duration Badge**: Displays exact playtime in the corner (e.g. `00:05` or `01:24`).
 - **Framerate & Format Badges**: Shows `MP4 · 24fps` or `WEBP · 30fps`.
 - **Thumbnail Generation**:
-  - Because video files do not have traditional image decoders in standard image libraries, Berry's frontend WebView automatically captures the first keyframe from an offscreen HTML5 `<video>` canvas, encodes it to base64, and the Rust backend stores it as a downscaled WebP thumbnail via `save_video_thumbnail`.
+  - Because video files do not have traditional image decoders in standard image libraries, Omera's frontend WebView automatically captures the first keyframe from an offscreen HTML5 `<video>` canvas, encodes it to base64, and the Rust backend stores it as a downscaled WebP thumbnail via `save_video_thumbnail`.
 - **Hover Playback**: Hovering over a video card initiates lightweight video previewing directly on the canvas without opening full playback.
 
 ---

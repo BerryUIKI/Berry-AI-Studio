@@ -556,7 +556,7 @@ export const fr: typeof en = {
     dbPath: "Chemin de la base de données SQLite locale",
     storageTitle: "Emplacement des données et configurations (préservées)",
     configFile: "Fichier de configuration (config.json)",
-    databaseFile: "Base de données SQLite (berry.db)",
+    databaseFile: "Base de données SQLite (omera.db)",
     thumbnailsDir: "Cache des miniatures WebP (thumbnails/)",
     openFolder: "Ouvrir le dossier",
     storageNotice: "Toutes les bases de données, tags, albums et configurations sont stockés en sécurité dans le dossier AppData.",

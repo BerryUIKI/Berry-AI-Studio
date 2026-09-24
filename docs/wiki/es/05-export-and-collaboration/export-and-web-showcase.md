@@ -1,6 +1,6 @@
 # Exportación por lotes, transcodificación y muestra web
 
-Berry AI Studio cuenta con un motor de empaquetado y exportación de alto rendimiento (`ExportModal.vue`) potenciado por procesamiento multihilo con **Rayon**. Admite transcodificación de formatos, eliminación de metadatos por privacidad, plantillas dinámicas de nombres de archivo y generación de muestras HTML interactivas sin dependencias externas.
+Omera cuenta con un motor de empaquetado y exportación de alto rendimiento (`ExportModal.vue`) potenciado por procesamiento multihilo con **Rayon**. Admite transcodificación de formatos, eliminación de metadatos por privacidad, plantillas dinámicas de nombres de archivo y generación de muestras HTML interactivas sin dependencias externas.
 
 ---
 
@@ -14,7 +14,7 @@ Para abrir el cuadro de exportación:
 
 ## 2. Transcodificación de formatos y compresión
 
-Berry convierte y recodifica imágenes en paralelo aprovechando todos los núcleos de su CPU:
+Omera convierte y recodifica imágenes en paralelo aprovechando todos los núcleos de su CPU:
 
 | Formato de destino | Opciones y ajustes | Caso de uso idóneo |
 | :--- | :--- | :--- |
@@ -35,7 +35,7 @@ Puede limitar las dimensiones máximas para evitar distribuir por error imágene
 
 ## 3. Saneamiento de metadatos de privacidad en 4 niveles
 
-Muchos creadores desean compartir sus obras en línea protegiendo sus prompts propietarios, incrustaciones negativas o semillas. Berry proporciona **cuatro niveles discretos de privacidad**:
+Muchos creadores desean compartir sus obras en línea protegiendo sus prompts propietarios, incrustaciones negativas o semillas. Omera proporciona **cuatro niveles discretos de privacidad**:
 
 1. **Mantener todo**:
    - Conserva todos los bloques de metadatos incrustados (grafos de ComfyUI, parámetros de A1111, comentarios de NovelAI y datos EXIF).
@@ -73,11 +73,11 @@ Puede generar automáticamente archivos complementarios junto a cada imagen expo
 
 ## 5. Generador de álbum web interactivo independiente (HTML Showcase)
 
-Berry puede empaquetar sus activos exportados en una **galería web de archivo único completamente autocontenida** (`index.html`):
+Omera puede empaquetar sus activos exportados en una **galería web de archivo único completamente autocontenida** (`index.html`):
 
 - **Cero dependencias**: No requiere servidor web, Node.js ni librerías JavaScript externas. Basta con hacer doble clic para abrirla en cualquier navegador.
 - **Características incluidas**:
-   - Estética oscura de estudio a juego con Berry AI Studio.
+   - Estética oscura de estudio a juego con Omera.
    - Cuadrícula responsiva de galería con carga diferida de miniaturas.
    - Visor Lightbox a pantalla completa con zoom y desplazamiento por arrastre y rueda de ratón.
    - Inspector desplegable de parámetros de generación y prompts.

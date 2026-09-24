@@ -1,6 +1,6 @@
 # Workspace & UI Anatomy
 
-Berry AI Studio features an **Eagle / Lightroom** inspired 3-pane desktop workspace engineered for high-density visual curation, keyboard speed, and distraction-free viewing.
+Omera features an **Eagle / Lightroom** inspired 3-pane desktop workspace engineered for high-density visual curation, keyboard speed, and distraction-free viewing.
 
 ---
 
@@ -8,7 +8,7 @@ Berry AI Studio features an **Eagle / Lightroom** inspired 3-pane desktop worksp
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│ [Logo] Berry AI Studio   [ File  Edit  View  Tools  Help ]              [ _ ] [ □ ] [ ✕ ] │  <- TitleBar & MenuBar
+│ [Logo] Omera   [ File  Edit  View  Tools  Help ]              [ _ ] [ □ ] [ ✕ ] │  <- TitleBar & MenuBar
 ├──────────────┬──────────────────────────────────────────────────────────┬──────────────┤
 │              │ [🔍 Search: prompt, model, rating... ] [🧠] [☰ Filter]    │              │
 │  NAVIGATION  ├──────────────────────────────────────────────────────────┤   PROPERTY   │
@@ -66,7 +66,7 @@ The window uses a frameless design with custom native-like title bar (`TitleBar.
   - `Language`: Instantly switch between 7 supported languages.
   - `Keyboard Shortcuts` (`?`): Display in-app shortcut cheatsheet.
   - `Check for Updates...`: Query GitHub Releases for updates.
-  - `About Berry AI Studio`: Display version, author, and license information.
+  - `About Omera`: Display version, author, and license information.
 
 ---
 

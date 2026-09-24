@@ -1,6 +1,6 @@
 # Keyboard Shortcuts Cheatsheet
 
-Berry AI Studio is designed with a **keyboard-first workflow**. You can browse, rate, group, inspect, and organize massive libraries without ever touching the mouse.
+Omera is designed with a **keyboard-first workflow**. You can browse, rate, group, inspect, and organize massive libraries without ever touching the mouse.
 
 ---
 
@@ -67,7 +67,7 @@ Berry AI Studio is designed with a **keyboard-first workflow**. You can browse, 
 | `Ctrl + E` / `Cmd + E` | **Batch Export** | Open the batch transcoding, privacy sanitization, and packaging modal. |
 | `Ctrl + ,` / `Cmd + ,` | **Preferences** | Open the central application settings window. |
 | `?` or `Shift + /` | **Shortcuts Guide** | Open the interactive keyboard shortcuts cheatsheet. |
-| `Alt + F4` | **Exit App** | Cleanly exit Berry AI Studio. |
+| `Alt + F4` | **Exit App** | Cleanly exit Omera. |
 
 ---
 

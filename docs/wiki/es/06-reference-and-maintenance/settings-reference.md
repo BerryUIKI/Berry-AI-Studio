@@ -1,6 +1,6 @@
 # Referencia completa de configuración
 
-La ventana de preferencias de Berry AI Studio (`SettingsModal.vue`) se abre mediante `Archivo > Preferencias / Configuración...` o con el atajo `Ctrl + ,` / `Cmd + ,`. Todos los ajustes se conservan de forma permanente en `config.json` dentro del directorio de datos de la aplicación.
+La ventana de preferencias de Omera (`SettingsModal.vue`) se abre mediante `Archivo > Preferencias / Configuración...` o con el atajo `Ctrl + ,` / `Cmd + ,`. Todos los ajustes se conservan de forma permanente en `config.json` dentro del directorio de datos de la aplicación.
 
 ---
 
@@ -10,7 +10,7 @@ La ventana de preferencias de Berry AI Studio (`SettingsModal.vue`) se abre medi
 | :--- | :--- | :--- | :--- |
 | **Idioma de la aplicación** | `locale` | `"auto"` | Opciones disponibles: `auto` (sigue el idioma del SO), `en` (Inglés), `zh-CN` (Chino simplificado), `zh-TW` (Chino tradicional), `ja` (Japonés), `de` (Alemán), `fr` (Francés), `es` (Español). |
 | **Vista predeterminada de galería** | `default_view` | `"grid"` | Modo de visualización al arrancar: `"grid"` (Cuadrícula uniforme), `"masonry"` (Cascada) o `"table"` (Lista detallada). |
-| **Escanear automáticamente al inicio** | `auto_scan` | `true` | Comprueba automáticamente las carpetas indexadas en busca de archivos nuevos o modificados al abrir Berry. |
+| **Escanear automáticamente al inicio** | `auto_scan` | `true` | Comprueba automáticamente las carpetas indexadas en busca de archivos nuevos o modificados al abrir Omera. |
 | **Intervalo del escaneo inicial** | `startup_scan_interval_minutes`| `360` | Tiempo mínimo de enfriamiento en minutos entre reconciliaciones completas de disco (`30`, `60`, `360`, `1440`). Evita lecturas innecesarias si se reinicia la aplicación frecuentemente. |
 | **Buscar actualizaciones al inicio** | `auto_check_update` | `true` | Consulta silenciosamente los lanzamientos en GitHub Releases al iniciar y muestra un indicador si hay una versión más reciente. |
 
@@ -56,7 +56,7 @@ La ventana de preferencias de Berry AI Studio (`SettingsModal.vue`) se abre medi
 | Campo de ajuste | Clave en `config.json` | Valor predeterminado | Descripción |
 | :--- | :--- | :--- | :--- |
 | **Motor de base de datos** | `storage_backend` | `"sqlite"` | Motor de datos activo: `"sqlite"`, `"mysql"` o `"postgres"`. |
-| **URL de conexión remota** | `remote_connection_url` | `""` | Cadena de conexión a la base de datos (p. ej., `postgres://user:pass@host:5432/berry_studio`). |
+| **URL de conexión remota** | `remote_connection_url` | `""` | Cadena de conexión a la base de datos (p. ej., `postgres://user:pass@host:5432/omera_studio`). |
 | **Identificador de estación (Client ID)**| `client_identifier` | `""` | Nombre único del equipo utilizado para el registro de cambios y la resolución de conflictos OCC. |
 | **Asignaciones de raíz de almacenamiento**| `root_mappings` | `{}` | Mapeo de directorios multiplataforma que enlaza los UUIDs centrales de raíz con las rutas de montaje locales del SO. |
 | **Probar conexión** | N/A | N/A | Envía un ping al servidor remoto de base de datos y muestra la latencia de red en milisegundos. |
@@ -93,9 +93,9 @@ Muestra el estado de diagnóstico en tiempo real de los analizadores sin pérdid
 
 - **Versión**: Muestra la versión actual de la aplicación (p. ej., `v0.3.0`).
 - **Esquema de base de datos**: Informa del nivel de migración activo en SQLite (p. ej., `Esquema v14`).
-- **Ubicación de la base de datos**: Ruta absoluta a `berry.db`.
+- **Ubicación de la base de datos**: Ruta absoluta a `omera.db`.
 - **Botones de acceso rápido a carpetas**:
   - `Abrir configuración`: Abre la carpeta que contiene `config.json`.
-  - `Abrir base de datos`: Abre el directorio con `berry.db` y los diarios WAL.
+  - `Abrir base de datos`: Abre el directorio con `omera.db` y los diarios WAL.
   - `Abrir miniaturas`: Abre el directorio de caché de miniaturas WebP.
   - `Abrir modelos`: Abre el directorio con los pesos de los modelos ONNX.

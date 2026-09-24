@@ -1,6 +1,6 @@
 # 云端快照备份与增量同步
 
-Berry AI Studio 内置了专用的云端快照备份与差异增量同步引擎（`src-tauri/src/cloud_backup.rs` 与 `src-tauri/src/cloud_sync.rs`），无需依赖任何第三方繁琐的备份软件，即可实现数据库的秒级热备份以及远程媒体资产的增量镜像。
+Omera 内置了专用的云端快照备份与差异增量同步引擎（`src-tauri/src/cloud_backup.rs` 与 `src-tauri/src/cloud_sync.rs`），无需依赖任何第三方繁琐的备份软件，即可实现数据库的秒级热备份以及远程媒体资产的增量镜像。
 
 ---
 
@@ -18,13 +18,13 @@ Berry AI Studio 内置了专用的云端快照备份与差异增量同步引擎�
 
 ## 2. SQLite 在线热快照机制 (`cloud_backup_create_snapshot`)
 
-Berry 基于 SQLite 原生的 `VACUUM INTO` 核心指令实现高可靠一致性快照：
+Omera 基于 SQLite 原生的 `VACUUM INTO` 核心指令实现高可靠一致性快照：
 
 ```mermaid
 sequenceDiagram
-    participant UI as Berry Studio 前端
+    participant UI as Omera Studio 前端
     participant Rust as Rust 后台 (cloud_backup.rs)
-    participant DB as SQLite WAL (berry.db)
+    participant DB as SQLite WAL (omera.db)
     participant Remote as 远端云存储 (S3/WebDAV)
 
     UI->>Rust: 请求创建备份快照
@@ -38,7 +38,7 @@ sequenceDiagram
 
 ### 快照可靠性保障：
 - **无锁非阻塞 (Non-Locking)**：利用 SQLite WAL 的底层并发特性，备份期间数据库无需停机，你可以继续顺畅看图、评分或跑图入库，丝毫不受干扰。
-- **自动本地回滚防线**：在执行从云端快照还原操作时，Berry 会在覆盖前自动在本地留存一份回滚备份（`berry.db.rollback`），即使遭遇意外断网或文件损坏，亦可一键安全回退。
+- **自动本地回滚防线**：在执行从云端快照还原操作时，Omera 会在覆盖前自动在本地留存一份回滚备份（`omera.db.rollback`），即使遭遇意外断网或文件损坏，亦可一键安全回退。
 
 ---
 

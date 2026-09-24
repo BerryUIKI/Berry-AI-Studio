@@ -1,6 +1,6 @@
 # 雲端快照備份與差異同步
 
-Berry AI Studio 配備原生的雲端備份與增量差異同步引擎（`src-tauri/src/cloud_backup.rs` 與 `src-tauri/src/cloud_sync.rs`），無需依賴第三方工具，即可實現資料庫一致性快照備份與遠端媒體檔案增量鏡像同步。
+Omera 配備原生的雲端備份與增量差異同步引擎（`src-tauri/src/cloud_backup.rs` 與 `src-tauri/src/cloud_sync.rs`），無需依賴第三方工具，即可實現資料庫一致性快照備份與遠端媒體檔案增量鏡像同步。
 
 ---
 
@@ -18,13 +18,13 @@ Berry AI Studio 配備原生的雲端備份與增量差異同步引擎（`src-ta
 
 ## 2. 熱 SQLite 快照備份機制 (`cloud_backup_create_snapshot`)
 
-Berry 運用 SQLite 原生的 `VACUUM INTO` 指令來實現無縫熱備份：
+Omera 運用 SQLite 原生的 `VACUUM INTO` 指令來實現無縫熱備份：
 
 ```mermaid
 sequenceDiagram
-    participant UI as Berry 前端介面
+    participant UI as Omera 前端介面
     participant Rust as 後端 (cloud_backup.rs)
-    participant DB as SQLite WAL (berry.db)
+    participant DB as SQLite WAL (omera.db)
     participant Remote as 雲端儲存 (S3/WebDAV)
 
     UI->>Rust: 發起備份快照請求
@@ -38,7 +38,7 @@ sequenceDiagram
 
 ### 快照核心保障：
 - **全程無鎖 (Non-Locking)**：呼叫 SQLite 線上清空真空 API，備份期間您可以照常檢索、評分、批次標記或生成入庫，完全不受干擾。
-- **復原防護機制 (Rollback Safety)**：當從遠端快照執行還原時，Berry 會在覆蓋前自動於本地建立安全還原備份 (`berry.db.rollback`)，從容抵禦網路異常中斷或下載校驗失敗風險。
+- **復原防護機制 (Rollback Safety)**：當從遠端快照執行還原時，Omera 會在覆蓋前自動於本地建立安全還原備份 (`omera.db.rollback`)，從容抵禦網路異常中斷或下載校驗失敗風險。
 
 ---
 

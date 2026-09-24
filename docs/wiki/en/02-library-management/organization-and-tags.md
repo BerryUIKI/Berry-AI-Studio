@@ -1,12 +1,12 @@
 # Organization, Ratings & Tags
 
-Berry AI Studio provides rich curation mechanisms designed to sort, categorize, and prioritize tens of thousands of artworks quickly without cluttering your filesystem.
+Omera provides rich curation mechanisms designed to sort, categorize, and prioritize tens of thousands of artworks quickly without cluttering your filesystem.
 
 ---
 
 ## 1. Star Ratings & Scoring System
 
-Berry uses a dual-precision rating model stored directly in SQLite (`files.rating` and `files.aesthetic_score`):
+Omera uses a dual-precision rating model stored directly in SQLite (`files.rating` and `files.aesthetic_score`):
 
 ### Star Ratings (0 to 5 Stars or 1 to 10 Scale)
 - **Keyboard Shortcuts**: Select one or more images and press:
@@ -43,7 +43,7 @@ Albums provide a way to group related artworks across different folders without 
 Tags provide granular categorization and visual triage:
 
 ### Preset Color Badges
-Berry includes 8 distinct visual color presets:
+Omera includes 8 distinct visual color presets:
 - 🔴 Red
 - 🟠 Orange
 - 🟡 Yellow
@@ -79,6 +79,6 @@ Whenever you select multiple items (via `Ctrl+Click`, `Shift+Click`, or `Ctrl+A`
 - **Batch Tag / Album**: Open the modal to apply or remove tags and albums in bulk.
 - **Copy Prompts**: Copies the positive prompts of all selected images to your clipboard, formatted with clean `---` dividers.
 - **Copy Paths**: Copies full absolute filesystem paths (one per line) for pasting into command lines or scripts.
-- **Move & Copy**: Move or copy physical files into another folder indexed in Berry.
+- **Move & Copy**: Move or copy physical files into another folder indexed in Omera.
 - **Cull Drafts**: Active when selected cards contain burst stacks (see [Stacks & Bursts](../04-intelligent-curation/stacks-and-bursts.md)).
 - **Trash**: Safely moves all selected files to your OS Recycle Bin/Trash.

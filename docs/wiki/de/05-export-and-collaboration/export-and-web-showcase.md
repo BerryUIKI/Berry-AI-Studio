@@ -1,6 +1,6 @@
 # Stapelexport, Transkodierung & Web-Showcase
 
-Berry AI Studio verfügt über eine hochperformante Export- und Paketierungs-Engine (`ExportModal.vue`), die durch Multi-Threading mit **Rayon** angetrieben wird. Sie unterstützt Formatkonvertierung, mehrstufige Metadatenbereinigung, Dateinamensmuster und die Erstellung vollkommen abhängigkeitsfreier HTML-Showcases.
+Omera verfügt über eine hochperformante Export- und Paketierungs-Engine (`ExportModal.vue`), die durch Multi-Threading mit **Rayon** angetrieben wird. Sie unterstützt Formatkonvertierung, mehrstufige Metadatenbereinigung, Dateinamensmuster und die Erstellung vollkommen abhängigkeitsfreier HTML-Showcases.
 
 ---
 
@@ -14,7 +14,7 @@ So öffnen Sie das Exportfenster:
 
 ## 2. Format-Transkodierung & Kompression
 
-Berry konvertiert und rekodiert Bilder parallel über alle verfügbaren CPU-Kerne:
+Omera konvertiert und rekodiert Bilder parallel über alle verfügbaren CPU-Kerne:
 
 | Zielformat | Optionen & Einstellungen | Bester Einsatzzweck |
 | :--- | :--- | :--- |
@@ -35,7 +35,7 @@ Sie können die maximale Kantenlänge begrenzen, um die Weitergabe unhandlich gr
 
 ## 3. 4-stufige Datenschutz-Metadatenbereinigung
 
-Viele Urheber möchten Kunstwerke online präsentieren, eigene Prompts, negative Embeddings oder Seeds jedoch vertraulich behandeln. Berry bietet **vier diskrete Bereinigungsstufen**:
+Viele Urheber möchten Kunstwerke online präsentieren, eigene Prompts, negative Embeddings oder Seeds jedoch vertraulich behandeln. Omera bietet **vier diskrete Bereinigungsstufen**:
 
 1. **Alles beibehalten (Keep All)**:
    - Behält alle eingebetteten Metadatenblöcke bei (ComfyUI-Workflow-Graphen, A1111-Parameter, NovelAI-Kommentare und EXIF-Daten).
@@ -73,11 +73,11 @@ Sie können begleitende Dateien parallel zu jedem Bild erzeugen lassen:
 
 ## 5. Eigenständiges interaktives HTML-Showcase-Album
 
-Berry kann Ihre ausgewählten Werke zu einer **in sich geschlossenen Offline-Webgalerie** bündeln (`index.html`):
+Omera kann Ihre ausgewählten Werke zu einer **in sich geschlossenen Offline-Webgalerie** bündeln (`index.html`):
 
 - **Keinerlei Abhängigkeiten**: Benötigt weder Webserver, Node.js noch externe JavaScript-Bibliotheken. Lässt sich per Doppelklick in jedem modernen Webbrowser öffnen.
 - **Enthaltene Funktionen**:
-  - Dunkles Studio-Design passend zu Berry AI Studio.
+  - Dunkles Studio-Design passend zu Omera.
   - Responsives Galerie-Raster mit Lazy-Loading für Vorschaubilder.
   - Vollbild-Lightbox mit stufenlosem Mausrad-Zoom und Verschieben.
   - Ausklappbarer Prompt-Inspektor mit Generierungsparametern.

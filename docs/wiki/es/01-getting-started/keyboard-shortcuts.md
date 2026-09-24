@@ -1,6 +1,6 @@
 # Guía de atajos de teclado
 
-Berry AI Studio está diseñado con un flujo de trabajo centrado en el teclado (**keyboard-first**). Puede explorar, puntuar, agrupar, inspeccionar y organizar bibliotecas masivas sin necesidad de tocar el ratón.
+Omera está diseñado con un flujo de trabajo centrado en el teclado (**keyboard-first**). Puede explorar, puntuar, agrupar, inspeccionar y organizar bibliotecas masivas sin necesidad de tocar el ratón.
 
 ---
 
@@ -67,7 +67,7 @@ Berry AI Studio está diseñado con un flujo de trabajo centrado en el teclado (
 | `Ctrl + E` / `Cmd + E` | **Exportar por lotes** | Abrir el cuadro modal de transcodificación, privacidad y empaquetado. |
 | `Ctrl + ,` / `Cmd + ,` | **Preferencias** | Abrir la ventana central de ajustes y preferencias de la aplicación. |
 | `?` o `Shift + /` | **Guía de atajos** | Abrir la hoja interactiva de atajos de teclado. |
-| `Alt + F4` | **Salir de la app** | Cerrar ordenadamente Berry AI Studio. |
+| `Alt + F4` | **Salir de la app** | Cerrar ordenadamente Omera. |
 
 ---
 

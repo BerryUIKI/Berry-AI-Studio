@@ -1,6 +1,6 @@
 # クラウドスナップショットバックアップと同期
 
-Berry AI Studio は、クラウドバックアップおよび差分同期エンジン（`src-tauri/src/cloud_backup.rs` および `src-tauri/src/cloud_sync.rs`）を標準搭載しており、サードパーティ製ツールに頼ることなく、データベースの自動バックアップとリモートへの増分メディアミラーリングを実現します。
+Omera は、クラウドバックアップおよび差分同期エンジン（`src-tauri/src/cloud_backup.rs` および `src-tauri/src/cloud_sync.rs`）を標準搭載しており、サードパーティ製ツールに頼ることなく、データベースの自動バックアップとリモートへの増分メディアミラーリングを実現します。
 
 ---
 
@@ -18,13 +18,13 @@ Berry AI Studio は、クラウドバックアップおよび差分同期エン�
 
 ## 2. ホット SQLite スナップショットバックアップ (`cloud_backup_create_snapshot`)
 
-Berry は、SQLite ネイティブの `VACUUM INTO` コマンドを使用してデータベースのバックアップを作成します：
+Omera は、SQLite ネイティブの `VACUUM INTO` コマンドを使用してデータベースのバックアップを作成します：
 
 ```mermaid
 sequenceDiagram
-    participant UI as Berry Studio UI
+    participant UI as Omera Studio UI
     participant Rust as バックエンド (cloud_backup.rs)
-    participant DB as SQLite WAL (berry.db)
+    participant DB as SQLite WAL (omera.db)
     participant Remote as クラウドストレージ (S3/WebDAV)
 
     UI->>Rust: バックアップスナップショット要求
@@ -38,7 +38,7 @@ sequenceDiagram
 
 ### スナップショットの保証事項：
 - **ノンブロッキング（非ロック）**: SQLite のオンライン Vacuum API を使用するため、バックアップ中も閲覧、評価、画像生成を一切中断することなく継続できます。
-- **ロールバック保護**: リモートスナップショットを復元する際、Berry は適用前にローカルの安全なコピー（`berry.db.rollback`）を自動作成し、ネットワーク切断やデータ破損から保護します。
+- **ロールバック保護**: リモートスナップショットを復元する際、Omera は適用前にローカルの安全なコピー（`omera.db.rollback`）を自動作成し、ネットワーク切断やデータ破損から保護します。
 
 ---
 

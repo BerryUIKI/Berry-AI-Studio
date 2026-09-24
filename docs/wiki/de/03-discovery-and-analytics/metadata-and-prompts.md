@@ -1,12 +1,12 @@
 # AIGC-Metadaten & Prompt-Inspektion
 
-Berry AI Studio verfügt über ein verlustfreies Metadaten-Extraktionsmodul in nativem Rust (`berry-metadata`). Es extrahiert vollautomatisch Prompts, negative Prompts, Modellnamen, Seeds und Ausführungsgraphen aller führenden Plattformen für generative KI.
+Omera verfügt über ein verlustfreies Metadaten-Extraktionsmodul in nativem Rust (`omera-metadata`). Es extrahiert vollautomatisch Prompts, negative Prompts, Modellnamen, Seeds und Ausführungsgraphen aller führenden Plattformen für generative KI.
 
 ---
 
 ## 1. Unterstützte KI-Generierungsplattformen
 
-Berry versteht nativ Metadaten, die in PNG-Chunks, WebP-EXIF-Headern und MP4-ISOBMFF-Boxen eingebettet sind:
+Omera versteht nativ Metadaten, die in PNG-Chunks, WebP-EXIF-Headern und MP4-ISOBMFF-Boxen eingebettet sind:
 
 | Plattform / Werkzeug | Extrahierte Metadatenfelder | Container-Speicherort |
 | :--- | :--- | :--- |
@@ -61,7 +61,7 @@ Wenn ein Bild oder Video ausgewählt ist, stellt das rechte Bedienfeld (`I`-Kür
 
 ## 3. Interaktive Prompt-Token-Chips
 
-Berry AI Studio zerlegt Prompt-Zeichenketten in interaktive Token-Chips, anstatt unformatierten Fließtext anzuzeigen:
+Omera zerlegt Prompt-Zeichenketten in interaktive Token-Chips, anstatt unformatierten Fließtext anzuzeigen:
 
 - **1-Klick-Suche**: Ein Klick auf einen Token-Chip (z. B. `[cyberpunk city]`) führt sofort eine bibliotheksweite Suche nach diesem Begriff über all Ihre Kunstwerke aus.
 - **1-Klick-Kopieren**: Klicken Sie auf das Kopiersymbol in der oberen rechten Ecke des Prompt-Bereichs, um den bereinigten Text direkt in die Zwischenablage zu übernehmen.
@@ -73,7 +73,7 @@ Berry AI Studio zerlegt Prompt-Zeichenketten in interaktive Token-Chips, anstatt
 
 Generative Werkzeuge betten häufig kurze Modell-Hashes (z. B. `31e35c80`) oder vollständige SHA256-Hashes anstelle von lesbaren Dateinamen ein.
 
-- Berry fragt automatisch seinen lokalen **Modell-Cache** (SQLite-Tabelle `model_cache`) ab, um kryptische Hashes in lesbare Checkpoint-Namen wie `„Animagine XL 3.1“` aufzulösen.
+- Omera fragt automatisch seinen lokalen **Modell-Cache** (SQLite-Tabelle `model_cache`) ab, um kryptische Hashes in lesbare Checkpoint-Namen wie `„Animagine XL 3.1“` aufzulösen.
 - Bei unbekannten Hashes können Sie eine AUTOMATIC1111-`cache.json`-Datei importieren oder das Modell direkt über Civitai nachschlagen (siehe [Modelle & LoRA-Bibliothek](../04-intelligent-curation/models-and-loras.md)).
 
 ---

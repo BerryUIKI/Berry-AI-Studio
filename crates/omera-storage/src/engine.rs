@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::db::DatabaseError;
 
-/// Supported database dialects for Berry AI Studio.
+/// Supported database dialects for Omera.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DatabaseDialect {
@@ -43,7 +43,7 @@ impl DatabaseDialect {
     }
 }
 
-/// Abstract storage engine interface for Berry AI Studio.
+/// Abstract storage engine interface for Omera.
 pub trait StorageEngine: Send {
     /// Returns the database dialect of this storage backend.
     fn dialect(&self) -> DatabaseDialect;

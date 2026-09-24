@@ -1,12 +1,12 @@
 # Organisation, Bewertungen & Tags
 
-Berry AI Studio bietet leistungsfähige Kurationsmechanismen, um zehntausende Kunstwerke schnell zu sortieren, zu kategorisieren und zu priorisieren, ohne Ihr Dateisystem zu überfrachten.
+Omera bietet leistungsfähige Kurationsmechanismen, um zehntausende Kunstwerke schnell zu sortieren, zu kategorisieren und zu priorisieren, ohne Ihr Dateisystem zu überfrachten.
 
 ---
 
 ## 1. Sterne-Bewertungen & Bewertungssystem
 
-Berry nutzt ein Bewertungssystem mit doppelter Genauigkeit, das direkt in SQLite gespeichert wird (`files.rating` und `files.aesthetic_score`):
+Omera nutzt ein Bewertungssystem mit doppelter Genauigkeit, das direkt in SQLite gespeichert wird (`files.rating` und `files.aesthetic_score`):
 
 ### Sterne-Bewertungen (0 bis 5 Sterne)
 - **Tastaturkürzel**: Wählen Sie ein oder mehrere Bilder aus und drücken Sie:
@@ -43,7 +43,7 @@ Alben ermöglichen es, zusammengehörige Kunstwerke aus unterschiedlichen Ordner
 Tags ermöglichen eine feingliedrige Kategorisierung und visuelle Ordnung:
 
 ### Vordefinierte Farb-Badges
-Berry bietet 8 sofort erkennbare Farbvarianten:
+Omera bietet 8 sofort erkennbare Farbvarianten:
 - 🔴 Rot
 - 🟠 Orange
 - 🟡 Gelb
@@ -79,6 +79,6 @@ Sobald mehrere Elemente markiert werden (über `Strg+Klick`, `Umschalt+Klick` od
 - **Tag / Album**: Den Dialog öffnen, um Tags und Alben für alle markierten Dateien zuzuweisen oder zu entfernen.
 - **Prompts kopieren**: Kopiert die positiven Prompts aller markierten Bilder in die Zwischenablage, getrennt durch saubere `---`-Trennlinien.
 - **Pfade kopieren**: Kopiert vollständige absolute Dateipfade (einer pro Zeile) zum Einfügen in Skripte oder Terminals.
-- **Verschieben & Kopieren**: Physisches Verschieben oder Kopieren der Dateien in ein anderes von Berry indiziertes Verzeichnis.
+- **Verschieben & Kopieren**: Physisches Verschieben oder Kopieren der Dateien in ein anderes von Omera indiziertes Verzeichnis.
 - **Niedrig bewertete Entwürfe aussortieren**: Aktiv, wenn ausgewählte Karten Bilderstapel enthalten (siehe [Stapel & Serien](../04-intelligent-curation/stacks-and-bursts.md)).
 - **Papierkorb**: Verschiebt alle ausgewählten Dateien sicher in den Papierkorb des Betriebssystems.

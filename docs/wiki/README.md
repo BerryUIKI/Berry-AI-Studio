@@ -1,6 +1,6 @@
-# Berry AI Studio Documentation & Product Wiki
+# Omera Documentation & Product Wiki
 
-Welcome to the official documentation and product wiki for **Berry AI Studio** — an open-source, high-performance desktop asset manager and prompt studio engineered for AI-generated images, videos, and workflow graphs.
+Welcome to the official documentation and product wiki for **Omera** — an open-source, high-performance desktop asset manager and prompt studio engineered for AI-generated images, videos, and workflow graphs.
 
 ---
 

@@ -1,6 +1,6 @@
 # Medienimport & Ordnermodi
 
-Berry AI Studio bietet eine flexible Ordnerarchitektur, die speziell auf moderne Arbeitsabläufe der KI-Generierung zugeschnitten ist. Anstatt Sie in eine starre Bibliotheksstruktur zu zwingen, unterstützt Berry **drei unterschiedliche Ordnermodi**, automatische Pipeline-Erfassung und eine breite Palette an Medienformaten.
+Omera bietet eine flexible Ordnerarchitektur, die speziell auf moderne Arbeitsabläufe der KI-Generierung zugeschnitten ist. Anstatt Sie in eine starre Bibliotheksstruktur zu zwingen, unterstützt Omera **drei unterschiedliche Ordnermodi**, automatische Pipeline-Erfassung und eine breite Palette an Medienformaten.
 
 ---
 
@@ -11,13 +11,13 @@ Beim Hinzufügen eines Ordners (`Datei > Ordner hinzufügen...` oder `Strg + O`)
 ```mermaid
 graph TD
     subgraph Modus A: Externer Link
-        A1["Bestehender Foto- / NAS-Ordner"] -->|In-Place-Indizierung| A2[("Berry DB")]
+        A1["Bestehender Foto- / NAS-Ordner"] -->|In-Place-Indizierung| A2[("Omera DB")]
         A1 -.->|Dateien werden nie verschoben| A1
     end
 
     subgraph Modus B: Verwalteter Tresor
         B1["Eingehende Kunstwerke"] -->|Kopieren oder Verschieben| B2["Tresor: JJJJ/MM/UUID_name"]
-        B2 -->|Direkt verwalteter Index| B3[("Berry DB")]
+        B2 -->|Direkt verwalteter Index| B3[("Omera DB")]
     end
 
     subgraph Modus C: AIGC-Pipeline
@@ -29,13 +29,13 @@ graph TD
 
 ### Modus A: Externer Link & Überwachung (`link`)
 - **Funktionsweise**: In-Place Zero-Copy-Indexierung.
-- **Ideal für**: Bestehende NAS-Freigaben (SMB/NFS), externe Festplatten oder umfangreiche schreibgeschützte Archivsammlungen, die von Berry AI Studio weder verschoben noch modifiziert werden sollen.
-- **Verhalten**: Berry extrahiert Metadaten und generiert schnelle Vorschaubilder, belässt die physischen Originaldateien jedoch exakt an ihrem ursprünglichen Speicherort auf dem Datenträger.
+- **Ideal für**: Bestehende NAS-Freigaben (SMB/NFS), externe Festplatten oder umfangreiche schreibgeschützte Archivsammlungen, die von Omera weder verschoben noch modifiziert werden sollen.
+- **Verhalten**: Omera extrahiert Metadaten und generiert schnelle Vorschaubilder, belässt die physischen Originaldateien jedoch exakt an ihrem ursprünglichen Speicherort auf dem Datenträger.
 
 ### Modus B: Verwalteter Projekt-Tresor (`managed`)
 - **Funktionsweise**: Dediziertes, intern organisiertes Anwendungs-Repository.
 - **Ideal für**: Kuratierte persönliche Bibliotheken oder Studio-Portfolios, bei denen eine saubere, einheitliche Speicherstruktur gewünscht ist.
-- **Verhalten**: Wenn Sie Dateien in einen verwalteten Tresor importieren oder ablegen, organisiert Berry sie automatisch in einer nach Datum unterteilten Verzeichnisstruktur:
+- **Verhalten**: Wenn Sie Dateien in einen verwalteten Tresor importieren oder ablegen, organisiert Omera sie automatisch in einer nach Datum unterteilten Verzeichnisstruktur:
   ```
   <Tresor_Stammverzeichnis>/
   └── 2026/
@@ -48,7 +48,7 @@ graph TD
 - **Funktionsweise**: Kontinuierliche Überwachung und automatisierte Übernahme neu generierter Ausgaben.
 - **Ideal für**: Die direkte Verknüpfung mit lokalen Ausgabeordnern von **AUTOMATIC1111 / SD.Next**, **ComfyUI**, **Fooocus** oder **InvokeAI**.
 - **Mechanismen der Pipeline**:
-  1. **Schreibschutz-Entprellung (Write-Lock Debouncing)**: Wenn ein KI-Generator eine große PNG- oder MP4-Datei auf die Festplatte schreibt, schwankt die Dateigröße während des Schreibvorgangs. Der Wächter von Berry prüft die Dateigrößenstabilität für mindestens **500 ms**, bevor die Datei verarbeitet wird. Dies verhindert das Einlesen unvollständiger oder beschädigter Bilddaten.
+  1. **Schreibschutz-Entprellung (Write-Lock Debouncing)**: Wenn ein KI-Generator eine große PNG- oder MP4-Datei auf die Festplatte schreibt, schwankt die Dateigröße während des Schreibvorgangs. Der Wächter von Omera prüft die Dateigrößenstabilität für mindestens **500 ms**, bevor die Datei verarbeitet wird. Dies verhindert das Einlesen unvollständiger oder beschädigter Bilddaten.
   2. **Erfassungsverhalten**: Wählen Sie zwischen **Kopieren** (Original beibehalten, Kopie in der Bibliothek anlegen) oder **Verschieben** (neu erzeugte Generationen direkt in die Bibliothek übernehmen).
   3. **Auto-Harvest & Verzögerte Quellbereinigung**: Sie können eine automatische Schonfrist für das Quellverzeichnis des Generators festlegen (`Sofort`, `1 Stunde`, `24 Stunden`, `3 Tage`, `7 Tage`, `Nie`). Nach Ablauf der Schonfrist werden verarbeitete Quell-Generierungsdateien sicher in den **System-Papierkorb** verschoben. So bleibt Ihre Generierungs-SSD sauber, ohne dass Datenverlust droht.
 
@@ -56,7 +56,7 @@ graph TD
 
 ## 2. Unterstützte Datei- & Medienformate
 
-Berry AI Studio analysiert Container-Header und Binärdatenströme über native Rust-Parser (`berry-metadata`), indem es Dateisignaturen (Magic Bytes) prüft, anstatt sich ausschließlich auf Dateiendungen zu verlassen:
+Omera analysiert Container-Header und Binärdatenströme über native Rust-Parser (`omera-metadata`), indem es Dateisignaturen (Magic Bytes) prüft, anstatt sich ausschließlich auf Dateiendungen zu verlassen:
 
 | Container | Endungen | Header-Erkennung | Fähigkeiten zur Metadaten-Extraktion |
 | :--- | :--- | :--- | :--- |
@@ -72,13 +72,13 @@ Berry AI Studio analysiert Container-Header und Binärdatenströme über native 
 
 ## 3. Inkrementelle Indizierung & Dateisystem-Überwachung
 
-Berry AI Studio vermeidet langwierige, vollständige Datenträgerscans beim Programmstart:
+Omera vermeidet langwierige, vollständige Datenträgerscans beim Programmstart:
 
 1. **Fingerabdruck-Prüfung (Fingerprint Verification)**:
    - Dateien werden in SQLite über einen schnellen zusammengesetzten Index erfasst: `(path, size_bytes, modified_at)`.
-   - Beim Start oder bei erneuten Scans vergleicht Berry den gecachten Zeitstempel und die Dateigröße. Übereinstimmende Dateien werden sofort übersprungen, ohne dass Dateiinhalte gelesen oder Metadaten-JSONs geparst werden müssen.
+   - Beim Start oder bei erneuten Scans vergleicht Omera den gecachten Zeitstempel und die Dateigröße. Übereinstimmende Dateien werden sofort übersprungen, ohne dass Dateiinhalte gelesen oder Metadaten-JSONs geparst werden müssen.
 2. **Dauerhaftes Änderungsprotokoll (Change Journaling)**:
    - Ereignisse der Dateisystem-Überwachung (`notify` v8) werden mit einer **Entprellzeit von 750 ms** gesammelt und in SQLite (`filesystem_change_journal`) festgehalten.
-   - Selbst wenn Sie 1.000 Bilder in kurzer Folge im Batch generieren, fasst Berry Ereignisse in Blöcken von 1.024 Vorgängen zusammen, was Ruckeln der Benutzeroberfläche und Datenbanksperren verhindert.
+   - Selbst wenn Sie 1.000 Bilder in kurzer Folge im Batch generieren, fasst Omera Ereignisse in Blöcken von 1.024 Vorgängen zusammen, was Ruckeln der Benutzeroberfläche und Datenbanksperren verhindert.
 3. **Startscan-Intervall (Cooldown)**:
-   - Unter **Einstellungen > Allgemein** können Sie das Startscan-Intervall festlegen (Standard: **6 Stunden**). Berry lädt die bestehende Bibliothek aus SQLite in unter 50 ms direkt beim Start und verschiebt vollständige Datenträgerabgleiche bis zum Ablauf des Intervalls.
+   - Unter **Einstellungen > Allgemein** können Sie das Startscan-Intervall festlegen (Standard: **6 Stunden**). Omera lädt die bestehende Bibliothek aus SQLite in unter 50 ms direkt beim Start und verschiebt vollständige Datenträgerabgleiche bis zum Ablauf des Intervalls.

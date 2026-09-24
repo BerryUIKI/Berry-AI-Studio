@@ -1,4 +1,4 @@
-# [Berry AI Studio](Home.md)
+# [Omera](Home.md)
 
 - **[🏠 Home](Home.md)**
 

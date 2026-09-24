@@ -1,6 +1,6 @@
 # Batch Export, Transcoding & Web Showcase
 
-Berry AI Studio includes a high-throughput export and packaging engine (`ExportModal.vue`) powered by **Rayon** multi-threading. It supports format transcoding, privacy metadata stripping, filename templating, and zero-dependency HTML showcase generation.
+Omera includes a high-throughput export and packaging engine (`ExportModal.vue`) powered by **Rayon** multi-threading. It supports format transcoding, privacy metadata stripping, filename templating, and zero-dependency HTML showcase generation.
 
 ---
 
@@ -14,7 +14,7 @@ To open the export modal:
 
 ## 2. Format Transcoding & Compression
 
-Berry converts and re-encodes images in parallel across all CPU cores:
+Omera converts and re-encodes images in parallel across all CPU cores:
 
 | Target Format | Options & Settings | Best Use Case |
 | :--- | :--- | :--- |
@@ -35,7 +35,7 @@ You can constrain maximum output dimensions to prevent accidental distribution o
 
 ## 3. 4-Tier Privacy Metadata Sanitization
 
-Many creators want to share artworks online while keeping proprietary prompts, negative embeddings, or seeds private. Berry provides **four discrete privacy tiers**:
+Many creators want to share artworks online while keeping proprietary prompts, negative embeddings, or seeds private. Omera provides **four discrete privacy tiers**:
 
 1. **Keep All**:
    - Preserves all embedded metadata chunks (ComfyUI workflow graphs, A1111 parameters, NovelAI comments, and EXIF camera data).
@@ -73,11 +73,11 @@ You can automatically generate companion files alongside each exported image:
 
 ## 5. Standalone Interactive HTML Showcase Generator
 
-Berry can package your exported assets into a **self-contained, single-file HTML portfolio** (`index.html`):
+Omera can package your exported assets into a **self-contained, single-file HTML portfolio** (`index.html`):
 
 - **Zero Dependencies**: Requires no web server, Node.js, or external JavaScript libraries. Double-click to open in any web browser.
 - **Features Included**:
-  - Dark studio aesthetic matching Berry AI Studio.
+  - Dark studio aesthetic matching Omera.
   - Responsive gallery grid with lazy-loaded thumbnails.
   - Fullscreen Lightbox viewer with mouse-wheel zoom and pan.
   - Collapsible prompt inspector showing generation parameters.

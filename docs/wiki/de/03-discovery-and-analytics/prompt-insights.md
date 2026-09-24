@@ -1,6 +1,6 @@
 # Prompt-Analysen & Einblicke
 
-Mit wachsender Bildersammlung wird es entscheidend zu verstehen, welche Prompt-Schlüsselwörter, Künstler und technischen Parameter zu Ihren am besten bewerteten Kunstwerken führen. Berry AI Studio bietet ein dediziertes Analyse-Dashboard (`PromptStatsModal.vue`), das Metadaten über Ihre gesamte Bibliothek hinweg aggregiert.
+Mit wachsender Bildersammlung wird es entscheidend zu verstehen, welche Prompt-Schlüsselwörter, Künstler und technischen Parameter zu Ihren am besten bewerteten Kunstwerken führen. Omera bietet ein dediziertes Analyse-Dashboard (`PromptStatsModal.vue`), das Metadaten über Ihre gesamte Bibliothek hinweg aggregiert.
 
 ---
 

@@ -1,6 +1,6 @@
 # Vollständige Einstellungsreferenz
 
-Das Einstellungsfenster von Berry AI Studio (`SettingsModal.vue`) wird über `Datei > Einstellungen...` oder `Strg + ,` / `Cmd + ,` aufgerufen. Alle Einstellungen werden dauerhaft in der Datei `config.json` in Ihrem lokalen Anwendungsdaten-Verzeichnis gespeichert.
+Das Einstellungsfenster von Omera (`SettingsModal.vue`) wird über `Datei > Einstellungen...` oder `Strg + ,` / `Cmd + ,` aufgerufen. Alle Einstellungen werden dauerhaft in der Datei `config.json` in Ihrem lokalen Anwendungsdaten-Verzeichnis gespeichert.
 
 ---
 
@@ -56,7 +56,7 @@ Das Einstellungsfenster von Berry AI Studio (`SettingsModal.vue`) wird über `Da
 | Einstellungsfeld | Schlüssel in `config.json` | Standardwert | Beschreibung |
 | :--- | :--- | :--- | :--- |
 | **Datenbank-Backend** | `storage_backend` | `"sqlite"` | Aktives Datenbanksystem: `"sqlite"`, `"mysql"` oder `"postgres"`. |
-| **Remote-Verbindungs-URL** | `remote_connection_url` | `""` | Verbindungszeichenfolge (z. B. `postgres://user:pass@host:5432/berry_studio`). |
+| **Remote-Verbindungs-URL** | `remote_connection_url` | `""` | Verbindungszeichenfolge (z. B. `postgres://user:pass@host:5432/omera_studio`). |
 | **Workstation Client-ID** | `client_identifier` | `""` | Eindeutiger Rechnername zur Kennzeichnung im Änderungsprotokoll und zur OCC-Konfliktverfolgung. |
 | **Geteilte Speicherpfade** | `root_mappings` | `{}` | Plattformübergreifende Pfadzuweisungen zwischen zentralen Root-UUIDs und lokalen Betriebssystem-Mounts. |
 | **Verbindung testen** | — | — | Sendet einen Ping an den Datenbankserver und misst die Netzwerk-Roundtrip-Latenz in Millisekunden. |
@@ -93,9 +93,9 @@ Zeigt den aktuellen Status der integrierten verlustfreien Metadaten-Parser an:
 
 - **Version**: Zeigt die installierte Anwendungsversion an (z. B. `v0.3.0`).
 - **Datenbankschema**: Meldet die aktive SQLite-Schema-Migrationsstufe (z. B. `Schema Version 14`).
-- **Lokaler SQLite-Datenbankpfad**: Absoluter Dateipfad zu `berry.db`.
+- **Lokaler SQLite-Datenbankpfad**: Absoluter Dateipfad zu `omera.db`.
 - **Schaltflächen zum schnellen Öffnen**:
   - `Konfigurationsdatei öffnen`: Öffnet den Ordner mit `config.json`.
-  - `Datenbankordner öffnen`: Öffnet das Verzeichnis mit `berry.db` und den WAL-Dateien.
+  - `Datenbankordner öffnen`: Öffnet das Verzeichnis mit `omera.db` und den WAL-Dateien.
   - `Vorschaubild-Cache öffnen`: Öffnet das Verzeichnis des WebP-Thumbnail-Caches.
   - `Modellordner öffnen`: Öffnet das Verzeichnis der lokalen ONNX-Gewichte.

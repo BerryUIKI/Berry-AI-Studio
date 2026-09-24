@@ -1,6 +1,6 @@
 # Gallery Modes & Display Options
 
-Berry AI Studio provides four dedicated gallery presentation modes designed to accommodate different curation workflows, ranging from rapid visual triage to detailed technical inspections.
+Omera provides four dedicated gallery presentation modes designed to accommodate different curation workflows, ranging from rapid visual triage to detailed technical inspections.
 
 ---
 
@@ -10,7 +10,7 @@ Use the top toolbar buttons or menu shortcuts (`View`) to toggle between view mo
 
 ### 1. Uniform Grid View (`grid` — ⊞)
 - **Concept**: Fixed-height, uniform aspect ratio cards arranged in responsive columns.
-- **Responsive Architecture**: Card width stays stable when the window is resized. Berry dynamically adjusts the number of columns (`calculateGalleryColumns`) instead of stretching or squishing images.
+- **Responsive Architecture**: Card width stays stable when the window is resized. Omera dynamically adjusts the number of columns (`calculateGalleryColumns`) instead of stretching or squishing images.
 - **Zoom Slider**: Drag the zoom slider or use `Ctrl + =` / `Ctrl + -` to scale card minimum width smoothly from **130 px** (overview thumbnail mode) to **360 px** (large detail mode).
 - **Virtualization**: Only elements currently within the viewport (plus a small look-ahead overscan buffer) are rendered into the DOM. Scrolling through a 100,000-image library consumes no more memory than scrolling through 100 images.
 
@@ -54,7 +54,7 @@ In **Settings > Display & Safety**, you can toggle **Show Card Badges** on or of
 
 ## 3. Sensitive Content (NSFW) Privacy Blur
 
-To protect privacy during presentations or working in public spaces, Berry AI Studio includes built-in content protection:
+To protect privacy during presentations or working in public spaces, Omera includes built-in content protection:
 
 - **Automatic Blur (`blur_nsfw` setting)**: Any asset tagged as `is_nsfw` or identified with an adult content rating is masked with an aggressive CSS blur overlay.
 - **Click-to-Reveal**: Clicking the eye icon (`👁`) or the card unblurs that specific item temporarily for review.

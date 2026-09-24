@@ -2,7 +2,7 @@
 
 Generative AI creators frequently generate batches of 10 to 50 variations with identical or slightly modified prompts to find the single best composition. Without curation tools, this floods your library with near-duplicate drafts.
 
-Berry AI Studio solves this with **Intelligent Burst Stacking**, **Poker-Deck Cards**, **Authoritative Hero Selection**, and **Side-by-Side Comparison**.
+Omera solves this with **Intelligent Burst Stacking**, **Poker-Deck Cards**, **Authoritative Hero Selection**, and **Side-by-Side Comparison**.
 
 ---
 
@@ -34,12 +34,12 @@ flowchart LR
 
 ## 2. Automated Burst Stacking (`auto_stack_images`)
 
-Berry can automatically detect and group sequential generation bursts in the background:
+Omera can automatically detect and group sequential generation bursts in the background:
 
 ### Clustering Criteria:
 1. **Prompt Token Similarity**: Computes tokenized Jaccard similarity across positive prompts. You can configure the required threshold in **Settings > Stacks & Bursts** (default: `0.85` / 85% match).
-2. **Time Window Proximity**: Generative bursts occur in quick succession. Berry clusters variations created within a configurable time window (default: `180 minutes`).
-3. **Execution**: You can run auto-stacking on demand via **Tools > Organize Library by Prompt (All Folders or Current Folder)**, or let Berry cluster images automatically during ingestion.
+2. **Time Window Proximity**: Generative bursts occur in quick succession. Omera clusters variations created within a configurable time window (default: `180 minutes`).
+3. **Execution**: You can run auto-stacking on demand via **Tools > Organize Library by Prompt (All Folders or Current Folder)**, or let Omera cluster images automatically during ingestion.
 
 ---
 
@@ -54,8 +54,8 @@ You can create, dissolve, and adjust stacks using keyboard shortcuts:
 | **Designate Hero Cover** | `Alt + S` / `Option + S` | Designates the active image as the primary cover card (`stack_order = 0`). |
 
 ### Stack Merge Safety & Flattening
-In Berry AI Studio, stacks **cannot be nested** (you cannot put a stack inside a stack). When you select multiple stacks and press `Ctrl + G`:
-- Berry automatically flattens all source stacks into the target stack.
+In Omera, stacks **cannot be nested** (you cannot put a stack inside a stack). When you select multiple stacks and press `Ctrl + G`:
+- Omera automatically flattens all source stacks into the target stack.
 - A confirmation dialog (`StackMergeWarningModal.vue`) appears to prevent accidental grouping.
 - You can check *"Do not show again"* to suppress future warnings (can be reset in **Settings > Stacks & Bursts > Reset Suppressed Warnings**).
 

@@ -1,6 +1,6 @@
 # Copia de instantáneas en la nube y reflejo de medios
 
-Berry AI Studio incorpora un motor de sincronización delta y copias de respaldo en la nube (`src-tauri/src/cloud_backup.rs` y `src-tauri/src/cloud_sync.rs`) que posibilita copias automatizadas de la base de datos y reflejo incremental de archivos multimedia remotos sin depender de herramientas de terceros.
+Omera incorpora un motor de sincronización delta y copias de respaldo en la nube (`src-tauri/src/cloud_backup.rs` y `src-tauri/src/cloud_sync.rs`) que posibilita copias automatizadas de la base de datos y reflejo incremental de archivos multimedia remotos sin depender de herramientas de terceros.
 
 ---
 
@@ -18,13 +18,13 @@ Configure los puntos de enlace remotos en **Preferencias > Copia en la nube**:
 
 ## 2. Copias de instantáneas SQLite en caliente (`cloud_backup_create_snapshot`)
 
-Berry realiza copias de seguridad de su base de datos utilizando la instrucción nativa `VACUUM INTO` de SQLite:
+Omera realiza copias de seguridad de su base de datos utilizando la instrucción nativa `VACUUM INTO` de SQLite:
 
 ```mermaid
 sequenceDiagram
-    participant UI as Interfaz Berry Studio
+    participant UI as Interfaz Omera Studio
     participant Rust as Backend (cloud_backup.rs)
-    participant DB as SQLite WAL (berry.db)
+    participant DB as SQLite WAL (omera.db)
     participant Remote as Almacenamiento nube (S3/WebDAV)
 
     UI->>Rust: Solicitar instantánea de copia
@@ -38,7 +38,7 @@ sequenceDiagram
 
 ### Garantías de las instantáneas:
 - **Sin bloqueos (Non-Locking)**: Utiliza la API en caliente de SQLite. Puede continuar explorando, calificando y generando imágenes sin interrupciones.
-- **Seguridad ante reversiones**: Al restaurar una instantánea, Berry crea automáticamente una copia de seguridad local previa (`berry.db.rollback`) antes de sobreescribir con la copia remota, protegiéndole frente a caídas de red o descargas corruptas.
+- **Seguridad ante reversiones**: Al restaurar una instantánea, Omera crea automáticamente una copia de seguridad local previa (`omera.db.rollback`) antes de sobreescribir con la copia remota, protegiéndole frente a caídas de red o descargas corruptas.
 
 ---
 

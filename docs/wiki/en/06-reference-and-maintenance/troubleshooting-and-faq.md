@@ -1,6 +1,6 @@
 # Troubleshooting & Frequently Asked Questions (FAQ)
 
-This guide covers common questions, edge cases, and troubleshooting steps for Berry AI Studio.
+This guide covers common questions, edge cases, and troubleshooting steps for Omera.
 
 ---
 
@@ -42,23 +42,23 @@ This guide covers common questions, edge cases, and troubleshooting steps for Be
 
 ## 2. Frequently Asked Questions (FAQ)
 
-### Is Berry AI Studio completely free to use?
-Yes. Berry AI Studio is free, open-source software licensed under **AGPL-3.0**. There are no subscriptions, paywalls, or locked features.
+### Is Omera completely free to use?
+Yes. Omera is free, open-source software licensed under **AGPL-3.0**. There are no subscriptions, paywalls, or locked features.
 
-### Can Berry AI Studio handle libraries with 100,000+ or 500,000+ files?
-Yes. Berry was engineered from the ground up to support massive collections. It uses:
+### Can Omera handle libraries with 100,000+ or 500,000+ files?
+Yes. Omera was engineered from the ground up to support massive collections. It uses:
 - **Keyset cursor deep pagination** (`search_files_cursor_page`) that maintains sub-millisecond query performance regardless of library size.
 - **SQLite Write-Ahead Logging (WAL)** for high-throughput non-blocking reads.
 - **Dynamic DOM virtualization** that only renders elements visible in your viewport.
 
-### Does Berry AI Studio upload my prompts or images to the cloud?
+### Does Omera upload my prompts or images to the cloud?
 No. All scanning, metadata extraction, database storage, and AI inference (CLIP and WD14) run 100% locally on your machine. No telemetry or analytics are collected.
 
-### Can I drag and drop images from Berry directly into ComfyUI or Discord?
+### Can I drag and drop images from Omera directly into ComfyUI or Discord?
 Yes. Dragging an image card from the gallery directly into your web browser or external desktop application transmits standard OS file drop payloads, preserving embedded metadata chunks.
 
 ### What happens if I delete a folder from the left sidebar?
-Removing a folder from Berry AI Studio removes the folder and its index records from Berry's database. **It never deletes or moves your physical media files on disk.**
+Removing a folder from Omera removes the folder and its index records from Omera's database. **It never deletes or moves your physical media files on disk.**
 
 ### Can multiple team members collaborate on the same library?
 Yes. By switching from SQLite to a shared **MySQL 8.0+** or **PostgreSQL 14+** database in **Settings > Team & Collaboration**, multiple artists can connect to a shared network library with real-time change synchronization and cross-platform path mapping.

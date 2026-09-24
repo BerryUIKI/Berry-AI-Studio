@@ -1,6 +1,6 @@
 # Resolución de problemas y preguntas frecuentes (FAQ)
 
-Esta guía recopila soluciones a problemas comunes, casos límite y preguntas frecuentes sobre Berry AI Studio.
+Esta guía recopila soluciones a problemas comunes, casos límite y preguntas frecuentes sobre Omera.
 
 ---
 
@@ -42,23 +42,23 @@ Esta guía recopila soluciones a problemas comunes, casos límite y preguntas fr
 
 ## 2. Preguntas frecuentes (FAQ)
 
-### ¿Berry AI Studio es completamente gratuito?
-Sí. Berry AI Studio es software libre y de código abierto bajo licencia **AGPL-3.0**. No incluye suscripciones, muros de pago ni funcionalidades bloqueadas.
+### ¿Omera es completamente gratuito?
+Sí. Omera es software libre y de código abierto bajo licencia **AGPL-3.0**. No incluye suscripciones, muros de pago ni funcionalidades bloqueadas.
 
-### ¿Puede Berry AI Studio gestionar bibliotecas con más de 100.000 o 500.000 archivos?
-Sí. Berry ha sido concebido desde sus cimientos para manejar colecciones inmensas mediante:
+### ¿Puede Omera gestionar bibliotecas con más de 100.000 o 500.000 archivos?
+Sí. Omera ha sido concebido desde sus cimientos para manejar colecciones inmensas mediante:
 - **Paginación profunda por cursor Keyset** (`search_files_cursor_page`) que mantiene tiempos de respuesta inferiores al milisegundo sin importar el tamaño del catálogo.
 - **SQLite en modo Write-Ahead Logging (WAL)** para lecturas no bloqueantes de alto rendimiento.
 - **Virtualización dinámica del DOM** que renderiza exclusivamente los elementos visibles en pantalla.
 
-### ¿Berry AI Studio sube mis prompts o imágenes a la nube?
+### ¿Omera sube mis prompts o imágenes a la nube?
 No. Todo el escaneo, extracción de metadatos, almacenamiento en base de datos e inferencia de IA (CLIP y WD14) se ejecutan 100% en local en su ordenador. No se recopila telemetría ni analítica alguna.
 
-### ¿Puedo arrastrar imágenes de Berry directamente a ComfyUI o Discord?
+### ¿Puedo arrastrar imágenes de Omera directamente a ComfyUI o Discord?
 Sí. Al arrastrar una tarjeta desde la galería hacia su navegador web o cualquier otra aplicación externa se emiten datos estándar de transferencia de archivos del sistema operativo, conservando intactos todos los metadatos incrustados.
 
 ### ¿Qué sucede si elimino una carpeta de la barra lateral izquierda?
-Al quitar una carpeta de Berry AI Studio se eliminan la carpeta y sus registros indexados de la base de datos de Berry. **En ningún caso se borran ni mueven sus archivos multimedia del disco.**
+Al quitar una carpeta de Omera se eliminan la carpeta y sus registros indexados de la base de datos de Omera. **En ningún caso se borran ni mueven sus archivos multimedia del disco.**
 
 ### ¿Varios miembros de un equipo pueden colaborar sobre la misma biblioteca?
 Sí. Cambiando el motor de SQLite a un servidor compartido de **MySQL 8.0+** o **PostgreSQL 14+** en **Preferencias > Equipo y base de datos**, múltiples creadores pueden conectarse a una biblioteca de red compartida con sincronización en tiempo real y asignación de rutas multiplataforma.

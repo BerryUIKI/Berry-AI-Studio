@@ -99,7 +99,7 @@ fn generate_mock_files(folder_id: i64, start_index: usize, count: usize) -> Vec<
 
 fn benchmark_library_queries(size: usize) {
     let temp_dir = tempfile::tempdir().expect("Failed to create tempdir");
-    let db_path = temp_dir.path().join("berry.db");
+    let db_path = temp_dir.path().join("omera.db");
     let db = Database::connect(&db_path).expect("Failed to open db");
 
     let folder = db
@@ -294,7 +294,7 @@ fn benchmark_thumbnail_manifest_sync(count: usize) {
     let thumb_dir = cache_dir.join("thumbnails");
     fs::create_dir_all(&thumb_dir).expect("Failed to create thumb dir");
 
-    let db_path = temp_dir.path().join("berry.db");
+    let db_path = temp_dir.path().join("omera.db");
     let _ = Database::connect(&db_path).expect("Failed to init db");
 
     println!("Creating {} mock thumbnail files on disk...", count);
@@ -339,7 +339,7 @@ fn benchmark_thumbnail_manifest_sync(count: usize) {
 
 fn main() {
     println!("#######################################################");
-    println!("# BERRY AI STUDIO - LARGE LIBRARY BENCHMARK SUITE    #");
+    println!("# OMERA - LARGE LIBRARY BENCHMARK SUITE               #");
     println!("#######################################################");
 
     benchmark_library_queries(1_000);

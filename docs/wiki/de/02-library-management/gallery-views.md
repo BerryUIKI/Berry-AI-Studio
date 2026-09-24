@@ -1,6 +1,6 @@
 # Galerieansichten & Anzeigeoptionen
 
-Berry AI Studio bietet vier spezialisierte Galerieansichten, die für unterschiedliche Kurationsanforderungen konzipiert sind — von der schnellen visuellen Sichtung bis hin zu detaillierten technischen Prüfungen.
+Omera bietet vier spezialisierte Galerieansichten, die für unterschiedliche Kurationsanforderungen konzipiert sind — von der schnellen visuellen Sichtung bis hin zu detaillierten technischen Prüfungen.
 
 ---
 
@@ -10,7 +10,7 @@ Verwenden Sie die Schaltflächen in der oberen Symbolleiste oder das Menü (`Ans
 
 ### 1. Einheitliche Rasteransicht (`grid` — ⊞)
 - **Konzept**: Karten mit fester Höhe und einheitlichem Seitenverhältnis, angeordnet in responsiven Spalten.
-- **Responsive Architektur**: Die Kartenbreite bleibt bei Fenstergrößenänderungen stabil. Berry passt die Spaltenanzahl dynamisch an (`calculateGalleryColumns`), anstatt Bilder zu strecken oder zu stauchen.
+- **Responsive Architektur**: Die Kartenbreite bleibt bei Fenstergrößenänderungen stabil. Omera passt die Spaltenanzahl dynamisch an (`calculateGalleryColumns`), anstatt Bilder zu strecken oder zu stauchen.
 - **Zoom-Schieberegler**: Ziehen Sie den Zoomregler oder nutzen Sie `Strg + =` / `Strg + -`, um die minimale Kartenbreite stufenlos von **130 px** (Übersichtsmodus) bis **360 px** (Detailmodus) zu skalieren.
 - **Virtualisierung**: Nur Elemente, die sich aktuell im sichtbaren Bereich (Viewport) befinden (zuzüglich eines kleinen Vorauslade-Puffers), werden im DOM gerendert. Das Scrollen durch eine Bibliothek mit 100.000 Bildern verbraucht nicht mehr Arbeitsspeicher als das Betrachten von 100 Bildern.
 
@@ -54,7 +54,7 @@ Unter **Einstellungen > Galerie** können Sie die Option **Karten-Badges anzeige
 
 ## 3. Weichzeichnung sensibler Inhalte (NSFW)
 
-Um Ihre Privatsphäre bei Präsentationen oder beim Arbeiten an öffentlichen Orten zu schützen, enthält Berry AI Studio einen integrierten Inhaltsschutz:
+Um Ihre Privatsphäre bei Präsentationen oder beim Arbeiten an öffentlichen Orten zu schützen, enthält Omera einen integrierten Inhaltsschutz:
 
 - **Automatischer Weichzeichner (`blur_nsfw`)**: Jedes Asset, das mit `is_nsfw` gekennzeichnet ist oder eine entsprechende Altersfreigabe aufweist, wird standardmäßig durch einen starken CSS-Weichzeichnungsfilter unkenntlich gemacht.
 - **Klicken zum Anzeigen**: Ein Klick auf das Augensymbol (`👁`) oder auf die Bildkarte blendet das Bild zur Prüfung vorübergehend scharf ein.

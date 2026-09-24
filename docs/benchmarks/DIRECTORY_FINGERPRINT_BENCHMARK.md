@@ -2,8 +2,8 @@
 
 **Date:** 2026-09-21  
 **Test Platform:** Windows 11, NVMe SSD  
-**Target Crates:** `berry-scan`, `berry-storage`  
-**Benchmark Command:** `cargo bench --bench directory_fingerprint -p berry-scan`
+**Target Crates:** `omera-scan`, `omera-storage`  
+**Benchmark Command:** `cargo bench --bench directory_fingerprint -p omera-scan`
 
 ---
 

@@ -556,7 +556,7 @@ export const de: typeof en = {
     dbPath: "Lokaler SQLite-Datenbankpfad",
     storageTitle: "Speicherorte für Daten & Konfiguration (bleiben erhalten)",
     configFile: "Konfigurationsdatei (config.json)",
-    databaseFile: "SQLite-Datenbank (berry.db)",
+    databaseFile: "SQLite-Datenbank (omera.db)",
     thumbnailsDir: "WebP-Vorschaubild-Cache (thumbnails/)",
     openFolder: "Ordner öffnen",
     storageNotice: "Alle Datenbanken, Tags, Alben und Einstellungen werden dauerhaft im AppData-Verzeichnis gespeichert.",

@@ -1,12 +1,12 @@
 # Organisation, Notes & Tags
 
-Berry AI Studio propose de riches mécanismes de curation conçus pour trier, catégoriser et hiérarchiser des dizaines de milliers d'œuvres rapidement sans encombrer votre système de fichiers.
+Omera propose de riches mécanismes de curation conçus pour trier, catégoriser et hiérarchiser des dizaines de milliers d'œuvres rapidement sans encombrer votre système de fichiers.
 
 ---
 
 ## 1. Système de notation par étoiles & Évaluation
 
-Berry utilise un modèle de notation à double précision stocké directement dans SQLite (`files.rating` et `files.aesthetic_score`) :
+Omera utilise un modèle de notation à double précision stocké directement dans SQLite (`files.rating` et `files.aesthetic_score`) :
 
 ### Notes par étoiles (0 à 5 étoiles ou échelle de 1 à 10)
 - **Raccourcis clavier** : Sélectionnez une ou plusieurs images et appuyez sur :
@@ -43,7 +43,7 @@ Les albums permettent de regrouper des créations artistiques connexes dispersé
 Les tags offrent une catégorisation granulaire et un tri visuel efficace :
 
 ### Palettes de couleurs prédéfinies
-Berry intègre 8 couleurs visuelles distinctes :
+Omera intègre 8 couleurs visuelles distinctes :
 - 🔴 Rouge
 - 🟠 Orange
 - 🟡 Jaune
@@ -79,6 +79,6 @@ Dès que vous sélectionnez plusieurs éléments (via `Ctrl+Clic`, `Maj+Clic` ou
 - **Tags & Albums par lots** : Ouvre la boîte de dialogue pour appliquer ou retirer des tags et des albums en masse.
 - **Copier prompts** : Copie les prompts positifs de toutes les images sélectionnées dans votre presse-papier, séparés par des délimiteurs `---` clairs.
 - **Copier chemins** : Copie les chemins absolus complets du système de fichiers (une ligne par fichier) pour les coller dans un terminal ou un script.
-- **Déplacer & Copier** : Déplace ou copie les fichiers physiques vers un autre dossier indexé dans Berry.
+- **Déplacer & Copier** : Déplace ou copie les fichiers physiques vers un autre dossier indexé dans Omera.
 - **Élaguer les brouillons (Cull Drafts)** : Actif lorsque les cartes sélectionnées contiennent des piles de rafales (voir [Piles & Rafales](../04-intelligent-curation/stacks-and-bursts.md)).
 - **Corbeille** : Déplace en toute sécurité tous les fichiers sélectionnés vers la corbeille de votre système d'exploitation.

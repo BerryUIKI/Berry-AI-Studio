@@ -1,5 +1,5 @@
 # Deutsche Dokumentation (German)
 
-Willkommen zur deutschen Dokumentation von **Berry AI Studio**.
+Willkommen zur deutschen Dokumentation von **Omera**.
 
 👉 **[Zum offiziellen deutschen Wiki (Startseite)](Home.md)**

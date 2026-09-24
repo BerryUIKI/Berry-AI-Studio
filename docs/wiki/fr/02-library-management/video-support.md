@@ -1,12 +1,12 @@
 # Prise en charge des vidéos & médias animés
 
-Alors que la génération par IA s'étend rapidement à la vidéo (AnimateDiff, SVD, Wan2.1, HunyuanVideo, CogVideoX, LTX-Video), Berry AI Studio intègre une prise en charge native de premier ordre pour les créations animées et les vidéos aux formats **MP4** et **WebM**.
+Alors que la génération par IA s'étend rapidement à la vidéo (AnimateDiff, SVD, Wan2.1, HunyuanVideo, CogVideoX, LTX-Video), Omera intègre une prise en charge native de premier ordre pour les créations animées et les vidéos aux formats **MP4** et **WebM**.
 
 ---
 
 ## 1. Formats vidéo & Conteneurs pris en charge
 
-Berry AI Studio analyse les conteneurs vidéo directement en Rust natif (`berry-metadata`) :
+Omera analyse les conteneurs vidéo directement en Rust natif (`omera-metadata`) :
 
 - **MP4 (`.mp4`)** : Analyse l'arborescence des boîtes ISOBMFF (`ftyp`, `moov`, `trak`, `mdia`, `minf`, `stbl`).
   - Extrait automatiquement les dimensions de la vidéo (`Largeur × Hauteur`), la fréquence d'images (FPS), la durée de lecture et le codec vidéo (`H.264`, `H.265 / HEVC`, `AV1`).
@@ -22,7 +22,7 @@ Dans le canevas de la galerie, les fichiers vidéo se distinguent clairement des
 - **Badge de durée** : Indique le temps de lecture exact dans le coin de la carte (ex. `00:05` ou `01:24`).
 - **Badges de fréquence d'images & format** : Affiche `MP4 · 24fps` ou `WEBP · 30fps`.
 - **Génération des miniatures** :
-  - Comme les fichiers vidéo ne disposent pas de décodeurs d'images standard dans les bibliothèques logicielles habituelles, la vue Web (WebView) de Berry capture automatiquement la première image clé depuis un canevas HTML5 `<video>` en arrière-plan, l'encode en base64, puis le backend Rust l'enregistre sous forme de miniature WebP optimisée via `save_video_thumbnail`.
+  - Comme les fichiers vidéo ne disposent pas de décodeurs d'images standard dans les bibliothèques logicielles habituelles, la vue Web (WebView) de Omera capture automatiquement la première image clé depuis un canevas HTML5 `<video>` en arrière-plan, l'encode en base64, puis le backend Rust l'enregistre sous forme de miniature WebP optimisée via `save_video_thumbnail`.
 - **Lecture au survol** : Survoler une carte vidéo avec le curseur déclenche un aperçu vidéo léger directement sur le canevas sans avoir à ouvrir le lecteur plein écran.
 
 ---

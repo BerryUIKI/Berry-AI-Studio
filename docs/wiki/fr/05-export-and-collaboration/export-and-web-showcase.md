@@ -1,6 +1,6 @@
 # Exportation par lots, Transcodage & Galerie Web
 
-Berry AI Studio intègre un moteur d'exportation et d'empaquetage à haut débit (`ExportModal.vue`) propulsé par le multithreading **Rayon**. Il prend en charge le transcodage de formats, l'assainissement de la confidentialité des métadonnées, les modèles dynamiques de noms de fichiers et la génération de vitrines HTML interactives autonomes sans aucune dépendance.
+Omera intègre un moteur d'exportation et d'empaquetage à haut débit (`ExportModal.vue`) propulsé par le multithreading **Rayon**. Il prend en charge le transcodage de formats, l'assainissement de la confidentialité des métadonnées, les modèles dynamiques de noms de fichiers et la génération de vitrines HTML interactives autonomes sans aucune dépendance.
 
 ---
 
@@ -14,7 +14,7 @@ Pour ouvrir la fenêtre d'exportation :
 
 ## 2. Transcodage de format & Compression
 
-Berry convertit et réencode les images en parallèle sur l'ensemble des cœurs de votre processeur :
+Omera convertit et réencode les images en parallèle sur l'ensemble des cœurs de votre processeur :
 
 | Format cible | Options & Réglages | Cas d'usage idéal |
 | :--- | :--- | :--- |
@@ -35,7 +35,7 @@ Vous pouvez limiter les dimensions maximales pour éviter la diffusion involonta
 
 ## 3. Assainissement des métadonnées sur 4 niveaux
 
-De nombreux créateurs souhaitent partager leurs créations en ligne tout en gardant secrets leurs prompts exclusifs, leurs embeddings négatifs ou leurs graines de génération. Berry propose **quatre niveaux d'assainissement de confidentialité** :
+De nombreux créateurs souhaitent partager leurs créations en ligne tout en gardant secrets leurs prompts exclusifs, leurs embeddings négatifs ou leurs graines de génération. Omera propose **quatre niveaux d'assainissement de confidentialité** :
 
 1. **Tout conserver (Prompts, workflows & EXIF)** :
    - Préserve l'intégralité des blocs de métadonnées intégrés (graphes ComfyUI, paramètres A1111, commentaires NovelAI et données EXIF).
@@ -73,11 +73,11 @@ Vous pouvez générer automatiquement des fichiers d'accompagnement à côté de
 
 ## 5. Générateur d'album vitrine HTML autonome
 
-Berry peut empaqueter vos créations exportées sous la forme d'une **vitrine web autonome en un fichier HTML unique** (`index.html`) :
+Omera peut empaqueter vos créations exportées sous la forme d'une **vitrine web autonome en un fichier HTML unique** (`index.html`) :
 
 - **Zéro dépendance** : Ne requiert aucun serveur web, Node.js ou bibliothèque JavaScript distante. Double-cliquez simplement pour l'ouvrir dans n'importe quel navigateur web.
 - **Fonctionnalités intégrées** :
-  - Esthétique sombre de studio assortie à Berry AI Studio.
+  - Esthétique sombre de studio assortie à Omera.
   - Grille responsive avec chargement différé (lazy loading) des miniatures.
   - Visualiseur Lightbox plein écran avec zoom et panoramique à la molette.
   - Volet repliable d'inspection des prompts affichant les paramètres de génération.

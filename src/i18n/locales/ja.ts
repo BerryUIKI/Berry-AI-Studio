@@ -556,7 +556,7 @@ export const ja: typeof en = {
     dbPath: "ローカル SQLite データベースパス",
     storageTitle: "データおよび設定の保存ディレクトリ (更新時も保持)",
     configFile: "環境設定ファイル (config.json)",
-    databaseFile: "主要 SQLite データベース (berry.db)",
+    databaseFile: "主要 SQLite データベース (omera.db)",
     thumbnailsDir: "WebP サムネイルキャッシュディレクトリ (thumbnails/)",
     openFolder: "フォルダを開く",
     storageNotice: "すべてのデータベース、カスタムタグ、アルバム、設定は上記のアプリケーションデータディレクトリに永続的に保存され、アプリ更新の影響を受けません。",

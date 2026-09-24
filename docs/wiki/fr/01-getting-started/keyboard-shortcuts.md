@@ -1,6 +1,6 @@
 # Guide des raccourcis clavier
 
-Berry AI Studio est pensé pour un **flux de travail axé sur le clavier**. Vous pouvez parcourir, noter, regrouper, inspecter et organiser des bibliothèques colossales sans jamais avoir à toucher la souris.
+Omera est pensé pour un **flux de travail axé sur le clavier**. Vous pouvez parcourir, noter, regrouper, inspecter et organiser des bibliothèques colossales sans jamais avoir à toucher la souris.
 
 ---
 
@@ -67,7 +67,7 @@ Berry AI Studio est pensé pour un **flux de travail axé sur le clavier**. Vous
 | `Ctrl + E` / `Cmd + E` | **Exporter par lots** | Ouvre la fenêtre de transcodage groupé, d'assainissement de confidentialité et d'empaquetage. |
 | `Ctrl + ,` / `Cmd + ,` | **Préférences** | Ouvre la fenêtre centrale des paramètres de l'application. |
 | `?` ou `Maj + /` | **Guide des raccourcis** | Ouvre l'antisèche interactive des raccourcis clavier. |
-| `Alt + F4` | **Quitter l'application** | Ferme proprement Berry AI Studio. |
+| `Alt + F4` | **Quitter l'application** | Ferme proprement Omera. |
 
 ---
 

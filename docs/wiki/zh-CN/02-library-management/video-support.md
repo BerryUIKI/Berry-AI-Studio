@@ -1,12 +1,12 @@
 # 动态媒体与视频支持
 
-随着生成式 AI 领域向视频与动态扩散模型（如 AnimateDiff、SVD、Wan2.1、HunyuanVideo、CogVideoX、LTX-Video 等）的迅猛发展，Berry AI Studio 为 **MP4** 和 **WebM** 格式的动态生成作品提供了原生的全方位支持。
+随着生成式 AI 领域向视频与动态扩散模型（如 AnimateDiff、SVD、Wan2.1、HunyuanVideo、CogVideoX、LTX-Video 等）的迅猛发展，Omera 为 **MP4** 和 **WebM** 格式的动态生成作品提供了原生的全方位支持。
 
 ---
 
 ## 1. 支持的视频格式与容器解析
 
-Berry AI Studio 直接在底层原生 Rust 引擎（`berry-metadata`）中解析现代视频流容器：
+Omera 直接在底层原生 Rust 引擎（`omera-metadata`）中解析现代视频流容器：
 
 - **MP4 (`.mp4`)**：深度解析 ISOBMFF box 数据树（`ftyp`、`moov`、`trak`、`mdia`、`minf`、`stbl`）。
   - 自动提取视频画面分辨率（`宽 × 高`）、帧率（FPS）、播放时长（Duration）以及视频编码格式（`H.264`、`H.265 / HEVC`、`AV1`）。
@@ -22,7 +22,7 @@ Berry AI Studio 直接在底层原生 Rust 引擎（`berry-metadata`）中解析
 - **时长角标**：卡片右下角标注精准播放时长（如 `00:05` 或 `01:24`）。
 - **帧率与容器角标**：清晰标注容器与帧率信息（如 `MP4 · 24fps` 或 `WEBP · 30fps`）。
 - **视频智能封面缩略图生成**：
-  - 由于视频文件缺少传统位图库解码支持，Berry 前端 WebView 会利用离屏 HTML5 `<video>` canvas 毫秒级捕获第一关键帧画面，编码后由 Rust 后台 `save_video_thumbnail` 压缩为标准 WebP 缩略图高速缓存。
+  - 由于视频文件缺少传统位图库解码支持，Omera 前端 WebView 会利用离屏 HTML5 `<video>` canvas 毫秒级捕获第一关键帧画面，编码后由 Rust 后台 `save_video_thumbnail` 压缩为标准 WebP 缩略图高速缓存。
 - **悬停动态预览**：鼠标指针悬停于视频卡片上方时，即可在画布内直接进行无缝轻量化动态预览，无需频繁点击打开播放器。
 
 ---
@@ -60,7 +60,7 @@ Berry AI Studio 直接在底层原生 Rust 引擎（`berry-metadata`）中解析
 
 现代 AI 视频生成普遍依赖复杂的嵌套工作流（例如：正向文本提示词 → 初始潜空间图像 → AnimateDiff 动态运动模块 → ControlNet OpenPose 姿态引导 → 空间超分放大）。
 
-当在 Berry 中查看由 ComfyUI 生成的视频时：
+当在 Omera 中查看由 ComfyUI 生成的视频时：
 - **右侧属性检查器**会自动解析并显示驱动该视频动态模块的正向和负向提示词。
 - **原始工作流折叠层**中完整解析整个执行图，清晰展示 Checkpoint 模型、运动 LoRA、上下文窗口长度（Context Window）、重叠帧数（Overlap Frames）以及 VAE 解码设定。
 - 支持一键点击**“发送到 ComfyUI”**，将原本的视频生成工作流直接原汁原味回传到正在运行的 ComfyUI 实例中，快速进行重绘渲染或参数微调。

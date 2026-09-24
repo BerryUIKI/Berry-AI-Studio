@@ -1,6 +1,6 @@
 # Analyses de prompts & Statistiques
 
-À mesure que votre collection s'enrichit, comprendre quels mots-clés de prompts, artistes et paramètres techniques produisent vos œuvres les mieux notées devient indispensable. Berry AI Studio propose une fenêtre d'analyses dédiée (`PromptStatsModal.vue`) qui agrège les métadonnées de toute votre bibliothèque.
+À mesure que votre collection s'enrichit, comprendre quels mots-clés de prompts, artistes et paramètres techniques produisent vos œuvres les mieux notées devient indispensable. Omera propose une fenêtre d'analyses dédiée (`PromptStatsModal.vue`) qui agrège les métadonnées de toute votre bibliothèque.
 
 ---
 

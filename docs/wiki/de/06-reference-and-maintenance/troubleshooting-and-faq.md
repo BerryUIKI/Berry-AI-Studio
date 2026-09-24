@@ -1,6 +1,6 @@
 # Fehlerbehebung & Häufig gestellte Fragen (FAQ)
 
-Dieser Leitfaden behandelt typische Fragen, Problemstellungen und Schritte zur Fehlerbehebung in Berry AI Studio.
+Dieser Leitfaden behandelt typische Fragen, Problemstellungen und Schritte zur Fehlerbehebung in Omera.
 
 ---
 
@@ -42,23 +42,23 @@ Dieser Leitfaden behandelt typische Fragen, Problemstellungen und Schritte zur F
 
 ## 2. Häufig gestellte Fragen (FAQ)
 
-### Ist Berry AI Studio vollkommen kostenlos nutzbar?
-Ja. Berry AI Studio ist freie Open-Source-Software unter der **AGPL-3.0**. Es gibt weder Abonnements noch Bezahlschranken oder gesperrte Premium-Funktionen.
+### Ist Omera vollkommen kostenlos nutzbar?
+Ja. Omera ist freie Open-Source-Software unter der **AGPL-3.0**. Es gibt weder Abonnements noch Bezahlschranken oder gesperrte Premium-Funktionen.
 
-### Eignet sich Berry AI Studio für Bibliotheken mit 100.000+ oder 500.000+ Bildern?
-Ja. Berry wurde von Grund auf für gewaltige Bildbestände konzipiert:
+### Eignet sich Omera für Bibliotheken mit 100.000+ oder 500.000+ Bildern?
+Ja. Omera wurde von Grund auf für gewaltige Bildbestände konzipiert:
 - **Keyset-Cursor-Tiefe-Paginierung** (`search_files_cursor_page`) garantiert Abfragelatenzen im Sub-Millisekunden-Bereich unabhängig von der Bibliotheksgröße.
 - **SQLite Write-Ahead Logging (WAL)** sorgt für extrem schnelle, blockierungsfreie parallele Lesezugriffe.
 - **Dynamische DOM-Virtualisierung** rendert ausschließlich die Karten, die sich aktuell im sichtbaren Bereich des Bildschirms befinden.
 
-### Lädt Berry AI Studio meine Prompts oder Bilder in die Cloud hoch?
+### Lädt Omera meine Prompts oder Bilder in die Cloud hoch?
 Nein. Sämtliche Scans, Metadaten-Extraktionen, Datenbankzugriffe und KI-Inferenzen (CLIP und WD14) laufen zu 100% lokal auf Ihrem eigenen Rechner. Es werden keinerlei Telemetriedaten erfasst.
 
 ### Kann ich Bilder per Drag & Drop direkt in ComfyUI oder Discord ziehen?
-Ja. Wenn Sie eine Bildkarte aus der Galerie in einen Webbrowser oder eine externe Desktop-Applikation ziehen, überträgt Berry Standard-Dateisystem-Payloads unter vollständiger Beibehaltung aller eingebetteten Metadatenblöcke.
+Ja. Wenn Sie eine Bildkarte aus der Galerie in einen Webbrowser oder eine externe Desktop-Applikation ziehen, überträgt Omera Standard-Dateisystem-Payloads unter vollständiger Beibehaltung aller eingebetteten Metadatenblöcke.
 
 ### Was geschieht, wenn ich einen Ordner aus der linken Seitenleiste entferne?
-Das Entfernen eines Ordners aus Berry AI Studio löscht lediglich das Verzeichnis und seine Indexeinträge aus der SQLite-Datenbank. **Ihre physischen Originaldateien auf dem Datenträger werden niemals berührt oder gelöscht.**
+Das Entfernen eines Ordners aus Omera löscht lediglich das Verzeichnis und seine Indexeinträge aus der SQLite-Datenbank. **Ihre physischen Originaldateien auf dem Datenträger werden niemals berührt oder gelöscht.**
 
 ### Können mehrere Teammitglieder gemeinsam an derselben Bibliothek arbeiten?
 Ja. Durch den Wechsel von SQLite zu einer gemeinsamen **MySQL 8.0+**- oder **PostgreSQL 14+**-Datenbank unter **Einstellungen > Team & Datenbank** können mehrere Workstations gleichzeitig auf ein geteiltes Netzwerk-Repository zugreifen — mit Echtzeit-Synchronisation und plattformübergreifendem Pfad-Mapping.

@@ -31,7 +31,7 @@ cargo fmt --all -- --check        # must be clean
 ```
 
 - Rust package manager: `cargo add <crate>` inside a crate dir.
-- Run a single test: `cargo test -p berry-storage db::tests::migrations_are_idempotent`.
+- Run a single test: `cargo test -p omera-storage db::tests::migrations_are_idempotent`.
 - **`dist/` must exist before any cargo command that compiles `src-tauri`**
   (`tauri::generate_context!` embeds `frontendDist` at compile time). CI runs
   `pnpm build` before the cargo steps; locally, `pnpm tauri dev`/`build` handles

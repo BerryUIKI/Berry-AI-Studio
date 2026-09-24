@@ -556,7 +556,7 @@ export const zhCN: typeof en = {
     dbPath: "本地 SQLite 数据库路径",
     storageTitle: "数据与配置存放目录 (更新不丢失)",
     configFile: "软件偏好配置文件 (config.json)",
-    databaseFile: "核心 SQLite 数据库 (berry.db)",
+    databaseFile: "核心 SQLite 数据库 (omera.db)",
     thumbnailsDir: "WebP 缩略图缓存目录 (thumbnails/)",
     openFolder: "打开所在目录",
     storageNotice: "所有数据库、自定义标签、相册索引及软件配置均持久保存于上述应用数据目录中，与程序安装执行文件完全隔离，更新或重装绝不会丢失任何数据。",

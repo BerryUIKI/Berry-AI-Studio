@@ -1,6 +1,6 @@
 # Maintenance de la base de données & du cache
 
-Berry AI Studio est conçu pour fonctionner en continu sans nécessiter d'intervention manuelle lourde. Cependant, à mesure que vous organisez, supprimez et modifiez des dizaines de milliers d'œuvres, effectuer périodiquement un compactage de la base de données et un entretien du cache garantit des performances optimales.
+Omera est conçu pour fonctionner en continu sans nécessiter d'intervention manuelle lourde. Cependant, à mesure que vous organisez, supprimez et modifiez des dizaines de milliers d'œuvres, effectuer périodiquement un compactage de la base de données et un entretien du cache garantit des performances optimales.
 
 ---
 
@@ -13,7 +13,7 @@ Ouvrez la fenêtre de gestion via **Fichier > Gestion de la base...** ou depuis 
 │ Maintenance de la base de données & Métriques                      [✕] │
 ├────────────────────────────────────────────────────────────────────────┤
 │ Métriques de stockage                                                  │
-│ • Fichier de base :   berry.db (Mode WAL)                              │
+│ • Fichier de base :   omera.db (Mode WAL)                              │
 │ • Fichiers indexés :  48 210 fichiers répartis sur 6 dossiers          │
 │ • Espace disque :     128.4 Mo (Base) / 1.42 Go (Miniatures)           │
 │ • Albums & Tags :     12 albums, 45 tags                               │
@@ -35,7 +35,7 @@ Lorsque vous supprimez des fichiers, retirez des tags ou dissociez des piles, SQ
 
 ### Exécuter `VACUUM` :
 - Cliquer sur **« Exécuter VACUUM »** déclenche la procédure native de compactage de SQLite.
-- Berry reconstruit le fichier de base de données dans une structure contiguë et saine, éliminant les pages libres et diminuant l'espace disque occupé.
+- Omera reconstruit le fichier de base de données dans une structure contiguë et saine, éliminant les pages libres et diminuant l'espace disque occupé.
 - **Sécurité** : L'opération de compactage est entièrement transactionnelle. En cas de coupure de courant en plein traitement, SQLite effectue un retour arrière (rollback) sans aucun risque de corruption.
 
 ---
@@ -44,11 +44,11 @@ Lorsque vous supprimez des fichiers, retirez des tags ou dissociez des piles, SQ
 
 ### Exporter une sauvegarde locale (`backup_database`)
 - Cliquez sur **« Exporter la sauvegarde… »** pour générer une copie de sauvegarde certifiée sans interruption de service.
-- Berry utilise l'API de sauvegarde en ligne de SQLite, vous permettant de réaliser des sauvegardes tout en continuant à utiliser l'application sans ralentissement.
+- Omera utilise l'API de sauvegarde en ligne de SQLite, vous permettant de réaliser des sauvegardes tout en continuant à utiliser l'application sans ralentissement.
 
 ### Restaurer depuis une sauvegarde (`restore_database`)
 - Si vous souhaitez réinstaller votre bibliothèque sur un nouvel ordinateur ou annuler des modifications accidentelles, cliquez sur **« Restaurer… »**.
-- Berry crée d'abord une copie de secours (rollback) de votre base active, charge le fichier de sauvegarde sélectionné, et recharge instantanément votre studio avec la bibliothèque restaurée.
+- Omera crée d'abord une copie de secours (rollback) de votre base active, charge le fichier de sauvegarde sélectionné, et recharge instantanément votre studio avec la bibliothèque restaurée.
 
 ---
 
@@ -58,12 +58,12 @@ Les miniatures sont stockées dans `<dossier_app_data>/thumbnails/` sous forme d
 
 ### Budget de cache disque configurable :
 - Dans **Préférences > Galerie**, vous pouvez régler le **Budget de cache des miniatures** (par défaut : `2048 Mo` / 2 Go).
-- Berry consigne l'horodatage d'accès de chaque fichier de miniature dans la table de base de données `thumbnail_cache_entries`.
-- Dès que l'espace total alloué aux miniatures excède votre budget, Berry élimine automatiquement les fichiers les moins récemment consultés selon une politique **LRU (Least Recently Used)**.
+- Omera consigne l'horodatage d'accès de chaque fichier de miniature dans la table de base de données `thumbnail_cache_entries`.
+- Dès que l'espace total alloué aux miniatures excède votre budget, Omera élimine automatiquement les fichiers les moins récemment consultés selon une politique **LRU (Least Recently Used)**.
 
 ### Vider le cache :
 - Si vous souhaitez libérer immédiatement de l'espace disque, cliquez sur **« Vider le cache des miniatures »**.
-- Berry supprime l'ensemble des fichiers WebP du disque et réinitialise la table de suivi. Les miniatures seront régénérées au fur et à mesure de votre navigation dans les dossiers.
+- Omera supprime l'ensemble des fichiers WebP du disque et réinitialise la table de suivi. Les miniatures seront régénérées au fur et à mesure de votre navigation dans les dossiers.
 
 ---
 

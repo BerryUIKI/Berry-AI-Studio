@@ -1,8 +1,8 @@
-//! Core domain types shared across Berry AI Studio crates.
+//! Core domain types shared across Omera crates.
 //!
 //! These types describe the *problem domain* — AI-generated image files and
 //! their embedded metadata — independent of any storage or extraction concern.
-//! Crates may depend on `berry-domain`, but it depends on nothing else.
+//! Crates may depend on `omera-domain`, but it depends on nothing else.
 
 mod album;
 mod checkpoint;
