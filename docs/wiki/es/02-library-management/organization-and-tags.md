@@ -1,12 +1,12 @@
 # Organización, puntuaciones y etiquetas
 
-Berry AI Studio proporciona avanzados mecanismos de curación diseñados para clasificar, ordenar y priorizar decenas de miles de obras de arte con gran rapidez y sin desordenar su sistema de archivos.
+Omera proporciona avanzados mecanismos de curación diseñados para clasificar, ordenar y priorizar decenas de miles de obras de arte con gran rapidez y sin desordenar su sistema de archivos.
 
 ---
 
 ## 1. Sistema de puntuación y estrellas
 
-Berry utiliza un modelo de valoración de doble precisión almacenado directamente en SQLite (`files.rating` y `files.aesthetic_score`):
+Omera utiliza un modelo de valoración de doble precisión almacenado directamente en SQLite (`files.rating` y `files.aesthetic_score`):
 
 ### Puntuaciones de estrellas (escala de 0 a 5 estrellas o de 1 a 10)
 - **Atajos de teclado**: Seleccione una o más imágenes y pulse:
@@ -43,7 +43,7 @@ Los álbumes permiten agrupar creaciones relacionadas distribuidas en diferentes
 Las etiquetas proporcionan una categorización granular y clasificación visual rápida:
 
 ### Distintivos de color predefinidos
-Berry incluye 8 paletas visuales preconfiguradas:
+Omera incluye 8 paletas visuales preconfiguradas:
 - 🔴 Rojo
 - 🟠 Naranja
 - 🟡 Amarillo
@@ -79,6 +79,6 @@ Siempre que seleccione múltiples elementos (mediante `Ctrl+Clic`, `Shift+Clic` 
 - **Etiqueta / Álbum por lotes**: Abre la ventana modal para aplicar o desvincular etiquetas y álbumes en grupo.
 - **Copiar prompts**: Copia al portapapeles los prompts positivos de todas las imágenes seleccionadas, separados con delimitadores limpios `---`.
 - **Copiar rutas**: Copia las rutas absolutas completas del sistema de archivos (una por línea) para utilizarlas en scripts o terminales.
-- **Mover y Copiar**: Mueve o copia archivos físicos a otra carpeta indexada en Berry.
+- **Mover y Copiar**: Mueve o copia archivos físicos a otra carpeta indexada en Omera.
 - **Eliminar borradores**: Se activa cuando la selección incluye pilas de ráfagas (consulte [Pilas y ráfagas](../04-intelligent-curation/stacks-and-bursts.md)).
 - **Papelera**: Traslada de forma segura todos los archivos seleccionados a la papelera de reciclaje del sistema operativo.

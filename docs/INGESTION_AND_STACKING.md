@@ -27,7 +27,7 @@ Omera organizes local assets through three distinct folder operating modes while
 - **Deletion**: Trashing an image from a linked folder triggers standard trash/recycle bin operations on the external file.
 
 ### 1.2 Mode B: Managed Project Vault (`managed`)
-- **Behavior**: Managed storage repository inside the Berry library directory or user-specified vault.
+- **Behavior**: Managed storage repository inside the Omera library directory or user-specified vault.
 - **Ingestion**: Supports dragging external files/folders directly into the folder in the UI:
   - **Copy Ingest** (`copy`): Copies files into vault, original files untouched.
   - **Move Ingest** (`move`): Moves files into vault, freeing external disk space.
@@ -60,7 +60,7 @@ Generative AI tools frequently write large PNG files containing multi-megabyte C
 [Extract Metadata & Compute Fingerprint]
        │
        ▼
-[Atomic Ingest to Berry Vault (Copy First)]
+[Atomic Ingest to Omera Vault (Copy First)]
        │
        ▼ (Verified Ingest Integrity: Size & Hash match)
 [Schedule Delayed Cleanup (if Move mode enabled)]
@@ -86,7 +86,7 @@ Image Stacking groups similar images (such as multi-seed batch generation, seed 
   - **Time Window**: Batch clustering constraint ensuring images generated within a time window (e.g. 30 minutes) are grouped together, preventing false clustering with historical outputs from months prior.
 - **Manual Stacking**:
   - Select multiple images in the gallery and press **`Ctrl+G`** (`Cmd+G`) to stack them immediately.
-  - Stacks cannot be nested. If the selection contains stacks, Berry warns before
+  - Stacks cannot be nested. If the selection contains stacks, Omera warns before
     flattening every source stack and selected standalone image into the first selected
     stack. The target retains its cover and existing member order.
   - Select a stack and press **`Ctrl+Shift+G`** (`Cmd+Shift+G`) to dissolve the stack back into individual items.
@@ -144,7 +144,7 @@ CREATE INDEX IF NOT EXISTS idx_cleanup_schedule ON pipeline_cleanup_queue(schedu
 Triggered via `Ctrl+O` or the `+` button in the sidebar:
 1. **Mode Selection Step**:
    - Card 1: 🔗 External Link (In-Place Reference).
-   - Card 2: 📂 Managed Project Vault (Berry Repository).
+   - Card 2: 📂 Managed Project Vault (Omera Repository).
    - Card 3: ⚡ AIGC Ingestion Pipeline (Watch & Harvest).
 2. **Path Configuration Step**:
    - For Pipeline: "🔍 Autodetect Local AI Tools" button + manual path browser.

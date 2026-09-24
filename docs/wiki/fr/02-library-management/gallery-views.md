@@ -1,6 +1,6 @@
 # Modes de galerie & Options d'affichage
 
-Berry AI Studio propose quatre modes de présentation dédiés de la galerie, pensés pour s'adapter aux différents besoins de curation, du tri visuel rapide à l'inspection technique approfondie.
+Omera propose quatre modes de présentation dédiés de la galerie, pensés pour s'adapter aux différents besoins de curation, du tri visuel rapide à l'inspection technique approfondie.
 
 ---
 
@@ -10,7 +10,7 @@ Utilisez les boutons de la barre d'outils supérieure ou les raccourcis du menu 
 
 ### 1. Vue Grille uniforme (`grid` — ⊞)
 - **Concept** : Cartes responsives à hauteur fixe et proportions uniformes, disposées en colonnes.
-- **Architecture responsive** : La largeur des cartes reste stable lors du redimensionnement de la fenêtre. Berry ajuste dynamiquement le nombre de colonnes (`calculateGalleryColumns`) au lieu d'étirer ou de déformer les images.
+- **Architecture responsive** : La largeur des cartes reste stable lors du redimensionnement de la fenêtre. Omera ajuste dynamiquement le nombre de colonnes (`calculateGalleryColumns`) au lieu d'étirer ou de déformer les images.
 - **Curseur de zoom** : Faites glisser le curseur de zoom ou utilisez `Ctrl + =` / `Ctrl + -` pour faire varier la largeur minimale des cartes de **130 px** (mode vignettes pour vue d'ensemble) à **360 px** (mode grand format pour observer les détails).
 - **Virtualisation** : Seuls les éléments présents dans la zone d'affichage (plus une petite mémoire tampon d'anticipation) sont générés dans le DOM. Faire défiler une bibliothèque de 100 000 images ne consomme pas plus de mémoire vive que faire défiler 100 images.
 
@@ -54,7 +54,7 @@ Dans **Préférences > Galerie**, vous pouvez activer ou désactiver l'option **
 
 ## 3. Flou de confidentialité pour contenu sensible (NSFW)
 
-Afin de préserver votre confidentialité lors de présentations professionnelles ou en travaillant dans des espaces publics, Berry AI Studio intègre une protection du contenu :
+Afin de préserver votre confidentialité lors de présentations professionnelles ou en travaillant dans des espaces publics, Omera intègre une protection du contenu :
 
 - **Flou automatique (paramètre `blur_nsfw`)** : Tout actif marqué comme `is_nsfw` ou identifié avec une classification pour adultes est masqué par un filtre CSS de flou prononcé.
 - **Cliquer pour afficher** : Un clic sur l'icône de l'œil (`👁`) ou directement sur la carte défloute temporairement cet élément précis pour examen.

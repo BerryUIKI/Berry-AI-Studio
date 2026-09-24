@@ -1,12 +1,12 @@
 # AIGC Metadata & Prompt Inspection
 
-Berry AI Studio features a lossless, multi-engine metadata parser written in Rust (`berry-metadata`). It automatically extracts prompts, negative prompts, models, seeds, and execution graphs across all major AI generation platforms.
+Omera features a lossless, multi-engine metadata parser written in Rust (`omera-metadata`). It automatically extracts prompts, negative prompts, models, seeds, and execution graphs across all major AI generation platforms.
 
 ---
 
 ## 1. Supported AI Generation Platforms
 
-Berry natively understands metadata embedded in PNG chunks, WebP EXIF headers, and MP4 ISOBMFF boxes from:
+Omera natively understands metadata embedded in PNG chunks, WebP EXIF headers, and MP4 ISOBMFF boxes from:
 
 | Platform / Tool | Extracted Metadata Fields | Source Container Location |
 | :--- | :--- | :--- |
@@ -61,7 +61,7 @@ When an image or video is selected, the right-hand panel (`I` hotkey) presents i
 
 ## 3. Interactive Prompt Token Chips
 
-Berry AI Studio parses prompt strings into tokenized chips rather than displaying a wall of unformatted text:
+Omera parses prompt strings into tokenized chips rather than displaying a wall of unformatted text:
 
 - **1-Click Search**: Clicking any token chip (e.g. `[cyberpunk city]`) immediately executes a library search for that specific concept across all your artworks.
 - **1-Click Copy**: Click the copy icon in the upper-right corner of the prompt box to copy the clean, unescaped prompt directly to your system clipboard.
@@ -73,7 +73,7 @@ Berry AI Studio parses prompt strings into tokenized chips rather than displayin
 
 Generative tools often embed short model hashes (e.g. `31e35c80`) or full SHA256 hashes instead of human-readable filenames.
 
-- Berry automatically queries its local **Model Cache** (`model_cache` SQLite table) to map cryptic hashes into friendly checkpoint names like `"Animagine XL 3.1"`.
+- Omera automatically queries its local **Model Cache** (`model_cache` SQLite table) to map cryptic hashes into friendly checkpoint names like `"Animagine XL 3.1"`.
 - If an unknown hash is encountered, you can import an AUTOMATIC1111 `cache.json` file or look it up directly via Civitai (see [Models & LoRA Library](../04-intelligent-curation/models-and-loras.md)).
 
 ---

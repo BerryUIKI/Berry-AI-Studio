@@ -556,7 +556,7 @@ export const zhTW: typeof en = {
     dbPath: "本機 SQLite 資料庫路徑",
     storageTitle: "資料與設定儲存目錄 (更新不遺失)",
     configFile: "軟體偏好設定檔案 (config.json)",
-    databaseFile: "核心 SQLite 資料庫 (berry.db)",
+    databaseFile: "核心 SQLite 資料庫 (omera.db)",
     thumbnailsDir: "WebP 縮圖快取目錄 (thumbnails/)",
     openFolder: "打開所在目錄",
     storageNotice: "所有資料庫、自訂標籤、相冊索引及軟體偏好設定均持久儲存於上述應用程式資料目錄中，與程式安裝執行檔完全隔離，更新或重裝絕不會遺失任何資料。",

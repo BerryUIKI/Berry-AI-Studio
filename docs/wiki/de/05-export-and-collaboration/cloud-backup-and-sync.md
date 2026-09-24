@@ -1,6 +1,6 @@
 # Cloud-Snapshot-Backup & Medienspiegelung
 
-Berry AI Studio verfügt über integrierte Module für Cloud-Backups und Delta-Synchronisation (`src-tauri/src/cloud_backup.rs` und `src-tauri/src/cloud_sync.rs`), die automatisierte Datenbanksicherungen und inkrementelle Medienspiegelungen ohne externe Hilfswerkzeuge ermöglichen.
+Omera verfügt über integrierte Module für Cloud-Backups und Delta-Synchronisation (`src-tauri/src/cloud_backup.rs` und `src-tauri/src/cloud_sync.rs`), die automatisierte Datenbanksicherungen und inkrementelle Medienspiegelungen ohne externe Hilfswerkzeuge ermöglichen.
 
 ---
 
@@ -18,13 +18,13 @@ Konfigurieren Sie Remote-Endpunkte unter **Einstellungen > Cloud & Backup**:
 
 ## 2. Konsistente SQLite-Snapshots im laufenden Betrieb (`cloud_backup_create_snapshot`)
 
-Berry sichert Ihre Datenbank über den nativen SQLite-Befehl `VACUUM INTO`:
+Omera sichert Ihre Datenbank über den nativen SQLite-Befehl `VACUUM INTO`:
 
 ```mermaid
 sequenceDiagram
-    participant UI as Berry Studio UI
+    participant UI as Omera Studio UI
     participant Rust as Backend (cloud_backup.rs)
-    participant DB as SQLite WAL (berry.db)
+    participant DB as SQLite WAL (omera.db)
     participant Remote as Cloud-Speicher (S3/WebDAV)
 
     UI->>Rust: Backup-Snapshot anfordern
@@ -38,7 +38,7 @@ sequenceDiagram
 
 ### Snapshot-Garantien:
 - **Blockierungsfrei (Non-Locking)**: Nutzt die Online-Vacuum-API von SQLite. Sie können ohne Unterbrechung weiter in der Galerie arbeiten, bewerten und Bilder generieren.
-- **Rollback-Sicherheit**: Beim Wiederherstellen eines Snapshots erstellt Berry automatisch eine lokale Sicherheitskopie (`berry.db.rollback`), bevor die Remote-Datenbank eingespielt wird. Dies schützt vor Netzwerkabbrüchen oder beschädigten Downloads.
+- **Rollback-Sicherheit**: Beim Wiederherstellen eines Snapshots erstellt Omera automatisch eine lokale Sicherheitskopie (`omera.db.rollback`), bevor die Remote-Datenbank eingespielt wird. Dies schützt vor Netzwerkabbrüchen oder beschädigten Downloads.
 
 ---
 

@@ -22,7 +22,7 @@ mod tests {
 
     #[test]
     fn reads_sibling_txt() {
-        let dir = std::env::temp_dir().join(format!("berry-sidecar-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("omera-sidecar-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let image = dir.join("image.png");
@@ -39,7 +39,7 @@ mod tests {
 
     #[test]
     fn missing_sidecar_returns_none() {
-        let dir = std::env::temp_dir().join(format!("berry-sidecar-none-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("omera-sidecar-none-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let image = dir.join("image.png");
@@ -52,7 +52,7 @@ mod tests {
 
     #[test]
     fn unreadable_sidecar_returns_none() {
-        let dir = std::env::temp_dir().join(format!("berry-sidecar-bad-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("omera-sidecar-bad-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let image = dir.join("image.png");

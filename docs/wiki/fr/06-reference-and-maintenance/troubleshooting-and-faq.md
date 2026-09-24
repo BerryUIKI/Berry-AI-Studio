@@ -1,6 +1,6 @@
 # Dépannage & Foire Aux Questions (FAQ)
 
-Ce guide répertorie les questions fréquentes, les situations particulières et les procédures de diagnostic et dépannage pour Berry AI Studio.
+Ce guide répertorie les questions fréquentes, les situations particulières et les procédures de diagnostic et dépannage pour Omera.
 
 ---
 
@@ -28,7 +28,7 @@ Ce guide répertorie les questions fréquentes, les situations particulières et
   3. Ouvrez le **Tiroir de filtres (`☰ Filtres`)** et cliquez sur **« Réinitialiser »** pour vérifier qu'aucun filtre actif (comme un filtre 5 étoiles) ne masque vos résultats.
 
 ### Problème : Des piles apparaissent séparées ou des cartes semblent en double
-- **Origine** : Les piles peuvent se fractionner si des images membres ont été renommées ou déplacées en dehors de Berry via l'explorateur de votre système d'exploitation.
+- **Origine** : Les piles peuvent se fractionner si des images membres ont été renommées ou déplacées en dehors de Omera via l'explorateur de votre système d'exploitation.
 - **Solution** : Sélectionnez les cartes concernées dans la galerie et appuyez sur `Ctrl + G` pour les réunir proprement en une seule pile consolidée.
 
 ### Problème : « Envoyer à ComfyUI » signale une connexion refusée
@@ -42,23 +42,23 @@ Ce guide répertorie les questions fréquentes, les situations particulières et
 
 ## 2. Foire Aux Questions (FAQ)
 
-### Berry AI Studio est-il entièrement gratuit ?
-Oui. Berry AI Studio est un logiciel libre et open-source sous licence **AGPL-3.0**. Il ne comporte aucun abonnement, aucune fonctionnalité payante bloquée ni mur payant.
+### Omera est-il entièrement gratuit ?
+Oui. Omera est un logiciel libre et open-source sous licence **AGPL-3.0**. Il ne comporte aucun abonnement, aucune fonctionnalité payante bloquée ni mur payant.
 
-### Berry AI Studio peut-il gérer des bibliothèques de 100 000 ou 500 000+ fichiers ?
-Oui. Berry a été conçu dès le départ pour manipuler d'immenses collections. Il met en œuvre :
+### Omera peut-il gérer des bibliothèques de 100 000 ou 500 000+ fichiers ?
+Oui. Omera a été conçu dès le départ pour manipuler d'immenses collections. Il met en œuvre :
 - **Une pagination profonde par curseur (Keyset Cursor)** (`search_files_cursor_page`) conservant une latence de requête inférieure à la milliseconde quelle que soit la taille de la base.
 - **SQLite en mode Write-Ahead Logging (WAL)** garantissant des lectures simultanées sans blocage à très haut débit.
 - **Une virtualisation dynamique du DOM** qui n'affiche dans l'interface que les éléments strictement visibles dans votre fenêtre.
 
-### Berry AI Studio téléverse-t-il mes prompts ou mes images sur le cloud ?
+### Omera téléverse-t-il mes prompts ou mes images sur le cloud ?
 Non. L'analyse des fichiers, l'extraction des métadonnées, le stockage en base de données et l'inférence par IA (CLIP et WD14) fonctionnent à 100 % en local sur votre machine. Aucune donnée d'utilisation ni télémétrie n'est collectée.
 
-### Puis-je glisser-déposer des images depuis Berry directement vers ComfyUI ou Discord ?
+### Puis-je glisser-déposer des images depuis Omera directement vers ComfyUI ou Discord ?
 Oui. Glisser une carte d'image depuis la galerie directement vers votre navigateur web ou une application de bureau externe transmet les données de fichier natives du système d'exploitation, préservant l'intégralité des métadonnées intégrées.
 
 ### Que se passe-t-il si je supprime un dossier de la barre latérale gauche ?
-Supprimer un dossier dans Berry AI Studio retire le dossier et ses fiches d'indexation de la base de données de Berry. **Cela ne supprime ni ne déplace jamais vos fichiers médias physiques sur votre disque.**
+Supprimer un dossier dans Omera retire le dossier et ses fiches d'indexation de la base de données de Omera. **Cela ne supprime ni ne déplace jamais vos fichiers médias physiques sur votre disque.**
 
 ### Plusieurs membres d'une même équipe peuvent-ils collaborer sur la même bibliothèque ?
 Oui. En passant de SQLite à une base de données partagée **MySQL 8.0+** ou **PostgreSQL 14+** dans **Préférences > Équipe & Base de données**, plusieurs artistes peuvent se connecter simultanément à une bibliothèque réseau avec synchronisation des modifications en temps réel et mappage multiplateforme des chemins.

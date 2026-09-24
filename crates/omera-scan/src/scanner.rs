@@ -3,7 +3,7 @@
 //! A [`Scanner`] walks a folder recursively, detects each supported media
 //! file's container from its magic bytes, upserts rows into the database in
 //! batches, and removes rows for files that no longer exist on disk. Metadata
-//! extraction is plugged in from `berry-metadata` via [`Scanner::with_extractor`].
+//! extraction is plugged in from `omera-metadata` via [`Scanner::with_extractor`].
 
 use std::collections::{BTreeSet, HashMap};
 use std::fs::File;
@@ -159,7 +159,7 @@ struct MediaFile {
 pub type MetadataExtractor =
     Box<dyn Fn(Container, &Path) -> Option<ExtractedMetadata> + Send + Sync>;
 
-/// Scans folders and persists the results through `berry-storage`.
+/// Scans folders and persists the results through `omera-storage`.
 ///
 /// Each [`scan_folder`](Self::scan_folder) call opens its own database
 /// connection to the same file (SQLite WAL allows concurrent readers), so a

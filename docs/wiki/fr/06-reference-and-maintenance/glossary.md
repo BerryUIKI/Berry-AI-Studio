@@ -1,6 +1,6 @@
 # Glossaire du produit
 
-Ce glossaire définit les principaux termes métier, les concepts architecturaux et les fonctionnalités employés au sein de **Berry AI Studio**.
+Ce glossaire définit les principaux termes métier, les concepts architecturaux et les fonctionnalités employés au sein de **Omera**.
 
 ---
 
@@ -16,9 +16,9 @@ Ce glossaire définit les principaux termes métier, les concepts architecturaux
 - **Carte en paquet de jeu (Poker-Deck Card)** : Représentation visuelle d'une pile d'images dans la galerie, stylisée avec des bordures étagées simulant des cartes superposées et un badge interactif de décompte.
 - **CFG Scale (Classifier-Free Guidance)** : Paramètre des modèles de diffusion contrôlant le niveau de fidélité et d'adhérence du rendu au prompt textuel d'origine.
 - **Checkpoint (Modèle de base)** : Modèle neuronal génératif fondamental contenant l'ensemble des poids entraînés (généralement au format `.safetensors`), identifié par son nom et son hash SHA256.
-- **CLIP (Contrastive Language-Image Pre-training)** : Architecture de réseau neuronal multimodal employée par Berry AI Studio pour la recherche sémantique en langage naturel et les calculs de similarité visuelle.
+- **CLIP (Contrastive Language-Image Pre-training)** : Architecture de réseau neuronal multimodal employée par Omera pour la recherche sémantique en langage naturel et les calculs de similarité visuelle.
 - **Coffre-fort de projet géré (Mode B / Managed Vault)** : Répertoire d'application dédié qui organise physiquement les fichiers importés dans une arborescence ordonnée et découpée par date (`AAAA/MM/UUID_nomfichier.ext`).
-- **ComfyUI** : Moteur de génération par IA modulaire basé sur des graphes de nœuds. Berry analyse ses flux de travail intégrés et prend en charge l'envoi direct via l'API `/prompt`.
+- **ComfyUI** : Moteur de génération par IA modulaire basé sur des graphes de nœuds. Omera analyse ses flux de travail intégrés et prend en charge l'envoi direct via l'API `/prompt`.
 - **Curseur Keyset (Pagination par curseur)** : Stratégie de requête de base de données remplaçant les requêtes lentes `OFFSET N` par `WHERE (modified_at, id) < (?, ?)`, garantissant une traversée de page en moins d'une milliseconde même sur plus de 500 000 enregistrements.
 
 ## E

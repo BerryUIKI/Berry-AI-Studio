@@ -2,7 +2,7 @@
 
 Los creadores de IA generativa suelen generar lotes de 10 a 50 variaciones con prompts idénticos o ligeramente modificados para encontrar la mejor composición. Sin herramientas de curación específicas, esto inunda la biblioteca con borradores casi duplicados.
 
-Berry AI Studio resuelve este problema mediante el **Apilamiento inteligente de ráfagas**, **Tarjetas en baraja de póquer**, **Selección autorizada de portadas (Hero)** y **Comparación lado a lado**.
+Omera resuelve este problema mediante el **Apilamiento inteligente de ráfagas**, **Tarjetas en baraja de póquer**, **Selección autorizada de portadas (Hero)** y **Comparación lado a lado**.
 
 ---
 
@@ -34,12 +34,12 @@ flowchart LR
 
 ## 2. Apilamiento automático de ráfagas (`auto_stack_images`)
 
-Berry puede detectar y agrupar automáticamente ráfagas de generación consecutivas en segundo plano:
+Omera puede detectar y agrupar automáticamente ráfagas de generación consecutivas en segundo plano:
 
 ### Criterios de agrupación:
 1. **Similitud de tokens del prompt**: Calcula la similitud de Jaccard tokenizada sobre los prompts positivos. Puede configurar el umbral requerido en **Preferencias > Pilas y ráfagas** (predeterminado: `0.85` / 85% de coincidencia).
-2. **Proximidad temporal**: Las ráfagas generativas se producen en rápida sucesión. Berry agrupa las variaciones creadas dentro de una ventana de tiempo configurable (predeterminado: `180 minutos`).
-3. **Ejecución**: Puede ejecutar el autoapilamiento a petición mediante **Herramientas > Organizar biblioteca por prompt (Todas las carpetas o Carpeta actual)**, o permitir que Berry agrupe las imágenes automáticamente durante la ingesta.
+2. **Proximidad temporal**: Las ráfagas generativas se producen en rápida sucesión. Omera agrupa las variaciones creadas dentro de una ventana de tiempo configurable (predeterminado: `180 minutos`).
+3. **Ejecución**: Puede ejecutar el autoapilamiento a petición mediante **Herramientas > Organizar biblioteca por prompt (Todas las carpetas o Carpeta actual)**, o permitir que Omera agrupe las imágenes automáticamente durante la ingesta.
 
 ---
 
@@ -54,8 +54,8 @@ Puede crear, deshacer y ajustar pilas mediante atajos de teclado:
 | **Establecer como portada (Hero)** | `Alt + S` / `Option + S` | Asigna la imagen activa como la portada principal de la pila (`stack_order = 0`). |
 
 ### Seguridad al combinar pilas y aplanamiento
-En Berry AI Studio, las pilas **no se pueden anidar** (no es posible colocar una pila dentro de otra). Cuando selecciona varias pilas y pulsa `Ctrl + G`:
-- Berry aplana automáticamente todas las pilas de origen dentro de la pila de destino.
+En Omera, las pilas **no se pueden anidar** (no es posible colocar una pila dentro de otra). Cuando selecciona varias pilas y pulsa `Ctrl + G`:
+- Omera aplana automáticamente todas las pilas de origen dentro de la pila de destino.
 - Aparece un cuadro de confirmación (`StackMergeWarningModal.vue`) para prevenir agrupaciones accidentales.
 - Puede marcar *«No volver a mostrar esta advertencia»* (puede restablecerse en **Preferencias > Pilas y ráfagas > Restablecer advertencias**).
 

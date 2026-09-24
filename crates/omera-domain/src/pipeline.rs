@@ -20,7 +20,7 @@ pub struct CleanupQueueItem {
     pub id: i64,
     /// Absolute path of the original source file.
     pub source_file_path: String,
-    /// Target image ID in Berry AI Studio's library.
+    /// Target image ID in Omera's library.
     pub target_image_id: i64,
     /// Scheduled deletion time in Unix epoch seconds.
     pub scheduled_delete_at: i64,

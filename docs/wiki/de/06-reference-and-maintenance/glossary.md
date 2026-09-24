@@ -1,6 +1,6 @@
 # Glossar
 
-Dieses Glossar definiert zentrale Fachbegriffe, Architekturkonzepte und Funktionen von **Berry AI Studio**.
+Dieses Glossar definiert zentrale Fachbegriffe, Architekturkonzepte und Funktionen von **Omera**.
 
 ---
 
@@ -17,15 +17,15 @@ Dieses Glossar definiert zentrale Fachbegriffe, Architekturkonzepte und Funktion
 ## C
 - **CFG-Skala (Classifier-Free Guidance)**: Ein Steuerungsparameter bei Diffusionsmodellen, der festlegt, wie streng sich der Generierungsprozess am Text-Prompt orientieren soll.
 - **Checkpoint-Modell**: Ein trainiertes Basis-Neuronalnetz (üblicherweise im `.safetensors`-Format), das über seinen Modellnamen und SHA256-Hash identifiziert wird.
-- **CLIP (Contrastive Language-Image Pre-training)**: Eine multimodale neuronale Netzwerkarchitektur, die in Berry AI Studio für die semantische Suche in natürlicher Sprache und visuelle Ähnlichkeitsberechnungen eingesetzt wird.
-- **ComfyUI**: Eine modulare, knotenbasierte Oberfläche für generative KI-Workflows. Berry parst eingebettete Ausführungsgraphen und unterstützt die direkte Übergabe an die `/prompt`-API.
+- **CLIP (Contrastive Language-Image Pre-training)**: Eine multimodale neuronale Netzwerkarchitektur, die in Omera für die semantische Suche in natürlicher Sprache und visuelle Ähnlichkeitsberechnungen eingesetzt wird.
+- **ComfyUI**: Eine modulare, knotenbasierte Oberfläche für generative KI-Workflows. Omera parst eingebettete Ausführungsgraphen und unterstützt die direkte Übergabe an die `/prompt`-API.
 
 ## E
 - **Entwürfe aussortieren (Cull Drafts)**: Eine Stapel-Bereinigungsaktion, die hochbewertete Titelbilder in Bilderserien behält, während geringer bewertete Entwürfe mit einem Klick in den Papierkorb verschoben werden.
 - **Externer Link & Überwachung (Modus A)**: Ein Ordnermodus, der lokale oder Netzwerkverzeichnisse vor Ort („In-Place“) ohne Kopieren indiziert und die Originaldateien unverändert lässt.
 
 ## J
-- **Jaccard-Ähnlichkeit**: Ein mathematisches Ähnlichkeitsmaß für Mengen, das von Berry genutzt wird, um aufeinanderfolgende Prompts anhand gemeinsamer Token für die automatische Stapelbildung zu vergleichen.
+- **Jaccard-Ähnlichkeit**: Ein mathematisches Ähnlichkeitsmaß für Mengen, das von Omera genutzt wird, um aufeinanderfolgende Prompts anhand gemeinsamer Token für die automatische Stapelbildung zu vergleichen.
 
 ## K
 - **Keyset-Cursor-Paginierung**: Eine Datenbankabfrage-Strategie, die langsame `OFFSET N`-Befehle durch `WHERE (modified_at, id) < (?, ?)` ersetzt und selbst bei mehr als 500.000 Datensätzen Abfragezeiten im Sub-Millisekunden-Bereich liefert.

@@ -1,12 +1,12 @@
 # 影片與動態媒體支援
 
-隨著生成式 AI 跨足動態影像領域（如 AnimateDiff、SVD、Wan2.1、HunyuanVideo、CogVideoX、LTX-Video），Berry AI Studio 提供原生、一流的 **MP4** 與 **WebM** 影片與動態創作支援。
+隨著生成式 AI 跨足動態影像領域（如 AnimateDiff、SVD、Wan2.1、HunyuanVideo、CogVideoX、LTX-Video），Omera 提供原生、一流的 **MP4** 與 **WebM** 影片與動態創作支援。
 
 ---
 
 ## 1. 支援的影片格式與容器
 
-Berry AI Studio 透過原生 Rust 模組 (`berry-metadata`) 直接解析視訊檔案容器：
+Omera 透過原生 Rust 模組 (`omera-metadata`) 直接解析視訊檔案容器：
 
 - **MP4 (`.mp4`)**：深度剖析 ISOBMFF 盒子樹狀結構（`ftyp`、`moov`、`trak`、`mdia`、`minf`、`stbl`）。
   - 自動擷取視訊解析度（`寬 × 高`）、影格率 (FPS)、播放時長以及視訊編碼格式（`H.264`、`H.265 / HEVC`、`AV1`）。
@@ -22,7 +22,7 @@ Berry AI Studio 透過原生 Rust 模組 (`berry-metadata`) 直接解析視訊�
 - **時長角標**：在卡片角落精確顯示總秒數（例如 `00:05` 或 `01:24`）。
 - **影格率與格式角標**：清楚標示 `MP4 · 24fps` 或 `WEBP · 30fps`。
 - **智慧縮圖生成**：
-  - 由於常規影像庫無法直接解碼視訊影格，Berry 前端 WebView 會在後台透過離屏 HTML5 `<video>` 畫布擷取第一訊框（Keyframe），編碼為 Base64 並由 Rust 後端透過 `save_video_thumbnail` 快取為輕量高品質 WebP 縮圖。
+  - 由於常規影像庫無法直接解碼視訊影格，Omera 前端 WebView 會在後台透過離屏 HTML5 `<video>` 畫布擷取第一訊框（Keyframe），編碼為 Base64 並由 Rust 後端透過 `save_video_thumbnail` 快取為輕量高品質 WebP 縮圖。
 - **懸停即時預覽**：滑鼠游標懸停在影片卡片上時，無需打開燈箱即可在卡片內靜音即時預覽動態畫面。
 
 ---

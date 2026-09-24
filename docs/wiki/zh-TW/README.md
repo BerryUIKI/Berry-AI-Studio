@@ -1,6 +1,6 @@
 # 繁體中文文件 (Traditional Chinese)
 
-歡迎查閱 Berry AI Studio 繁體中文維基與使用者指南。
+歡迎查閱 Omera 繁體中文維基與使用者指南。
 
 👉 **[前往繁體中文首頁 (Home.md)](Home.md)**
 

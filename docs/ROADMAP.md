@@ -7,7 +7,7 @@ This roadmap documents completed milestones and future engineering goals for **O
 ## 🏆 Completed Milestones (v0.1.0 & v0.1.1)
 
 ### ✅ Milestone 1: Core Foundation & Scaffolding
-- [x] Multi-crate Rust workspace architecture (`berry-domain`, `berry-metadata`, `berry-scan`, `berry-storage`, `src-tauri`).
+- [x] Multi-crate Rust workspace architecture (`omera-domain`, `omera-metadata`, `omera-scan`, `omera-storage`, `src-tauri`).
 - [x] Embedded SQLite engine with `PRAGMA user_version` incremental migrations.
 - [x] Cross-platform build configurations for Windows, macOS, and Linux.
 

@@ -2,7 +2,7 @@
 
 Im Workflow mit generativer KI erzeugt man häufig Serien von 10 bis 50 Bildvarianten mit identischen oder nur leicht variierten Prompts, um die beste Komposition zu finden. Ohne passende Organisationswerkzeuge wird die Bibliothek schnell von fast identischen Entwürfen überflutet.
 
-Berry AI Studio löst dieses Problem durch **intelligente Serien-Stapelbildung**, **Poker-Deck-Karten**, **autoritative Titelbild-Auswahl** und **synchronisierten Bildvergleich nebeneinander**.
+Omera löst dieses Problem durch **intelligente Serien-Stapelbildung**, **Poker-Deck-Karten**, **autoritative Titelbild-Auswahl** und **synchronisierten Bildvergleich nebeneinander**.
 
 ---
 
@@ -34,12 +34,12 @@ flowchart LR
 
 ## 2. Automatische Serien-Stapelbildung (`auto_stack_images`)
 
-Berry kann aufeinanderfolgende Generierungsserien im Hintergrund automatisch erkennen und bündeln:
+Omera kann aufeinanderfolgende Generierungsserien im Hintergrund automatisch erkennen und bündeln:
 
 ### Kriterien für die Clusterbildung:
 1. **Prompt-Token-Ähnlichkeit**: Berechnet die tokenisierte Jaccard-Ähnlichkeit über die positiven Prompts. Der erforderliche Schwellenwert lässt sich unter **Einstellungen > Stapel** konfigurieren (Standard: `0.85` bzw. 85% Übereinstimmung).
-2. **Zeitfenster-Nähe**: Generierungsserien entstehen meist in kurzer zeitlicher Folge. Berry fasst Varianten zusammen, die innerhalb eines konfigurierbaren Zeitfensters erzeugt wurden (Standard: `180 Minuten`).
-3. **Ausführung**: Sie können das automatische Stapeln manuell über **Werkzeuge > Bibliothek nach Prompt organisieren (Alle Ordner oder Aktueller Ordner)** anstoßen oder Berry die Bilder automatisch beim Erfassen gruppieren lassen.
+2. **Zeitfenster-Nähe**: Generierungsserien entstehen meist in kurzer zeitlicher Folge. Omera fasst Varianten zusammen, die innerhalb eines konfigurierbaren Zeitfensters erzeugt wurden (Standard: `180 Minuten`).
+3. **Ausführung**: Sie können das automatische Stapeln manuell über **Werkzeuge > Bibliothek nach Prompt organisieren (Alle Ordner oder Aktueller Ordner)** anstoßen oder Omera die Bilder automatisch beim Erfassen gruppieren lassen.
 
 ---
 
@@ -54,8 +54,8 @@ Sie können Stapel jederzeit über Tastaturkürzel erstellen, auflösen und bear
 | **Als Titelbild festlegen** | `Alt + S` / `Option + S` | Bestimmt das aktive Bild als primäres Deckblatt (`stack_order = 0`). |
 
 ### Schutz vor Verschachtelung & Sicheres Zusammenführen
-In Berry AI Studio können Stapel **nicht verschachtelt werden** (ein Stapel kann keinen weiteren Stapel enthalten). Wenn Sie mehrere Stapel auswählen und `Strg + G` drücken:
-- Löst Berry alle Quellstapel automatisch auf und führt die Einzelbilder in den Zielstapel zusammen.
+In Omera können Stapel **nicht verschachtelt werden** (ein Stapel kann keinen weiteren Stapel enthalten). Wenn Sie mehrere Stapel auswählen und `Strg + G` drücken:
+- Löst Omera alle Quellstapel automatisch auf und führt die Einzelbilder in den Zielstapel zusammen.
 - Ein Bestätigungsdialog (`StackMergeWarningModal.vue`) schützt vor versehentlichem Gruppieren.
 - Über die Option *„Diese Warnung nicht mehr anzeigen“* können Sie den Dialog unterdrücken (lässt sich unter **Einstellungen > Stapel > Unterdrückte Warnmeldungen zurücksetzen** wiederherstellen).
 

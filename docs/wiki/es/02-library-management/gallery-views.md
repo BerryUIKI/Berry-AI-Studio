@@ -1,6 +1,6 @@
 # Modos de galería y opciones de visualización
 
-Berry AI Studio ofrece cuatro modos dedicados de presentación en la galería diseñados para adaptarse a distintos flujos de curación, desde la clasificación visual rápida hasta inspecciones técnicas minuciosas.
+Omera ofrece cuatro modos dedicados de presentación en la galería diseñados para adaptarse a distintos flujos de curación, desde la clasificación visual rápida hasta inspecciones técnicas minuciosas.
 
 ---
 
@@ -10,7 +10,7 @@ Utilice los botones de la barra de herramientas superior o los atajos del menú 
 
 ### 1. Vista Cuadrícula uniforme (`grid` — ⊞)
 - **Concepto**: Tarjetas responsivas de altura fija y relación de aspecto uniforme organizadas en columnas adaptables.
-- **Arquitectura responsiva**: El ancho de la tarjeta se mantiene estable al redimensionar la ventana. Berry calcula dinámicamente el número de columnas (`calculateGalleryColumns`) en lugar de estirar o comprimir las imágenes.
+- **Arquitectura responsiva**: El ancho de la tarjeta se mantiene estable al redimensionar la ventana. Omera calcula dinámicamente el número de columnas (`calculateGalleryColumns`) en lugar de estirar o comprimir las imágenes.
 - **Control deslizante de zoom**: Arrastre el control de zoom o use `Ctrl + =` / `Ctrl + -` para ajustar suavemente el ancho mínimo de las tarjetas desde **130 px** (modo de vista previa compacta) hasta **360 px** (modo de gran detalle).
 - **Virtualización**: Solo se renderizan en el DOM los elementos visibles en el área de visualización (más un pequeño búfer de sobreexploración previo). Explorar una biblioteca de 100.000 imágenes consume prácticamente la misma memoria que una de 100 imágenes.
 
@@ -54,7 +54,7 @@ En **Preferencias > Galería**, puede activar o desactivar **Mostrar distintivos
 
 ## 3. Difuminado de privacidad para contenido sensible (NSFW)
 
-Para garantizar la privacidad durante presentaciones o al trabajar en espacios compartidos, Berry AI Studio incluye protección integrada de contenido:
+Para garantizar la privacidad durante presentaciones o al trabajar en espacios compartidos, Omera incluye protección integrada de contenido:
 
 - **Difuminado automático (`blur_nsfw` en ajustes)**: Cualquier activo clasificado como `is_nsfw` o identificado con calificación para adultos se oculta tras una máscara agresiva de difuminado CSS.
 - **Haga clic para revelar**: Al pulsar el icono de ojo (`👁`) o la tarjeta, se desactiva temporalmente el difuminado para ese elemento concreto.

@@ -2,7 +2,7 @@
 
 Les créateurs d'IA générative produisent fréquemment des séries de 10 à 50 variations avec des prompts identiques ou légèrement modifiés pour trouver la composition idéale. Sans outils de curation adaptés, cela submerge rapidement votre bibliothèque d'ébauches quasi identiques.
 
-Berry AI Studio résout ce problème grâce à l'**Empilement intelligent en rafales**, aux **Cartes façon paquet de jeu**, à la **Sélection d'image de couverture (Hero)** et au **Mode comparateur côte à côte**.
+Omera résout ce problème grâce à l'**Empilement intelligent en rafales**, aux **Cartes façon paquet de jeu**, à la **Sélection d'image de couverture (Hero)** et au **Mode comparateur côte à côte**.
 
 ---
 
@@ -34,12 +34,12 @@ flowchart LR
 
 ## 2. Empilement automatique en rafales (`auto_stack_images`)
 
-Berry peut détecter et regrouper automatiquement les rafales de génération consécutives en arrière-plan :
+Omera peut détecter et regrouper automatiquement les rafales de génération consécutives en arrière-plan :
 
 ### Critères de regroupement :
 1. **Similarité des jetons de prompt** : Calcule la similarité de Jaccard tokenisée sur les prompts positifs. Vous pouvez ajuster le seuil requis dans **Préférences > Piles** (par défaut : `0.85` / 85 % de correspondance).
-2. **Fenêtre temporelle maximale** : Les rafales génératives se produisent généralement dans un intervalle rapproché. Berry regroupe les variations créées dans un intervalle de temps configurable (par défaut : `180 minutes`).
-3. **Exécution** : Vous pouvez lancer l'empilement automatique à la demande via **Outils > Organiser la bibliothèque par prompt (Tous les dossiers ou Dossier actuel)**, ou laisser Berry regrouper les images au fur et à mesure de leur ingestion.
+2. **Fenêtre temporelle maximale** : Les rafales génératives se produisent généralement dans un intervalle rapproché. Omera regroupe les variations créées dans un intervalle de temps configurable (par défaut : `180 minutes`).
+3. **Exécution** : Vous pouvez lancer l'empilement automatique à la demande via **Outils > Organiser la bibliothèque par prompt (Tous les dossiers ou Dossier actuel)**, ou laisser Omera regrouper les images au fur et à mesure de leur ingestion.
 
 ---
 
@@ -54,8 +54,8 @@ Vous pouvez créer, dissocier et ajuster les piles à l'aide des raccourcis clav
 | **Définir comme couverture** | `Alt + S` / `Option + S` | Définit l'image active comme couverture principale (`stack_order = 0`). |
 
 ### Sécurité et aplatissement de la fusion de piles
-Dans Berry AI Studio, les piles **ne peuvent pas être imbriquées** (une pile ne peut pas contenir une autre pile). Lorsque vous sélectionnez plusieurs piles et appuyez sur `Ctrl + G` :
-- Berry aplatit automatiquement toutes les piles sources au sein de la pile cible.
+Dans Omera, les piles **ne peuvent pas être imbriquées** (une pile ne peut pas contenir une autre pile). Lorsque vous sélectionnez plusieurs piles et appuyez sur `Ctrl + G` :
+- Omera aplatit automatiquement toutes les piles sources au sein de la pile cible.
 - Une boîte de dialogue de confirmation (`StackMergeWarningModal.vue`) s'affiche pour éviter tout regroupement accidentel.
 - Vous pouvez cocher *« Ne plus afficher cet avertissement »* (réinitialisable dans **Préférences > Piles > Réinitialiser les avertissements**).
 

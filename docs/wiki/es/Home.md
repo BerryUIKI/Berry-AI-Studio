@@ -1,8 +1,8 @@
-# Berry AI Studio — Wiki oficial y guía del usuario
+# Omera — Wiki oficial y guía del usuario
 
-Bienvenido a la documentación de usuario definitiva y base de conocimientos de **Berry AI Studio** (`v0.3.0`).
+Bienvenido a la documentación de usuario definitiva y base de conocimientos de **Omera** (`v0.3.0`).
 
-Berry AI Studio es un gestor de activos y banco de trabajo de prompts local-first de código abierto, diseñado específicamente para creadores de IA generativa, ingenieros de prompts y estudios de diseño visual. Construido sobre **Tauri v2**, **Rust** y **Vue 3**, gestiona bibliotecas que van desde unos pocos cientos de obras de arte hasta más de 500.000 archivos con una latencia de consulta inferior al milisegundo, sin dependencia de la nube y con una extracción exhaustiva de metadatos de generación.
+Omera es un gestor de activos y banco de trabajo de prompts local-first de código abierto, diseñado específicamente para creadores de IA generativa, ingenieros de prompts y estudios de diseño visual. Construido sobre **Tauri v2**, **Rust** y **Vue 3**, gestiona bibliotecas que van desde unos pocos cientos de obras de arte hasta más de 500.000 archivos con una latencia de consulta inferior al milisegundo, sin dependencia de la nube y con una extracción exhaustiva de metadatos de generación.
 
 ---
 

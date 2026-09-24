@@ -1,6 +1,6 @@
 # 日本語ドキュメント (Japanese)
 
-**Berry AI Studio** 公式日本語ドキュメントへようこそ。
+**Omera** 公式日本語ドキュメントへようこそ。
 
 👉 **[公式日本語 Wiki ホームはこちら (Home.md)](Home.md)**
 

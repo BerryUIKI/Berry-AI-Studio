@@ -1,6 +1,6 @@
 # Product Glossary
 
-This glossary defines key domain terminology, architecture concepts, and features used throughout **Berry AI Studio**.
+This glossary defines key domain terminology, architecture concepts, and features used throughout **Omera**.
 
 ---
 
@@ -17,8 +17,8 @@ This glossary defines key domain terminology, architecture concepts, and feature
 ## C
 - **CFG Scale (Classifier-Free Guidance)**: A parameter in diffusion models controlling how closely the image generation adheres to the text prompt.
 - **Checkpoint Model**: A base generative neural network model containing trained weights (typically `.safetensors` format), identified by name and SHA256 hash.
-- **CLIP (Contrastive Language-Image Pre-training)**: A multi-modal neural network architecture used by Berry AI Studio for natural language semantic search and visual similarity calculations.
-- **ComfyUI**: A modular, node-based generative AI workflow engine. Berry parses its embedded workflow graphs and supports direct `/prompt` API dispatching.
+- **CLIP (Contrastive Language-Image Pre-training)**: A multi-modal neural network architecture used by Omera for natural language semantic search and visual similarity calculations.
+- **ComfyUI**: A modular, node-based generative AI workflow engine. Omera parses its embedded workflow graphs and supports direct `/prompt` API dispatching.
 - **Cull Drafts**: A batch cleanup action that keeps top-rated Hero artworks in a burst stack while moving lower-rated variations to the OS Recycle Bin.
 
 ## E

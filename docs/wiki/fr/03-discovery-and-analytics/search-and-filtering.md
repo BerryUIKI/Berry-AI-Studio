@@ -1,6 +1,6 @@
 # Syntaxe de recherche & Filtres visuels
 
-Berry AI Studio intègre un double moteur de recherche : la **Recherche syntaxique structurée** pour un filtrage technique de haute précision, et la **Recherche sémantique IA** pour les requêtes conceptuelles en langage naturel.
+Omera intègre un double moteur de recherche : la **Recherche syntaxique structurée** pour un filtrage technique de haute précision, et la **Recherche sémantique IA** pour les requêtes conceptuelles en langage naturel.
 
 ---
 
@@ -22,7 +22,7 @@ Dans la barre de recherche supérieure (`/` ou `Ctrl + F`), vous pouvez saisir d
 
 ## 2. Référence de la syntaxe clé-valeur
 
-Berry analyse les jetons de recherche en une structure `SearchCriteria` en Rust natif, interrogeant les index SQLite avec une exécution inférieure à la milliseconde :
+Omera analyse les jetons de recherche en une structure `SearchCriteria` en Rust natif, interrogeant les index SQLite avec une exécution inférieure à la milliseconde :
 
 | Clé de jeton | Exemple de syntaxe | Description |
 | :--- | :--- | :--- |

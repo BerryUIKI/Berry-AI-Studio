@@ -1,6 +1,6 @@
 # Suchsyntax & visuelle Filter
 
-Berry AI Studio verfügt über ein zweistufiges Suchsystem: Die **strukturierte Syntaxsuche** für präzise technische Filterungen und die **KI-Semantische Suche** für konzeptionelle Abfragen in natürlicher Sprache.
+Omera verfügt über ein zweistufiges Suchsystem: Die **strukturierte Syntaxsuche** für präzise technische Filterungen und die **KI-Semantische Suche** für konzeptionelle Abfragen in natürlicher Sprache.
 
 ---
 
@@ -22,7 +22,7 @@ In der oberen Suchleiste (`/` oder `Strg + F`) können Sie Freitext-Schlüsselw�
 
 ## 2. Referenz der Schlüssel-Wert-Syntax
 
-Berry parst Suchbegriffe in nativem Rust in strukturierte `SearchCriteria` und fragt SQLite-Indizes mit Ausführungszeiten im Sub-Millisekunden-Bereich ab:
+Omera parst Suchbegriffe in nativem Rust in strukturierte `SearchCriteria` und fragt SQLite-Indizes mit Ausführungszeiten im Sub-Millisekunden-Bereich ab:
 
 | Schlüssel | Beispielsyntax | Beschreibung |
 | :--- | :--- | :--- |

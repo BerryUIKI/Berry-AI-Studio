@@ -1,12 +1,12 @@
 # Video- & Animationsmedien-Unterstützung
 
-Mit der rasanten Verbreitung generativer KI-Videomodelle (AnimateDiff, SVD, Wan2.1, HunyuanVideo, CogVideoX, LTX-Video) bietet Berry AI Studio erstklassige, native Unterstützung für animierte Kunstwerke und Videos in den Formaten **MP4** und **WebM**.
+Mit der rasanten Verbreitung generativer KI-Videomodelle (AnimateDiff, SVD, Wan2.1, HunyuanVideo, CogVideoX, LTX-Video) bietet Omera erstklassige, native Unterstützung für animierte Kunstwerke und Videos in den Formaten **MP4** und **WebM**.
 
 ---
 
 ## 1. Unterstützte Videoformate & Container
 
-Berry AI Studio analysiert Videocontainer direkt in nativem Rust (`berry-metadata`):
+Omera analysiert Videocontainer direkt in nativem Rust (`omera-metadata`):
 
 - **MP4 (`.mp4`)**: Liest die ISOBMFF-Box-Hierarchie (`ftyp`, `moov`, `trak`, `mdia`, `minf`, `stbl`).
   - Extrahiert automatisch Videodimensionen (`Breite × Höhe`), Bildwiederholrate (FPS), Spieldauer sowie den Codec (`H.264`, `H.265 / HEVC`, `AV1`).
@@ -22,7 +22,7 @@ Im Galeriebereich unterscheiden sich Videodateien klar von statischen Bildern:
 - **Dauer-Badge**: Zeigt die exakte Spieldauer in der Kartenecke (z. B. `00:05` oder `01:24`).
 - **FPS- & Format-Badges**: Kennzeichnet Videos mit `MP4 · 24fps` oder `WEBP · 30fps`.
 - **Vorschaubild-Generierung**:
-  - Da Videodateien in Standard-Bildbibliotheken keine herkömmlichen Standbild-Decoder besitzen, erfasst das WebView-Frontend von Berry automatisch das erste Schlüsselbild über ein unsichtbares HTML5-`<video>`-Element, kodiert es in Base64 und das Rust-Backend speichert es als herunterskaliertes WebP-Vorschaubild via `save_video_thumbnail`.
+  - Da Videodateien in Standard-Bildbibliotheken keine herkömmlichen Standbild-Decoder besitzen, erfasst das WebView-Frontend von Omera automatisch das erste Schlüsselbild über ein unsichtbares HTML5-`<video>`-Element, kodiert es in Base64 und das Rust-Backend speichert es als herunterskaliertes WebP-Vorschaubild via `save_video_thumbnail`.
 - **Hover-Wiedergabe**: Wenn Sie den Mauszeiger über eine Videokarte bewegen, startet eine ressourcenschonende Videovorschau direkt im Galeriebereich, ohne dass ein separates Fenster geöffnet werden muss.
 
 ---

@@ -1,15 +1,15 @@
 # Checkpoint Models & LoRA Library
 
-Managing hundreds of Stable Diffusion checkpoint models and fine-tuned LoRAs is a challenge in generative AI workflows. Berry AI Studio provides built-in cataloging, hash resolution, and trigger word management.
+Managing hundreds of Stable Diffusion checkpoint models and fine-tuned LoRAs is a challenge in generative AI workflows. Omera provides built-in cataloging, hash resolution, and trigger word management.
 
 ---
 
 ## 1. Checkpoint Model Catalog (`ModelManagerModal.vue`)
 
-Berry automatically tracks every checkpoint model encountered across your library.
+Omera automatically tracks every checkpoint model encountered across your library.
 
 ### Automatic Model Discovery:
-- When indexing files, Berry parses checkpoint names and model hashes from embedded PNGInfo/EXIF metadata.
+- When indexing files, Omera parses checkpoint names and model hashes from embedded PNGInfo/EXIF metadata.
 - Open **Tools > Model Manager & Cache** to view a catalog of all models, their short hashes, full SHA256 checksums, and total image counts.
 
 ### Resolving Hashes with AUTOMATIC1111 `cache.json`:
@@ -17,7 +17,7 @@ Berry automatically tracks every checkpoint model encountered across your librar
 - If you have an existing AUTOMATIC1111 installation:
   1. Click **"Import Model Cache"** in the Model Manager.
   2. Select your WebUI `cache.json` file (typically located in `<webui_root>/cache.json`).
-  3. Berry imports the mapping into its local `model_cache` table, instantly resolving cryptic hashes across your entire library into friendly model titles.
+  3. Omera imports the mapping into its local `model_cache` table, instantly resolving cryptic hashes across your entire library into friendly model titles.
 
 ### Civitai SHA256 Hash Resolution:
 - For models without local names, you can click the Civitai lookup button in the Inspector to query Civitai's public model database via model hash.
@@ -53,7 +53,7 @@ Low-Rank Adaptations (LoRAs) require specific activation or trigger words in gen
    - Click **"+ In Prompt"** to copy the formatted `<lora:name:0.8>` string directly to your clipboard.
    - Click any trigger word chip to copy it for immediate use in your prompt editor.
 3. **Importing Civitai Sidecars (`.civitai.info`)**:
-   - If you download LoRAs with Civitai helper sidecars (`.civitai.info` or `.json`), Berry extracts model hashes, base model architectures (SD 1.5, SDXL, Pony, Flux), trained trigger words, and preview images automatically.
+   - If you download LoRAs with Civitai helper sidecars (`.civitai.info` or `.json`), Omera extracts model hashes, base model architectures (SD 1.5, SDXL, Pony, Flux), trained trigger words, and preview images automatically.
 4. **Local Directory Scanning**:
-   - Point Berry to your local LoRA folder (`models/Lora/`).
-   - Berry scans all `.safetensors` files and companion preview images, building a comprehensive searchable offline reference library.
+   - Point Omera to your local LoRA folder (`models/Lora/`).
+   - Omera scans all `.safetensors` files and companion preview images, building a comprehensive searchable offline reference library.

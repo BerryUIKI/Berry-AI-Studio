@@ -1,12 +1,12 @@
 # Metadatos AIGC e inspección de prompts
 
-Berry AI Studio cuenta con un analizador de metadatos multimodelo sin pérdidas desarrollado en Rust (`berry-metadata`). Extrae de forma automática prompts, prompts negativos, modelos, semillas y grafos de ejecución de las principales plataformas de generación con IA.
+Omera cuenta con un analizador de metadatos multimodelo sin pérdidas desarrollado en Rust (`omera-metadata`). Extrae de forma automática prompts, prompts negativos, modelos, semillas y grafos de ejecución de las principales plataformas de generación con IA.
 
 ---
 
 ## 1. Plataformas de generación con IA compatibles
 
-Berry reconoce de forma nativa los metadatos incrustados en fragmentos PNG, cabeceras EXIF de WebP y cajas ISOBMFF de MP4 procedentes de:
+Omera reconoce de forma nativa los metadatos incrustados en fragmentos PNG, cabeceras EXIF de WebP y cajas ISOBMFF de MP4 procedentes de:
 
 | Plataforma / Herramienta | Campos de metadatos extraídos | Ubicación en el contenedor |
 | :--- | :--- | :--- |
@@ -61,7 +61,7 @@ Al seleccionar una imagen o un vídeo, el panel lateral derecho (atajo `I`) pres
 
 ## 3. Pastillas interactivas de tokens de prompt
 
-Berry AI Studio segmenta las cadenas de prompts en pastillas de tokens en lugar de mostrar un bloque plano de texto sin estructura:
+Omera segmenta las cadenas de prompts en pastillas de tokens en lugar de mostrar un bloque plano de texto sin estructura:
 
 - **Búsqueda en 1 clic**: Al pulsar cualquier pastilla de token (p. ej., `[cyberpunk city]`), se inicia de inmediato una búsqueda en toda la biblioteca para ese concepto específico.
 - **Copia en 1 clic**: Haga clic en el icono de copia en la esquina superior derecha del cuadro de prompt para copiar el texto limpio y sin caracteres de escape al portapapeles.
@@ -73,7 +73,7 @@ Berry AI Studio segmenta las cadenas de prompts en pastillas de tokens en lugar 
 
 Las herramientas generativas suelen incrustar hashes cortos (p. ej., `31e35c80`) o hashes SHA256 completos en lugar de nombres de archivo reconocibles.
 
-- Berry consulta automáticamente su **Caché de modelos** local (tabla SQLite `model_cache`) para traducir hashes crípticos a nombres amigables como `"Animagine XL 3.1"`.
+- Omera consulta automáticamente su **Caché de modelos** local (tabla SQLite `model_cache`) para traducir hashes crípticos a nombres amigables como `"Animagine XL 3.1"`.
 - Si se detecta un hash desconocido, puede importar un archivo `cache.json` de AUTOMATIC1111 o consultarlo directamente en Civitai (consulte [Modelos y biblioteca LoRA](../04-intelligent-curation/models-and-loras.md)).
 
 ---

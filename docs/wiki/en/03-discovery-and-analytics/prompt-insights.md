@@ -1,6 +1,6 @@
 # Prompt Analytics & Insights
 
-As your asset collection grows, understanding which prompt keywords, artists, and technical parameters produce your highest-rated artworks becomes essential. Berry AI Studio provides a dedicated analytics modal (`PromptStatsModal.vue`) that aggregates metadata across your entire library.
+As your asset collection grows, understanding which prompt keywords, artists, and technical parameters produce your highest-rated artworks becomes essential. Omera provides a dedicated analytics modal (`PromptStatsModal.vue`) that aggregates metadata across your entire library.
 
 ---
 

@@ -106,7 +106,7 @@ pub fn run() {
                 .and_then(|content| serde_json::from_str::<commands::AppConfig>(&content).ok())
                 .map(|config| config.thumbnail_cache_budget_mb);
             if let Err(error) = std::thread::Builder::new()
-                .name("berry-thumbnail-manifest".to_string())
+                .name("omera-thumbnail-manifest".to_string())
                 .spawn(move || {
                     if let Err(error) = omera_scan::synchronize_thumbnail_manifest(
                         &thumbnail_data_dir,

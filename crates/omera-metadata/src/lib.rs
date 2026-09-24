@@ -270,7 +270,7 @@ mod tests {
     /// Helper: write `bytes` to a fresh temp subdirectory and return the path.
     fn temp_file(dir: &str, name: &str, bytes: &[u8]) -> std::path::PathBuf {
         let dir = std::env::temp_dir()
-            .join(format!("berry-meta-{}", std::process::id()))
+            .join(format!("omera-meta-{}", std::process::id()))
             .join(dir);
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();

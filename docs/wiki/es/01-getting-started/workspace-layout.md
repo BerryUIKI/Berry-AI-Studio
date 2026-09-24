@@ -1,6 +1,6 @@
 # Estructura y anatomía del espacio de trabajo
 
-Berry AI Studio cuenta con un espacio de trabajo de escritorio de 3 paneles inspirado en **Eagle / Lightroom**, diseñado para una curación visual de alta densidad, máxima velocidad con el teclado y una visualización libre de distracciones.
+Omera cuenta con un espacio de trabajo de escritorio de 3 paneles inspirado en **Eagle / Lightroom**, diseñado para una curación visual de alta densidad, máxima velocidad con el teclado y una visualización libre de distracciones.
 
 ---
 
@@ -8,7 +8,7 @@ Berry AI Studio cuenta con un espacio de trabajo de escritorio de 3 paneles insp
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│ [Logo] Berry AI Studio   [ Archivo  Edición  Ver  Herramientas  Ayuda ]   [ _ ] [ □ ] [ ✕ ] │  <- Barra de título y menús
+│ [Logo] Omera   [ Archivo  Edición  Ver  Herramientas  Ayuda ]   [ _ ] [ □ ] [ ✕ ] │  <- Barra de título y menús
 ├──────────────┬──────────────────────────────────────────────────────────┬──────────────┤
 │              │ [🔍 Buscar: prompt, modelo, puntuación... ] [🧠] [☰ Filtros]│              │
 │ BARRA LATERAL├──────────────────────────────────────────────────────────┤  INSPECTOR   │
@@ -39,7 +39,7 @@ La ventana utiliza un diseño sin marcos con una barra de título personalizada 
   - `Reescanear todas las carpetas`: Forzar un escaneo incremental en todas las carpetas registradas.
   - `Gestión de base de datos...`: Abrir herramientas de compactación, estadísticas de tamaño y copias de seguridad.
   - `Preferencias / Configuración...` (`Ctrl + ,` / `Cmd + ,`): Abrir la ventana central de ajustes de 8 pestañas.
-  - `Salir` (`Alt + F4`): Cerrar Berry AI Studio de forma ordenada.
+  - `Salir` (`Alt + F4`): Cerrar Omera de forma ordenada.
 - **Edición**:
   - `Seleccionar todo` (`Ctrl + A` / `Cmd + A`): Seleccionar todos los activos de la vista de galería activa.
   - `Deseleccionar todo` (`Esc`): Desmarcar todos los elementos seleccionados.
@@ -66,7 +66,7 @@ La ventana utiliza un diseño sin marcos con una barra de título personalizada 
   - `Idioma`: Cambiar al instante entre los 7 idiomas compatibles.
   - `Guía de atajos de teclado` (`?`): Mostrar la hoja de atajos dentro de la aplicación.
   - `Buscar actualizaciones...`: Consultar los lanzamientos oficiales en GitHub Releases.
-  - `Acerca de Berry AI Studio`: Mostrar información de versión, autoría y licencia.
+  - `Acerca de Omera`: Mostrar información de versión, autoría y licencia.
 
 ---
 

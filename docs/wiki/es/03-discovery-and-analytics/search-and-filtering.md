@@ -1,6 +1,6 @@
 # Sintaxis de búsqueda y filtros visuales
 
-Berry AI Studio cuenta con un sistema de búsqueda dual: **Búsqueda por sintaxis estructurada** para un filtrado técnico preciso y **Búsqueda semántica con IA** para consultas conceptuales en lenguaje natural.
+Omera cuenta con un sistema de búsqueda dual: **Búsqueda por sintaxis estructurada** para un filtrado técnico preciso y **Búsqueda semántica con IA** para consultas conceptuales en lenguaje natural.
 
 ---
 
@@ -22,7 +22,7 @@ En la barra de búsqueda superior (`/` o `Ctrl + F`), puede introducir palabras 
 
 ## 2. Referencia de sintaxis clave-valor
 
-Berry analiza los tokens de búsqueda en estructuras `SearchCriteria` en código Rust nativo, consultando índices SQLite con tiempos de respuesta inferiores al milisegundo:
+Omera analiza los tokens de búsqueda en estructuras `SearchCriteria` en código Rust nativo, consultando índices SQLite con tiempos de respuesta inferiores al milisegundo:
 
 | Clave de token | Ejemplo de sintaxis | Descripción |
 | :--- | :--- | :--- |

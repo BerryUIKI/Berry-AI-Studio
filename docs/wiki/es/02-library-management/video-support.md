@@ -1,12 +1,12 @@
 # Compatibilidad con vídeo y medios en movimiento
 
-A medida que la generación de IA se expande hacia el vídeo (AnimateDiff, SVD, Wan2.1, HunyuanVideo, CogVideoX, LTX-Video), Berry AI Studio proporciona soporte nativo de primer nivel para obras animadas y archivos de vídeo en formatos **MP4** y **WebM**.
+A medida que la generación de IA se expande hacia el vídeo (AnimateDiff, SVD, Wan2.1, HunyuanVideo, CogVideoX, LTX-Video), Omera proporciona soporte nativo de primer nivel para obras animadas y archivos de vídeo en formatos **MP4** y **WebM**.
 
 ---
 
 ## 1. Contenedores y formatos de vídeo compatibles
 
-Berry AI Studio analiza los contenedores de vídeo directamente en código Rust nativo (`berry-metadata`):
+Omera analiza los contenedores de vídeo directamente en código Rust nativo (`omera-metadata`):
 
 - **MP4 (`.mp4`)**: Analiza la jerarquía de cajas ISOBMFF (`ftyp`, `moov`, `trak`, `mdia`, `minf`, `stbl`).
   - Extrae automáticamente las dimensiones del vídeo (`Ancho × Alto`), la tasa de fotogramas (FPS), la duración de reproducción y el códec de vídeo (`H.264`, `H.265 / HEVC`, `AV1`).
@@ -22,7 +22,7 @@ En el lienzo de la galería, los archivos de vídeo se distinguen claramente de 
 - **Distintivo de duración**: Muestra el tiempo exacto de reproducción en la esquina (p. ej., `00:05` o `01:24`).
 - **Distintivos de FPS y formato**: Muestra indicadores como `MP4 · 24fps` o `WEBP · 30fps`.
 - **Generación de miniaturas**:
-  - Dado que los archivos de vídeo carecen de decodificadores tradicionales en las bibliotecas de imágenes estándar, el frontend WebView de Berry captura automáticamente el primer fotograma clave mediante un canvas `<video>` oculto de HTML5, lo codifica en base64 y el backend en Rust lo almacena como una miniatura WebP reducida mediante `save_video_thumbnail`.
+  - Dado que los archivos de vídeo carecen de decodificadores tradicionales en las bibliotecas de imágenes estándar, el frontend WebView de Omera captura automáticamente el primer fotograma clave mediante un canvas `<video>` oculto de HTML5, lo codifica en base64 y el backend en Rust lo almacena como una miniatura WebP reducida mediante `save_video_thumbnail`.
 - **Reproducción al pasar el cursor**: Al situar el puntero sobre una tarjeta de vídeo, se inicia una vista previa ligera directamente en la cuadrícula sin necesidad de abrir el reproductor completo.
 
 ---

@@ -1,11 +1,11 @@
-//! The AI image generators whose metadata Berry AI Studio understands.
+//! The AI image generators whose metadata Omera understands.
 
 use serde::{Deserialize, Serialize};
 
 /// The generation platform a piece of embedded metadata came from.
 ///
 /// Each variant corresponds to a known on-disk metadata format. Detection and
-/// parsing of each format is implemented in `berry-metadata` (full parsers
+/// parsing of each format is implemented in `omera-metadata` (full parsers
 /// arrive in M2); this enum is the shared vocabulary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum MetadataFormat {

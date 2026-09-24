@@ -1,6 +1,6 @@
 # Référence complète des paramètres
 
-La fenêtre des préférences de Berry AI Studio (`SettingsModal.vue`) s'ouvre via `Fichier > Préférences / Paramètres...` ou le raccourci `Ctrl + ,` / `Cmd + ,`. Tous les réglages sont conservés dans le fichier `config.json` de votre répertoire local de données d'application.
+La fenêtre des préférences de Omera (`SettingsModal.vue`) s'ouvre via `Fichier > Préférences / Paramètres...` ou le raccourci `Ctrl + ,` / `Cmd + ,`. Tous les réglages sont conservés dans le fichier `config.json` de votre répertoire local de données d'application.
 
 ---
 
@@ -10,7 +10,7 @@ La fenêtre des préférences de Berry AI Studio (`SettingsModal.vue`) s'ouvre v
 | :--- | :--- | :--- | :--- |
 | **Langue de l'application** | `locale` | `"auto"` | Choix parmi : `auto` (suit le système d'exploitation), `en` (anglais), `zh-CN` (chinois simplifié), `zh-TW` (chinois traditionnel), `ja` (japonais), `de` (allemand), `fr` (français), `es` (espagnol). |
 | **Vue par défaut de la galerie** | `default_view` | `"grid"` | Mode d'affichage initial au démarrage : `"grid"` (Grille uniforme), `"masonry"` (Mosaïque Waterfall) ou `"table"` (Liste détaillée). |
-| **Analyse automatique au démarrage** | `auto_scan` | `true` | Vérifie automatiquement les nouveaux fichiers ou modifications dans les dossiers indexés au lancement de Berry. |
+| **Analyse automatique au démarrage** | `auto_scan` | `true` | Vérifie automatiquement les nouveaux fichiers ou modifications dans les dossiers indexés au lancement de Omera. |
 | **Délai entre les analyses au démarrage** | `startup_scan_interval_minutes`| `360` | Intervalle minimal en minutes entre deux réconciliations complètes sur le disque (`30`, `60`, `360`, `1440`). Évite de surcharger les disques en cas de redémarrages fréquents. |
 | **Vérifier les mises à jour au démarrage** | `auto_check_update` | `true` | Interroge silencieusement GitHub Releases au démarrage et affiche un badge si une version plus récente est disponible. |
 
@@ -56,7 +56,7 @@ La fenêtre des préférences de Berry AI Studio (`SettingsModal.vue`) s'ouvre v
 | Champ de réglage | Clé dans `config.json` | Valeur par défaut | Description |
 | :--- | :--- | :--- | :--- |
 | **Moteur de base de données** | `storage_backend` | `"sqlite"` | Moteur actif : `"sqlite"`, `"mysql"` ou `"postgres"`. |
-| **URL de connexion distante** | `remote_connection_url` | `""` | Chaîne de connexion à la base de données (ex. `postgres://user:pass@host:5432/berry_studio`). |
+| **URL de connexion distante** | `remote_connection_url` | `""` | Chaîne de connexion à la base de données (ex. `postgres://user:pass@host:5432/omera_studio`). |
 | **Identifiant du poste client** | `client_identifier` | `""` | Nom unique de la machine consigné dans les journaux de modifications et pour la résolution des conflits OCC. |
 | **Mappage des racines de stockage** | `root_mappings` | `{}` | Associations liant les UUIDs universels des racines aux chemins de montage locaux du système d'exploitation. |
 | **Tester la connexion** | S/O | S/O | Envoie un ping au serveur de base de données distant et affiche la latence aller-retour en millisecondes. |
@@ -93,9 +93,9 @@ Présente l'état de fonctionnement en temps réel des analyseurs de métadonné
 
 - **Version** : Affiche la version actuelle de l'application (ex. `v0.3.0`).
 - **Schéma de base de données** : Indique le niveau de migration actif du schéma SQLite (ex. `Schéma version 14`).
-- **Emplacement de la base active** : Chemin absolu vers `berry.db`.
+- **Emplacement de la base active** : Chemin absolu vers `omera.db`.
 - **Boutons d'accès direct aux dossiers** :
   - `Fichier de configuration` : Ouvre le dossier contenant `config.json`.
-  - `Base de données SQLite` : Ouvre le dossier contenant `berry.db` et les fichiers journaux WAL.
+  - `Base de données SQLite` : Ouvre le dossier contenant `omera.db` et les fichiers journaux WAL.
   - `Cache des miniatures` : Ouvre le répertoire de cache des miniatures WebP.
   - `Dossier des modèles` : Ouvre le répertoire contenant les poids de modèles d'IA ONNX.

@@ -6,7 +6,7 @@
 - Read `docs/API_CONTRACTS.md` and `docs/IPC_REFERENCE.md` before changing IPC. Use `docs/HANDOFF_PROMPTS.md` for human engineering assignments. Proposed migration APIs are not implemented commands. Regenerate the IPC inventory after command changes and validate DTO compatibility separately.
 
 - The target identity is Omera, `com.berryuiki.omera`, repository `BerryUIKI/Omera`, database `omera.db`, and local settings prefix `omera_`.
-- Follow `docs/OMERA_MIGRATION.md` and `docs/STORAGE_EVOLUTION.md`. Current `berry-*` paths below remain valid until the coordinated source rename.
+- Follow `docs/OMERA_MIGRATION.md` and `docs/STORAGE_EVOLUTION.md`. Core crates are organized as `crates/omera-*`; legacy discovery readers and fallback paths are preserved for pre-1.0 compatibility.
 - All pre-1.0 releases must retain legacy discovery and supported import. Preserve source data during migration. Cleanup requires validated destination data and a separate explicit user decision in the application.
 - Never include user media, external vaults, or shared directories in automatic legacy application-data cleanup.
 

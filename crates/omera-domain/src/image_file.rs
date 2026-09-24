@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 /// The file container format of a scanned media file.
 ///
-/// Detection by magic bytes lives in `berry-metadata`; this type only
+/// Detection by magic bytes lives in `omera-metadata`; this type only
 /// describes the possible outcomes so the rest of the app can branch on it
 /// (e.g. "only PNG/JPEG/WebP carry embedded PNGInfo/EXIF metadata").
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

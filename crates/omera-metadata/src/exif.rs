@@ -200,7 +200,7 @@ mod tests {
 
     #[test]
     fn reads_dimensions_and_software() {
-        let dir = std::env::temp_dir().join(format!("berry-exif-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("omera-exif-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("comfy.jpg");
@@ -216,7 +216,7 @@ mod tests {
 
     #[test]
     fn non_exif_jpeg_has_no_info() {
-        let dir = std::env::temp_dir().join(format!("berry-exif-none-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("omera-exif-none-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("plain.jpg");

@@ -233,7 +233,7 @@ fn strategy_content_hash(root: &Path) -> (usize, usize) {
 
 fn main() {
     println!("#################################################################");
-    println!("# BERRY AI STUDIO - DIRECTORY FINGERPRINT BENCHMARK SUITE       #");
+    println!("# OMERA - DIRECTORY FINGERPRINT BENCHMARK SUITE                 #");
     println!("#################################################################");
 
     let num_dirs = 50;
@@ -431,6 +431,6 @@ fn main() {
     println!("2. On network filesystems (SMB/NFS/WebDAV), round-trip RPC latency dominates traversal time.");
     println!("3. Directory mtime gating slashes network RPC calls from O(N_files) to O(N_modified_dirs),");
     println!("   yielding a ~9x–10x speedup over LAN and ~9x–10x speedup over WAN/VPN.");
-    println!("4. In Berry AI Studio, `walk_media_files` with directory fingerprint gates is the recommended");
+    println!("4. In Omera, `walk_media_files` with directory fingerprint gates is the recommended");
     println!("   strategy for network vaults and multi-database team deployments.");
 }

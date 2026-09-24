@@ -1,12 +1,12 @@
 # Installation & Premier démarrage
 
-Ce guide détaille les prérequis système, les plateformes prises en charge, les procédures d'installation et la configuration initiale avec l'assistant de bienvenue pour **Berry AI Studio**.
+Ce guide détaille les prérequis système, les plateformes prises en charge, les procédures d'installation et la configuration initiale avec l'assistant de bienvenue pour **Omera**.
 
 ---
 
 ## 1. Prérequis système
 
-Berry AI Studio utilise une architecture native ultra-efficace propulsée par **Tauri v2**, **Rust** et **SQLite WAL**. Il fonctionne de manière fluide sur du matériel modeste tout en tirant pleinement parti des stations de travail multicœurs et du stockage NVMe pour les grandes bibliothèques (de 50 000 à plus de 500 000 fichiers).
+Omera utilise une architecture native ultra-efficace propulsée par **Tauri v2**, **Rust** et **SQLite WAL**. Il fonctionne de manière fluide sur du matériel modeste tout en tirant pleinement parti des stations de travail multicœurs et du stockage NVMe pour les grandes bibliothèques (de 50 000 à plus de 500 000 fichiers).
 
 ### Configuration matérielle minimale
 - **Processeur (CPU)** : Processeur double cœur x86_64 ou ARM64 (Intel Core i3 / AMD Ryzen 3 / Apple M1 ou plus récent).
@@ -25,35 +25,35 @@ Berry AI Studio utilise une architecture native ultra-efficace propulsée par **
 
 ## 2. Procédures d'installation
 
-Téléchargez les paquets officiels de production depuis la [page GitHub Releases](https://github.com/BerryUIKI/Berry-AI-Studio/releases) ou le [site officiel](https://berryuiki.github.io/Berry-AI-Studio/).
+Téléchargez les paquets officiels de production depuis la [page GitHub Releases](https://github.com/BerryUIKI/Omera/releases) ou le [site officiel](https://berryuiki.github.io/Omera/).
 
 ### Windows
-1. **Installateur standard (`Berry-AI-Studio_Windows_x64.exe`)** :
+1. **Installateur standard (`Omera_Windows_x64.exe`)** :
    - Double-cliquez sur le fichier exécutable d'installation.
    - Suivez l'assistant d'installation pour choisir l'emplacement et créer les raccourcis sur le Bureau et dans le menu Démarrer.
    - L'installateur gère automatiquement les raccourcis et enregistre les gestionnaires de protocoles.
-2. **Archive portable ZIP (`Berry-AI-Studio_Windows_x64.zip`)** :
+2. **Archive portable ZIP (`Omera_Windows_x64.zip`)** :
    - Extrayez l'archive `.zip` sur le disque de votre choix (par exemple, un SSD NVMe externe ou un disque amovible).
-   - Lancez `berry-ai-studio.exe` directement sans nécessiter de privilèges d'administrateur.
+   - Lancez `omera.exe` directement sans nécessiter de privilèges d'administrateur.
 
 ### macOS
 1. Téléchargez l'image disque correspondant à votre processeur :
-   - Apple Silicon (M1/M2/M3/M4) : `Berry-AI-Studio_macOS_aarch64.dmg`
-   - Intel Core : `Berry-AI-Studio_macOS_x64.dmg`
-2. Ouvrez le fichier `.dmg` et glissez **Berry AI Studio** dans votre dossier `/Applications`.
+   - Apple Silicon (M1/M2/M3/M4) : `Omera_macOS_aarch64.dmg`
+   - Intel Core : `Omera_macOS_x64.dmg`
+2. Ouvrez le fichier `.dmg` et glissez **Omera** dans votre dossier `/Applications`.
 3. Les paquets sont signés et notarisés par Apple Gatekeeper. Au premier lancement, démarrez l'application depuis Applications ou Spotlight.
 
 ### Linux
-1. **AppImage (`Berry-AI-Studio_Linux_x64.AppImage`)** :
+1. **AppImage (`Omera_Linux_x64.AppImage`)** :
    - Rendez le binaire exécutable :
      ```bash
-     chmod +x Berry-AI-Studio_Linux_x64.AppImage
-     ./Berry-AI-Studio_Linux_x64.AppImage
+     chmod +x Omera_Linux_x64.AppImage
+     ./Omera_Linux_x64.AppImage
      ```
-2. **Debian / Ubuntu (`Berry-AI-Studio_Linux_x64.deb`)** :
+2. **Debian / Ubuntu (`Omera_Linux_x64.deb`)** :
    - Installez via `dpkg` ou `apt` :
      ```bash
-     sudo dpkg -i Berry-AI-Studio_Linux_x64.deb
+     sudo dpkg -i Omera_Linux_x64.deb
      sudo apt-get install -f # Résout les éventuelles dépendances webkit2gtk manquantes
      ```
 
@@ -61,11 +61,11 @@ Téléchargez les paquets officiels de production depuis la [page GitHub Release
 
 ## 3. Assistant de bienvenue au premier démarrage
 
-Lorsque vous lancez Berry AI Studio pour la toute première fois, l'**Assistant de bienvenue** interactif (`OnboardingModal.vue`) s'affiche automatiquement pour vous guider dans la configuration initiale.
+Lorsque vous lancez Omera pour la toute première fois, l'**Assistant de bienvenue** interactif (`OnboardingModal.vue`) s'affiche automatiquement pour vous guider dans la configuration initiale.
 
 ```mermaid
 flowchart TD
-    A[Lancer Berry AI Studio] --> B[Bienvenue & Présentation des concepts]
+    A[Lancer Omera] --> B[Bienvenue & Présentation des concepts]
     B --> C[Détection des outils IA locaux]
     C --> D{Installations locales détectées ?}
     D -- Oui --> E[Ajout en 1 clic : SD WebUI / ComfyUI / Fooocus]
@@ -82,30 +82,30 @@ flowchart TD
    - Regroupement intelligent en piles/rafales façon jeu de cartes et comparaison côte à côte.
    - Confidentialité 100 % hors ligne sans aucune télémétrie.
 2. **Détection automatique des moteurs IA locaux** :
-   - Berry analyse les répertoires locaux usuels sur l'ensemble de vos disques (ex. `C:\`, `D:\`, `/home/`) à la recherche des répertoires de sortie de :
+   - Omera analyse les répertoires locaux usuels sur l'ensemble de vos disques (ex. `C:\`, `D:\`, `/home/`) à la recherche des répertoires de sortie de :
      - **AUTOMATIC1111 / SD.Next** (`outputs/txt2img-images`, `outputs/img2img-images`)
      - **ComfyUI** (`ComfyUI/output`)
      - **Fooocus** (`Fooocus/outputs`)
      - **InvokeAI** (`invokeai/outputs`)
    - S'ils sont détectés, vous pouvez les connecter en un seul clic en tant que **Pipelines AIGC** ou **Liens externes**.
 3. **Sélection du mode de stockage** :
-   - Choisissez comment Berry interagit avec vos fichiers (en savoir plus dans [Modes de dossiers & Importation](../02-library-management/folder-modes-and-import.md)).
+   - Choisissez comment Omera interagit avec vos fichiers (en savoir plus dans [Modes de dossiers & Importation](../02-library-management/folder-modes-and-import.md)).
 4. **Finalisation** :
-   - Berry initialise la base SQLite locale (`berry.db`) en mode Write-Ahead Logging (WAL), démarre l'analyse d'arrière-plan des dossiers et vous dirige directement vers la galerie principale du studio.
+   - Omera initialise la base SQLite locale (`omera.db`) en mode Write-Ahead Logging (WAL), démarre l'analyse d'arrière-plan des dossiers et vous dirige directement vers la galerie principale du studio.
 
 ---
 
 ## 4. Répertoires de données & Stockage de l'application
 
-Berry AI Studio stocke l'ensemble des index de bibliothèque, caches et fichiers de configuration localement dans votre profil utilisateur :
+Omera stocke l'ensemble des index de bibliothèque, caches et fichiers de configuration localement dans votre profil utilisateur :
 
-- **Windows** : `%APPDATA%\com.berryuiki.berryaistudio\` (par ex. `C:\Users\<NomUtilisateur>\AppData\Roaming\com.berryuiki.berryaistudio\`)
-- **macOS** : `~/Library/Application Support/com.berryuiki.berryaistudio/`
-- **Linux** : `~/.config/com.berryuiki.berryaistudio/`
+- **Windows** : `%APPDATA%\com.berryuiki.omera\` (par ex. `C:\Users\<NomUtilisateur>\AppData\Roaming\com.berryuiki.omera\`)
+- **macOS** : `~/Library/Application Support/com.berryuiki.omera/`
+- **Linux** : `~/.config/com.berryuiki.omera/`
 
 ### Contenu du répertoire :
-- `berry.db` : Base de données SQLite principale contenant toutes les métadonnées, notes, tags, albums et relations de piles.
-- `berry.db-wal` & `berry.db-shm` : Fichiers journaux SQLite en mode WAL.
+- `omera.db` : Base de données SQLite principale contenant toutes les métadonnées, notes, tags, albums et relations de piles.
+- `omera.db-wal` & `omera.db-shm` : Fichiers journaux SQLite en mode WAL.
 - `config.json` : Paramètres de l'application (thème, mode d'affichage, résolution des miniatures, URLs d'interopérabilité).
 - `thumbnails/` : Cache de miniatures WebP haute performance organisé sous la forme `{file_id}_{mtime}_{edge}.webp`.
 - `models/` : Poids de modèles IA ONNX locaux pour CLIP, SigLIP et les étiqueteurs automatiques WD14 Danbooru.

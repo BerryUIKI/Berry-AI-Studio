@@ -1,6 +1,6 @@
 # Disposition de l'espace de travail & Anatomie de l'interface
 
-Berry AI Studio propose un espace de travail de bureau à 3 volets inspiré d'**Eagle et Lightroom**, conçu pour la curation visuelle haute densité, la rapidité au clavier et une visualisation sans distraction.
+Omera propose un espace de travail de bureau à 3 volets inspiré d'**Eagle et Lightroom**, conçu pour la curation visuelle haute densité, la rapidité au clavier et une visualisation sans distraction.
 
 ---
 
@@ -8,7 +8,7 @@ Berry AI Studio propose un espace de travail de bureau à 3 volets inspiré d'**
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│ [Logo] Berry AI Studio   [ Fichier  Édition  Affichage  Outils  Aide ]   [ _ ] [ □ ] [ ✕ ] │  <- Barre de titre & Menus
+│ [Logo] Omera   [ Fichier  Édition  Affichage  Outils  Aide ]   [ _ ] [ □ ] [ ✕ ] │  <- Barre de titre & Menus
 ├──────────────┬──────────────────────────────────────────────────────────┬──────────────┤
 │              │ [🔍 Recherche : prompt, modèle, note... ] [🧠] [☰ Filtre] │              │
 │  BARRE       ├──────────────────────────────────────────────────────────┤  INSPECTEUR  │
@@ -67,7 +67,7 @@ La fenêtre adopte une conception sans cadre (frameless) avec une barre de titre
   - `Langue` : Basculer instantanément entre les 7 langues prises en charge.
   - `Raccourcis clavier` (`?`) : Afficher l'antisèche des raccourcis dans l'application.
   - `Vérifier les mises à jour...` : Interroger GitHub Releases pour détecter les nouvelles versions.
-  - `À propos de Berry AI Studio` : Afficher les informations de version, d'auteur et de licence.
+  - `À propos de Omera` : Afficher les informations de version, d'auteur et de licence.
 
 ---
 

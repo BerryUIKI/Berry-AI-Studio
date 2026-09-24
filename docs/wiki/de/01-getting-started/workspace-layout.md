@@ -1,6 +1,6 @@
 # Arbeitsbereich & UI-Aufbau
 
-Berry AI Studio verfügt über einen von **Eagle / Lightroom** inspirierten 3-Spalten-Desktop-Arbeitsbereich, der für hochdichte visuelle Kuration, Tastaturgeschwindigkeit und ablenkungsfreies Arbeiten konzipiert ist.
+Omera verfügt über einen von **Eagle / Lightroom** inspirierten 3-Spalten-Desktop-Arbeitsbereich, der für hochdichte visuelle Kuration, Tastaturgeschwindigkeit und ablenkungsfreies Arbeiten konzipiert ist.
 
 ---
 
@@ -8,7 +8,7 @@ Berry AI Studio verfügt über einen von **Eagle / Lightroom** inspirierten 3-Sp
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│ [Logo] Berry AI Studio   [ Datei  Bearbeiten  Ansicht  Werkzeuge  Hilfe ]    [ _ ] [ □ ] [ ✕ ] │  <- Titelleiste & Menüleiste
+│ [Logo] Omera   [ Datei  Bearbeiten  Ansicht  Werkzeuge  Hilfe ]    [ _ ] [ □ ] [ ✕ ] │  <- Titelleiste & Menüleiste
 ├──────────────┬──────────────────────────────────────────────────────────┬──────────────┤
 │              │ [🔍 Suche: Prompt, Modell, Bewertung... ] [🧠] [☰ Filter] │              │
 │  NAVIGATION  ├──────────────────────────────────────────────────────────┤  EIGENSCHAFTEN│
@@ -39,7 +39,7 @@ Das Anwendungsfenster verwendet ein rahmenloses Design mit einer individuellen, 
   - `Alle Ordner erneut scannen`: Einen inkrementellen Scan über alle registrierten Ordner erzwingen.
   - `Datenbankverwaltung...`: Werkzeuge für Datenbankkomprimierung, Speicherstatistiken und Snapshots öffnen.
   - `Einstellungen...` (`Strg + ,` / `Cmd + ,`): Das zentrale Einstellungsfenster mit 8 Kategorien öffnen.
-  - `Beenden` (`Alt + F4`): Berry AI Studio sauber schließen.
+  - `Beenden` (`Alt + F4`): Omera sauber schließen.
 - **Bearbeiten**:
   - `Alles auswählen` (`Strg + A` / `Cmd + A`): Alle Assets in der aktuellen Galerieansicht markieren.
   - `Auswahl aufheben` (`Esc`): Alle Markierungen aufheben.
@@ -66,7 +66,7 @@ Das Anwendungsfenster verwendet ein rahmenloses Design mit einer individuellen, 
   - `Sprache`: Direkt zwischen 7 unterstützten Sprachen wechseln.
   - `Tastaturkürzel` (`?`): Interaktive Tastaturkürzel-Übersicht anzeigen.
   - `Nach Updates suchen...`: GitHub Releases auf neue Versionen prüfen.
-  - `Über Berry AI Studio`: Versionsnummer, Entwickler- und Lizenzinformationen anzeigen.
+  - `Über Omera`: Versionsnummer, Entwickler- und Lizenzinformationen anzeigen.
 
 ---
 

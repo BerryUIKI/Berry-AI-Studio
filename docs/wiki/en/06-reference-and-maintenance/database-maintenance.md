@@ -1,6 +1,6 @@
 # Database & Cache Maintenance
 
-Berry AI Studio is engineered for continuous low-maintenance operation. However, as you curate, delete, and modify tens of thousands of artworks, performing periodic database compaction and cache management helps maintain peak performance.
+Omera is engineered for continuous low-maintenance operation. However, as you curate, delete, and modify tens of thousands of artworks, performing periodic database compaction and cache management helps maintain peak performance.
 
 ---
 
@@ -13,7 +13,7 @@ Open the management window via **File > Database Management...** or from the qui
 │ Database Management & Storage Compaction                           [✕] │
 ├────────────────────────────────────────────────────────────────────────┤
 │ Storage Metrics                                                        │
-│ • Database File:      berry.db (WAL Mode)                              │
+│ • Database File:      omera.db (WAL Mode)                              │
 │ • Indexed Files:      48,210 files across 6 folders                    │
 │ • Total Disk Size:    128.4 MB (Database) / 1.42 GB (Thumbnails)       │
 │ • Albums & Tags:      12 albums, 45 tags                               │
@@ -35,7 +35,7 @@ When you delete items, remove tags, or dissolve stacks, SQLite marks the underly
 
 ### Running `VACUUM`:
 - Clicking **"Compact Database (VACUUM)"** triggers SQLite's native vacuuming routine.
-- Berry rebuilds the database file into a clean, contiguous structure, eliminating freelist pages and reducing database file size on disk.
+- Omera rebuilds the database file into a clean, contiguous structure, eliminating freelist pages and reducing database file size on disk.
 - **Safety**: Vacuuming is fully transactional. If power is lost during compaction, SQLite rolls back safely without data corruption.
 
 ---
@@ -44,11 +44,11 @@ When you delete items, remove tags, or dissolve stacks, SQLite marks the underly
 
 ### Creating a Local Backup (`backup_database`)
 - Click **"Export Backup Snapshot"** to create a verified, non-locking backup of your database.
-- Berry uses SQLite's online backup API, allowing you to create backups while the application remains fully usable.
+- Omera uses SQLite's online backup API, allowing you to create backups while the application remains fully usable.
 
 ### Restoring from Backup (`restore_database`)
 - If you need to restore your library on a new computer or revert accidental changes, click **"Restore Database from Backup"**.
-- Berry creates a safety rollback of your current database, swaps in the backup file, and immediately hydrates the studio with the restored library state.
+- Omera creates a safety rollback of your current database, swaps in the backup file, and immediately hydrates the studio with the restored library state.
 
 ---
 
@@ -58,12 +58,12 @@ Thumbnails are stored in `<app_data_dir>/thumbnails/` as high-efficiency WebP fi
 
 ### Configurable Disk Cache Budget:
 - In **Settings > Display & Safety**, you can configure the **Thumbnail Cache Budget** (default: `2048 MB` / 2 GB).
-- Berry tracks the access timestamp of every thumbnail file in the `thumbnail_cache_entries` database table.
-- When total thumbnail size exceeds your budget, Berry automatically evicts the oldest accessed files using an **LRU (Least Recently Used)** policy.
+- Omera tracks the access timestamp of every thumbnail file in the `thumbnail_cache_entries` database table.
+- When total thumbnail size exceeds your budget, Omera automatically evicts the oldest accessed files using an **LRU (Least Recently Used)** policy.
 
 ### Purging the Cache:
 - If you want to free up disk space immediately, click **"Purge Thumbnail Cache"**.
-- Berry deletes all cached WebP files from disk and clears the manifest table. Thumbnails will be regenerated lazily on demand when you browse folders again.
+- Omera deletes all cached WebP files from disk and clears the manifest table. Thumbnails will be regenerated lazily on demand when you browse folders again.
 
 ---
 

@@ -1,12 +1,12 @@
 # Métadonnées AIGC & Inspection de prompts
 
-Berry AI Studio intègre un moteur d'analyse de métadonnées sans perte multi-plateformes écrit en Rust (`berry-metadata`). Il extrait automatiquement les prompts, les prompts négatifs, les modèles, les graines (seeds) et les graphes d'exécution de toutes les principales plateformes de génération par IA.
+Omera intègre un moteur d'analyse de métadonnées sans perte multi-plateformes écrit en Rust (`omera-metadata`). Il extrait automatiquement les prompts, les prompts négatifs, les modèles, les graines (seeds) et les graphes d'exécution de toutes les principales plateformes de génération par IA.
 
 ---
 
 ## 1. Plateformes de génération IA prises en charge
 
-Berry interprète nativement les métadonnées intégrées dans les chunks PNG, les en-têtes EXIF WebP et les boîtes ISOBMFF MP4 provenant de :
+Omera interprète nativement les métadonnées intégrées dans les chunks PNG, les en-têtes EXIF WebP et les boîtes ISOBMFF MP4 provenant de :
 
 | Plateforme / Outil | Champs de métadonnées extraits | Emplacement dans le conteneur |
 | :--- | :--- | :--- |
@@ -61,7 +61,7 @@ Lorsqu'une image ou une vidéo est sélectionnée, le panneau de droite (raccour
 
 ## 3. Jetons de prompt interactifs (Chips)
 
-Berry AI Studio segmente les chaînes de prompts sous forme de jetons interactifs au lieu d'afficher un bloc de texte brut difficile à lire :
+Omera segmente les chaînes de prompts sous forme de jetons interactifs au lieu d'afficher un bloc de texte brut difficile à lire :
 
 - **Recherche en 1 clic** : Cliquez sur n'importe quel jeton (ex. `[cyberpunk city]`) pour lancer immédiatement une recherche de ce concept sur l'ensemble de votre bibliothèque.
 - **Copie en 1 clic** : Cliquez sur l'icône de copie dans le coin supérieur droit du cadre de prompt pour copier le texte propre directement dans votre presse-papier.
@@ -73,7 +73,7 @@ Berry AI Studio segmente les chaînes de prompts sous forme de jetons interactif
 
 Les outils de génération intègrent fréquemment des hashs courts (ex. `31e35c80`) ou des hashs SHA256 complets plutôt que des noms de fichiers lisibles.
 
-- Berry consulte automatiquement son **Cache de modèles** local (table SQLite `model_cache`) pour convertir les hashs cryptiques en noms conviviaux tels que `"Animagine XL 3.1"`.
+- Omera consulte automatiquement son **Cache de modèles** local (table SQLite `model_cache`) pour convertir les hashs cryptiques en noms conviviaux tels que `"Animagine XL 3.1"`.
 - Si un hash inconnu est rencontré, vous pouvez importer un fichier `cache.json` d'AUTOMATIC1111 ou le résoudre directement via Civitai (voir [Modèles Checkpoint & Bibliothèque LoRA](../04-intelligent-curation/models-and-loras.md)).
 
 ---

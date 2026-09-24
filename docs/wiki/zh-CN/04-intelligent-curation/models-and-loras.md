@@ -1,15 +1,15 @@
 # 模型库与 LoRA 触发词管理
 
-在日常的生成式 AI 创作流中，管理成百上千个庞大的 Stable Diffusion Checkpoint 底模和各类精细微调的 LoRA 往往令人头疼。Berry AI Studio 提供了内置的模型目录自动归档、模型哈希智能反查以及 LoRA 触发词（Activation Tags）全生命周期管理系统。
+在日常的生成式 AI 创作流中，管理成百上千个庞大的 Stable Diffusion Checkpoint 底模和各类精细微调的 LoRA 往往令人头疼。Omera 提供了内置的模型目录自动归档、模型哈希智能反查以及 LoRA 触发词（Activation Tags）全生命周期管理系统。
 
 ---
 
 ## 1. Checkpoint 模型库与哈希解析 (`ModelManagerModal.vue`)
 
-Berry 能够在后台非侵入式地持续记录并收录全图库中遇到的所有 Checkpoint 模型。
+Omera 能够在后台非侵入式地持续记录并收录全图库中遇到的所有 Checkpoint 模型。
 
 ### 自动化模型发现机制：
-- 在为图像建立索引时，Berry 的原生 Rust 解析器会自动从 PNGInfo 或 EXIF 元数据中提炼底模名称与模型哈希。
+- 在为图像建立索引时，Omera 的原生 Rust 解析器会自动从 PNGInfo 或 EXIF 元数据中提炼底模名称与模型哈希。
 - 点击菜单栏的 **工具 > 模型管理器与缓存...**，即可查看图库收录的全部底模清单、8 位短哈希、完整 SHA-256 校验和以及各模型生成的图片总数统计。
 
 ### 导入 AUTOMATIC1111 `cache.json` 批量反查：
@@ -17,7 +17,7 @@ Berry 能够在后台非侵入式地持续记录并收录全图库中遇到的�
 - 如果你在本机部署了 AUTOMATIC1111 / SD.Next：
   1. 在模型管理器面板中，点击**“导入 A1111 cache.json”**。
   2. 选择你的 WebUI 根目录下的 `cache.json` 文件。
-  3. Berry 会将哈希与模型名称的映射关系批量写入本地 SQLite `model_cache` 表中，瞬间将全库所有历史图片中的晦涩哈希替换为清晰易懂的模型全名。
+  3. Omera 会将哈希与模型名称的映射关系批量写入本地 SQLite `model_cache` 表中，瞬间将全库所有历史图片中的晦涩哈希替换为清晰易懂的模型全名。
 
 ### Civitai SHA-256 在线哈希匹配：
 - 针对本地尚未收录的生僻底模，点击检查器中模型哈希旁边的 Civitai 放大镜图标，即可直接向 Civitai 开放接口发起反查，精准匹配原版模型主页。
@@ -53,7 +53,7 @@ Berry 能够在后台非侵入式地持续记录并收录全图库中遇到的�
    - 点击 **"+ 插入提示词"**（或“带 `<lora>` 格式复制”），即可将标准格式的 `<lora:模型名:0.8>` 字符串复制至剪贴板。
    - 单击任意触发词芯片标签，即可将其复制，以便立即粘贴至你的生图工具提示词输入框中。
 3. **导入 Civitai 伴随信息文件 (`.civitai.info`)**：
-   - 如果你通过 Civitai 助手或官方脚本下载了伴随文件（`.civitai.info` 或同名 `.json`），Berry 能自动解析模型 Hash、基础架构版本（SD 1.5、SDXL、Pony、Flux 等）、模型训练触发词以及官方封面预览图。
+   - 如果你通过 Civitai 助手或官方脚本下载了伴随文件（`.civitai.info` 或同名 `.json`），Omera 能自动解析模型 Hash、基础架构版本（SD 1.5、SDXL、Pony、Flux 等）、模型训练触发词以及官方封面预览图。
 4. **扫描本地 LoRA 存储目录**：
-   - 将 Berry 导向你本地存放 LoRA 的专属文件夹（如 WebUI 或 ComfyUI 的 `models/Lora/` 目录）。
-   - Berry 会遍历扫描所有 `.safetensors` 模型及其预览图，在本地构筑出一套强大的完全离线可检索的 LoRA 视觉参考词典。
+   - 将 Omera 导向你本地存放 LoRA 的专属文件夹（如 WebUI 或 ComfyUI 的 `models/Lora/` 目录）。
+   - Omera 会遍历扫描所有 `.safetensors` 模型及其预览图，在本地构筑出一套强大的完全离线可检索的 LoRA 视觉参考词典。

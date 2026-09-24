@@ -1,7 +1,7 @@
 //! Tauri IPC commands exposed to the frontend.
 //!
 //! Each command is a thin wrapper: parse the request, call into the core
-//! crates, and serialize the result. Business logic lives in the `berry-*`
+//! crates, and serialize the result. Business logic lives in the `omera-*`
 //! crates, not here.
 
 use std::collections::HashMap;

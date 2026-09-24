@@ -82,7 +82,7 @@ fn get_thumb_pool() -> &'static ThreadPool {
             .unwrap_or(4);
         rayon::ThreadPoolBuilder::new()
             .num_threads(threads)
-            .thread_name(|idx| format!("berry-thumb-{idx}"))
+            .thread_name(|idx| format!("omera-thumb-{idx}"))
             .build()
             .expect("Failed to initialize thumbnail worker thread pool")
     })
@@ -670,7 +670,7 @@ mod tests {
 
     fn test_dir(name: &str) -> PathBuf {
         let path =
-            std::env::temp_dir().join(format!("berry-thumbnail-{name}-{}", std::process::id()));
+            std::env::temp_dir().join(format!("omera-thumbnail-{name}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&path);
         fs::create_dir_all(path.join("thumbnails")).unwrap();
         path
@@ -689,7 +689,7 @@ mod tests {
     #[test]
     fn synchronization_imports_entries_and_evicts_oldest_files() {
         let dir = test_dir("manifest");
-        let db_path = dir.join("berry.db");
+        let db_path = dir.join("omera.db");
         Database::connect(&db_path).unwrap();
         let first = get_thumbnail_path(&dir, 1, 10, 256);
         let second = get_thumbnail_path(&dir, 2, 20, 256);
@@ -714,7 +714,7 @@ mod tests {
     #[test]
     fn canceled_batch_skips_files_before_decode() {
         let dir = test_dir("canceled-batch");
-        let db_path = dir.join("berry.db");
+        let db_path = dir.join("omera.db");
         Database::connect(&db_path).unwrap();
         let result = batch_generate_thumbnails(
             &dir,
@@ -736,7 +736,7 @@ mod tests {
     #[test]
     fn visible_request_reuses_a_sufficient_cached_tier() {
         let dir = test_dir("tier-reuse");
-        let db_path = dir.join("berry.db");
+        let db_path = dir.join("omera.db");
         let db = Database::connect(&db_path).unwrap();
         let cached_path = get_thumbnail_path(&dir, 1, 10, 384);
         fs::write(&cached_path, vec![1; 80]).unwrap();
@@ -779,7 +779,7 @@ mod tests {
     #[test]
     fn tracks_thumbnail_queue_diagnostics() {
         let dir = test_dir("diagnostics");
-        let db_path = dir.join("berry.db");
+        let db_path = dir.join("omera.db");
         let db = Database::connect(&db_path).unwrap();
 
         // 1. Canceled request increments canceled counter

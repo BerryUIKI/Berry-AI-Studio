@@ -1,6 +1,6 @@
 # Search Syntax & Visual Filtering
 
-Berry AI Studio features a dual-mode search system: **Structured Syntax Search** for precise technical filtering, and **AI Semantic Search** for natural-language conceptual queries.
+Omera features a dual-mode search system: **Structured Syntax Search** for precise technical filtering, and **AI Semantic Search** for natural-language conceptual queries.
 
 ---
 
@@ -22,7 +22,7 @@ In the top search bar (`/` or `Ctrl + F`), you can type free-form keywords or co
 
 ## 2. Key-Value Syntax Reference
 
-Berry parses search tokens into structured `SearchCriteria` in native Rust, querying SQLite indexes with sub-millisecond execution:
+Omera parses search tokens into structured `SearchCriteria` in native Rust, querying SQLite indexes with sub-millisecond execution:
 
 | Token Key | Syntax Example | Description |
 | :--- | :--- | :--- |

@@ -1,12 +1,12 @@
 # AIGC 元数据与提示词解析
 
-Berry AI Studio 内置了由 Rust 编写的高性能多引擎无损元数据解析核心（`berry-metadata`）。它能够毫秒级自动从主流生成式 AI 平台的输出作品中提取提示词、负向提示词、模型哈希、随机种子以及完整的工作流执行节点图。
+Omera 内置了由 Rust 编写的高性能多引擎无损元数据解析核心（`omera-metadata`）。它能够毫秒级自动从主流生成式 AI 平台的输出作品中提取提示词、负向提示词、模型哈希、随机种子以及完整的工作流执行节点图。
 
 ---
 
 ## 1. 支持的生成式 AI 平台矩阵
 
-Berry 原生支持从 PNG 文本块、WebP EXIF 头以及 MP4 ISOBMFF box 容器中提取以下工具的生成元数据：
+Omera 原生支持从 PNG 文本块、WebP EXIF 头以及 MP4 ISOBMFF box 容器中提取以下工具的生成元数据：
 
 | 平台 / 工具引擎 | 自动提取的元数据字段 | 所在媒体容器位置 |
 | :--- | :--- | :--- |
@@ -61,7 +61,7 @@ Berry 原生支持从 PNG 文本块、WebP EXIF 头以及 MP4 ISOBMFF box 容器
 
 ## 3. 词元化交互式提示词标签 (Token Chips)
 
-Berry AI Studio 将原本密密麻麻、难以阅读的长篇提示词字符串，自动分词拆解为直观易选的独立芯片标签（Token Chips）：
+Omera 将原本密密麻麻、难以阅读的长篇提示词字符串，自动分词拆解为直观易选的独立芯片标签（Token Chips）：
 
 - **一键反查 (1-Click Search)**：点击任意提示词芯片（例如 `[cyberpunk city]`），画廊会立即执行全库检索，瞬间筛选出包含该主题概念的所有历史生图。
 - **一键复制 (1-Click Copy)**：点击提示词卡片右上角的复制图标，即可将干净完整的提示词文本完整拷贝至系统剪贴板。
@@ -73,7 +73,7 @@ Berry AI Studio 将原本密密麻麻、难以阅读的长篇提示词字符串�
 
 AI 生图工具通常在元数据中只内嵌短哈希（如 `31e35c80`）或完整的 SHA-256 字符串，缺乏人类可读的文件名。
 
-- Berry 会自动查询本地的**模型哈希缓存**（SQLite `model_cache` 表），自动将生硬的哈希映射为友好的底模名称（如 `"Animagine XL 3.1"`）。
+- Omera 会自动查询本地的**模型哈希缓存**（SQLite `model_cache` 表），自动将生硬的哈希映射为友好的底模名称（如 `"Animagine XL 3.1"`）。
 - 当遇到陌生的未知哈希时，你可以直接一键导入 AUTOMATIC1111 的 `cache.json`，或直接通过 Civitai 进行线上反查匹配（详见[模型库与 LoRA 触发词管理](../04-intelligent-curation/models-and-loras.md)）。
 
 ---

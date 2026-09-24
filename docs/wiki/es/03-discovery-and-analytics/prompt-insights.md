@@ -1,6 +1,6 @@
 # Estadísticas y análisis de prompts
 
-A medida que crece su colección de activos, entender qué palabras clave de prompt, artistas y parámetros técnicos producen sus obras mejor valoradas resulta fundamental. Berry AI Studio incluye un panel modal de analítica dedicado (`PromptStatsModal.vue`) que consolida los metadatos de toda su biblioteca.
+A medida que crece su colección de activos, entender qué palabras clave de prompt, artistas y parámetros técnicos producen sus obras mejor valoradas resulta fundamental. Omera incluye un panel modal de analítica dedicado (`PromptStatsModal.vue`) que consolida los metadatos de toda su biblioteca.
 
 ---
 

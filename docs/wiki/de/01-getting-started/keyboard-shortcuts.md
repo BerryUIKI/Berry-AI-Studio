@@ -1,6 +1,6 @@
 # Tastaturkürzel-Übersicht
 
-Berry AI Studio ist für einen **Tastatur-fokussierten Arbeitsablauf** optimiert. Sie können umfangreiche Bibliotheken durchsuchen, bewerten, gruppieren, untersuchen und organisieren, ohne die Hand von der Tastatur nehmen zu müssen.
+Omera ist für einen **Tastatur-fokussierten Arbeitsablauf** optimiert. Sie können umfangreiche Bibliotheken durchsuchen, bewerten, gruppieren, untersuchen und organisieren, ohne die Hand von der Tastatur nehmen zu müssen.
 
 ---
 
@@ -67,7 +67,7 @@ Berry AI Studio ist für einen **Tastatur-fokussierten Arbeitsablauf** optimiert
 | `Strg + E` / `Cmd + E` | **Exportieren...** | Öffnet das Modal für Stapelexport, Transkodierung und HTML-Showcases. |
 | `Strg + ,` / `Cmd + ,` | **Einstellungen...** | Öffnet das zentrale Einstellungsfenster der Anwendung. |
 | `?` oder `Umschalt + /` | **Tastaturkürzel** | Öffnet die Übersicht aller Tastenkürzel. |
-| `Alt + F4` | **Beenden** | Beendet Berry AI Studio ordnungsgemäß. |
+| `Alt + F4` | **Beenden** | Beendet Omera ordnungsgemäß. |
 
 ---
 

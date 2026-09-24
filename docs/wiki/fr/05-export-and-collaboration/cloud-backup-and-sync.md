@@ -1,6 +1,6 @@
 # Sauvegarde d'instantanés Cloud & Miroir multimédia
 
-Berry AI Studio intègre un moteur de sauvegarde cloud et de synchronisation différentielle delta (`src-tauri/src/cloud_backup.rs` et `src-tauri/src/cloud_sync.rs`) qui permet des sauvegardes automatisées de base de données et la mise en miroir incrémentielle des fichiers médias distants, sans recourir à des outils tiers.
+Omera intègre un moteur de sauvegarde cloud et de synchronisation différentielle delta (`src-tauri/src/cloud_backup.rs` et `src-tauri/src/cloud_sync.rs`) qui permet des sauvegardes automatisées de base de données et la mise en miroir incrémentielle des fichiers médias distants, sans recourir à des outils tiers.
 
 ---
 
@@ -18,13 +18,13 @@ Configurez vos points de terminaison distants dans **Préférences > Sauvegarde 
 
 ## 2. Sauvegarde d'instantanés SQLite à chaud (`cloud_backup_create_snapshot`)
 
-Berry effectue la sauvegarde de votre base de données à l'aide de l'instruction native SQLite `VACUUM INTO` :
+Omera effectue la sauvegarde de votre base de données à l'aide de l'instruction native SQLite `VACUUM INTO` :
 
 ```mermaid
 sequenceDiagram
-    participant UI as Interface Berry Studio
+    participant UI as Interface Omera Studio
     participant Rust as Backend (cloud_backup.rs)
-    participant DB as SQLite WAL (berry.db)
+    participant DB as SQLite WAL (omera.db)
     participant Remote as Stockage Cloud (S3/WebDAV)
 
     UI->>Rust: Demande de création d'instantané
@@ -38,7 +38,7 @@ sequenceDiagram
 
 ### Garanties des instantanés :
 - **Sans interruption (Non-Locking)** : Utilise l'API de vacuum en ligne de SQLite. Vous pouvez continuer à parcourir, noter et générer des images sans aucune interruption de service.
-- **Sécurité de restauration (Rollback)** : Lors de la restauration d'un instantané distant, Berry génère automatiquement une copie locale de secours (`berry.db.rollback`) avant d'appliquer la sauvegarde distante, prévenant toute coupure réseau ou corruption de téléchargement.
+- **Sécurité de restauration (Rollback)** : Lors de la restauration d'un instantané distant, Omera génère automatiquement une copie locale de secours (`omera.db.rollback`) avant d'appliquer la sauvegarde distante, prévenant toute coupure réseau ou corruption de téléchargement.
 
 ---
 

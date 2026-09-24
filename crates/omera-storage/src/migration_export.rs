@@ -75,10 +75,7 @@ pub fn export_migration_sql(
         writer,
         "-- ========================================================="
     )?;
-    writeln!(
-        writer,
-        "-- Berry AI Studio Central Database Migration Script"
-    )?;
+    writeln!(writer, "-- Omera Central Database Migration Script")?;
     writeln!(
         writer,
         "-- Target Dialect: {}",

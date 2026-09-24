@@ -1,6 +1,6 @@
 # Comprehensive Settings Reference
 
-Berry AI Studio's preferences window (`SettingsModal.vue`) is accessed via `File > Preferences...` or `Ctrl + ,` / `Cmd + ,`. All settings are persisted to `config.json` in your local app data directory.
+Omera's preferences window (`SettingsModal.vue`) is accessed via `File > Preferences...` or `Ctrl + ,` / `Cmd + ,`. All settings are persisted to `config.json` in your local app data directory.
 
 ---
 
@@ -10,7 +10,7 @@ Berry AI Studio's preferences window (`SettingsModal.vue`) is accessed via `File
 | :--- | :--- | :--- | :--- |
 | **Application Language** | `locale` | `"auto"` | Choose from: `auto` (follows OS language), `en` (English), `zh-CN` (Simplified Chinese), `zh-TW` (Traditional Chinese), `ja` (Japanese), `de` (German), `fr` (French), `es` (Spanish). |
 | **Default Gallery View** | `default_view` | `"grid"` | Initial view mode on startup: `"grid"` (Uniform Grid), `"masonry"` (Waterfall), or `"table"` (Detailed List). |
-| **Auto-Scan on Startup** | `auto_scan` | `true` | Automatically checks indexed folders for new or modified files when Berry launches. |
+| **Auto-Scan on Startup** | `auto_scan` | `true` | Automatically checks indexed folders for new or modified files when Omera launches. |
 | **Startup Scan Interval** | `startup_scan_interval_minutes`| `360` | Minimum cooldown in minutes between full directory reconciliations (`30`, `60`, `360`, `1440`). Prevents disk churn if you restart the app frequently. |
 | **Auto-Check for Updates** | `auto_check_update` | `true` | Silently queries GitHub Releases on startup and displays an update badge if a newer version is available. |
 
@@ -56,7 +56,7 @@ Berry AI Studio's preferences window (`SettingsModal.vue`) is accessed via `File
 | Setting Field | Key in `config.json` | Default Value | Description |
 | :--- | :--- | :--- | :--- |
 | **Storage Backend** | `storage_backend` | `"sqlite"` | Active database engine: `"sqlite"`, `"mysql"`, or `"postgres"`. |
-| **Remote Connection URL** | `remote_connection_url` | `""` | Database connection string (e.g. `postgres://user:pass@host:5432/berry_studio`). |
+| **Remote Connection URL** | `remote_connection_url` | `""` | Database connection string (e.g. `postgres://user:pass@host:5432/omera_studio`). |
 | **Workstation Client ID** | `client_identifier` | `""` | Unique machine name used for change logs and optimistic concurrency conflict tracking. |
 | **Storage Root Mappings** | `root_mappings` | `{}` | Cross-platform directory mappings linking central Root UUIDs to local operating system mount paths. |
 | **Test Connection** | N/A | N/A | Pings remote database server and displays round-trip network latency in milliseconds. |
@@ -93,9 +93,9 @@ Displays real-time diagnostic status of built-in lossless metadata parsers:
 
 - **Version**: Displays the active application version (e.g. `v0.3.0`).
 - **Database Schema**: Reports active SQLite schema migration level (e.g. `Schema Version 14`).
-- **Active Database Location**: Absolute path to `berry.db`.
+- **Active Database Location**: Absolute path to `omera.db`.
 - **Quick-Open Folder Buttons**:
   - `Open Config`: Opens folder containing `config.json`.
-  - `Open Database`: Opens directory containing `berry.db` and WAL journals.
+  - `Open Database`: Opens directory containing `omera.db` and WAL journals.
   - `Open Thumbnails`: Opens the WebP thumbnail cache directory.
   - `Open Models`: Opens the ONNX AI weights directory.

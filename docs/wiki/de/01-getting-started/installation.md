@@ -1,12 +1,12 @@
 # Installation & Erster Start
 
-Dieser Leitfaden beschreibt die Systemanforderungen, unterstützten Plattformen, Installationsschritte und die Ersteinrichtung über den Onboarding-Assistenten für **Berry AI Studio**.
+Dieser Leitfaden beschreibt die Systemanforderungen, unterstützten Plattformen, Installationsschritte und die Ersteinrichtung über den Onboarding-Assistenten für **Omera**.
 
 ---
 
 ## 1. Systemanforderungen
 
-Berry AI Studio nutzt eine hocheffiziente native Architektur auf Basis von **Tauri v2**, **Rust** und **SQLite WAL**. Die Anwendung läuft reibungslos auf Standard-Hardware und schöpft auf leistungsstarken Multi-Core-Workstations mit NVMe-Speicher das volle Potenzial für umfangreiche Bibliotheken (50.000 bis über 500.000 Dateien) aus.
+Omera nutzt eine hocheffiziente native Architektur auf Basis von **Tauri v2**, **Rust** und **SQLite WAL**. Die Anwendung läuft reibungslos auf Standard-Hardware und schöpft auf leistungsstarken Multi-Core-Workstations mit NVMe-Speicher das volle Potenzial für umfangreiche Bibliotheken (50.000 bis über 500.000 Dateien) aus.
 
 ### Minimale Hardwareanforderungen
 - **CPU**: Dual-Core x86_64- oder ARM64-Prozessor (Intel Core i3 / AMD Ryzen 3 / Apple M1 oder neuer).
@@ -25,35 +25,35 @@ Berry AI Studio nutzt eine hocheffiziente native Architektur auf Basis von **Tau
 
 ## 2. Installationsverfahren
 
-Laden Sie offizielle Produktionspakete von der [GitHub-Releases-Seite](https://github.com/BerryUIKI/Berry-AI-Studio/releases) oder der [offiziellen Website](https://berryuiki.github.io/Berry-AI-Studio/) herunter.
+Laden Sie offizielle Produktionspakete von der [GitHub-Releases-Seite](https://github.com/BerryUIKI/Omera/releases) oder der [offiziellen Website](https://berryuiki.github.io/Omera/) herunter.
 
 ### Windows
-1. **Standard-Installationsprogramm (`Berry-AI-Studio_Windows_x64.exe`)**:
+1. **Standard-Installationsprogramm (`Omera_Windows_x64.exe`)**:
    - Führen Sie die Installationsdatei per Doppelklick aus.
    - Folgen Sie dem Installationsassistenten, um den Installationsort festzulegen und Verknüpfungen auf dem Desktop sowie im Startmenü zu erstellen.
    - Der Installer verwaltet Verknüpfungen und registriert Protokoll-Handler automatisch.
-2. **Portable ZIP-Version (`Berry-AI-Studio_Windows_x64.zip`)**:
+2. **Portable ZIP-Version (`Omera_Windows_x64.zip`)**:
    - Entpacken Sie das `.zip`-Archiv auf ein beliebiges Laufwerk (z. B. eine externe NVMe-SSD oder ein Wechsellaufwerk).
-   - Starten Sie `berry-ai-studio.exe` direkt ohne Administratorrechte.
+   - Starten Sie `omera.exe` direkt ohne Administratorrechte.
 
 ### macOS
 1. Laden Sie das zu Ihrem Prozessor passende Disk-Image herunter:
-   - Apple Silicon (M1/M2/M3/M4): `Berry-AI-Studio_macOS_aarch64.dmg`
-   - Intel Core: `Berry-AI-Studio_macOS_x64.dmg`
-2. Öffnen Sie die `.dmg`-Datei und ziehen Sie **Berry AI Studio** in Ihren `/Applications`-Ordner (Programme).
+   - Apple Silicon (M1/M2/M3/M4): `Omera_macOS_aarch64.dmg`
+   - Intel Core: `Omera_macOS_x64.dmg`
+2. Öffnen Sie die `.dmg`-Datei und ziehen Sie **Omera** in Ihren `/Applications`-Ordner (Programme).
 3. Die Pakete sind durch Apple Gatekeeper signiert und notarisiert. Starten Sie das Programm beim ersten Mal aus dem Programme-Ordner oder über Spotlight.
 
 ### Linux
-1. **AppImage (`Berry-AI-Studio_Linux_x64.AppImage`)**:
+1. **AppImage (`Omera_Linux_x64.AppImage`)**:
    - Machen Sie die Binärdatei ausführbar:
      ```bash
-     chmod +x Berry-AI-Studio_Linux_x64.AppImage
-     ./Berry-AI-Studio_Linux_x64.AppImage
+     chmod +x Omera_Linux_x64.AppImage
+     ./Omera_Linux_x64.AppImage
      ```
-2. **Debian / Ubuntu (`Berry-AI-Studio_Linux_x64.deb`)**:
+2. **Debian / Ubuntu (`Omera_Linux_x64.deb`)**:
    - Installieren Sie das Paket über `dpkg` oder `apt`:
      ```bash
-     sudo dpkg -i Berry-AI-Studio_Linux_x64.deb
+     sudo dpkg -i Omera_Linux_x64.deb
      sudo apt-get install -f # Eventuell fehlende webkit2gtk-Abhängigkeiten auflösen
      ```
 
@@ -61,11 +61,11 @@ Laden Sie offizielle Produktionspakete von der [GitHub-Releases-Seite](https://g
 
 ## 3. Einrichtungsassistent beim ersten Start
 
-Beim ersten Start von Berry AI Studio öffnet sich automatisch der interaktive **Einrichtungsassistent** (`OnboardingModal.vue`), um Sie durch die Konfiguration zu führen.
+Beim ersten Start von Omera öffnet sich automatisch der interaktive **Einrichtungsassistent** (`OnboardingModal.vue`), um Sie durch die Konfiguration zu führen.
 
 ```mermaid
 flowchart TD
-    A["Berry AI Studio starten"] --> B["Willkommen & Konzeptvorstellung"]
+    A["Omera starten"] --> B["Willkommen & Konzeptvorstellung"]
     B --> C["Erkennung lokaler KI-Werkzeuge"]
     C --> D{"Lokale Installationen gefunden?"}
     D -- Ja --> E["1-Klick-Hinzufügen von SD WebUI / ComfyUI / Fooocus"]
@@ -82,30 +82,30 @@ flowchart TD
    - Intelligente Poker-Deck-Serienstapel und direkter Bildvergleich nebeneinander.
    - 100% Offline-Datenschutz ohne jegliche Telemetrie.
 2. **Automatische Erkennung lokaler KI-Engines**:
-   - Berry scannt typische lokale Verzeichnisse über alle Laufwerke hinweg (z. B. `C:\`, `D:\`, `/home/`) nach Ausgabeordnern von:
+   - Omera scannt typische lokale Verzeichnisse über alle Laufwerke hinweg (z. B. `C:\`, `D:\`, `/home/`) nach Ausgabeordnern von:
      - **AUTOMATIC1111 / SD.Next** (`outputs/txt2img-images`, `outputs/img2img-images`)
      - **ComfyUI** (`ComfyUI/output`)
      - **Fooocus** (`Fooocus/outputs`)
      - **InvokeAI** (`invokeai/outputs`)
    - Gefundene Verzeichnisse können mit einem einzigen Klick als **AIGC-Pipelines** oder **Externe Links** angebunden werden.
 3. **Speichermodus auswählen**:
-   - Bestimmen Sie, wie Berry mit Ihren Dateien interagieren soll (weitere Details unter [Ordnermodi & Import](../02-library-management/folder-modes-and-import.md)).
+   - Bestimmen Sie, wie Omera mit Ihren Dateien interagieren soll (weitere Details unter [Ordnermodi & Import](../02-library-management/folder-modes-and-import.md)).
 4. **Abschluss**:
-   - Berry initialisiert die lokale SQLite-Datenbank (`berry.db`) im Write-Ahead Logging (WAL)-Modus, startet den Hintergrund-Ordnerscan und leitet Sie direkt in die Hauptgalerie weiter.
+   - Omera initialisiert die lokale SQLite-Datenbank (`omera.db`) im Write-Ahead Logging (WAL)-Modus, startet den Hintergrund-Ordnerscan und leitet Sie direkt in die Hauptgalerie weiter.
 
 ---
 
 ## 4. Anwendungsspeicher & Datenverzeichnis
 
-Berry AI Studio speichert alle Bibliotheksindizes, Caches und Konfigurationen lokal in Ihrem Benutzerprofil:
+Omera speichert alle Bibliotheksindizes, Caches und Konfigurationen lokal in Ihrem Benutzerprofil:
 
-- **Windows**: `%APPDATA%\com.berryuiki.berryaistudio\` (z. B. `C:\Users\<Benutzer>\AppData\Roaming\com.berryuiki.berryaistudio\`)
-- **macOS**: `~/Library/Application Support/com.berryuiki.berryaistudio/`
-- **Linux**: `~/.config/com.berryuiki.berryaistudio/`
+- **Windows**: `%APPDATA%\com.berryuiki.omera\` (z. B. `C:\Users\<Benutzer>\AppData\Roaming\com.berryuiki.omera\`)
+- **macOS**: `~/Library/Application Support/com.berryuiki.omera/`
+- **Linux**: `~/.config/com.berryuiki.omera/`
 
 ### Verzeichnisinhalt:
-- `berry.db`: Die primäre SQLite-Datenbank mit allen Metadaten, Bewertungen, Tags, Alben und Stapelbeziehungen.
-- `berry.db-wal` & `berry.db-shm`: SQLite-WAL-Journaldateien.
+- `omera.db`: Die primäre SQLite-Datenbank mit allen Metadaten, Bewertungen, Tags, Alben und Stapelbeziehungen.
+- `omera.db-wal` & `omera.db-shm`: SQLite-WAL-Journaldateien.
 - `config.json`: Anwendungseinstellungen (Design, Ansichtsmodus, Vorschauauflösung, Interop-URLs).
 - `thumbnails/`: Hocheffizienter WebP-Vorschaubild-Cache, strukturiert nach `{file_id}_{mtime}_{edge}.webp`.
 - `models/`: Lokale ONNX-KI-Gewichte für CLIP, SigLIP und WD14 Danbooru-Auto-Tagger.

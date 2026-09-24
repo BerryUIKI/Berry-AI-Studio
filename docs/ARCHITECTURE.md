@@ -41,7 +41,7 @@ The accepted target is Omera (`com.berryuiki.omera`), repository `BerryUIKI/Omer
 └──────────────────────────────┬──────────────────────────────┘
                                │
 ┌──────────────────────────────▼──────────────────────────────┐
-│                       `berry-storage`                       │
+│                       `omera-storage`                       │
 │  - Embedded SQLite database engine (rusqlite)               │
 │  - Version-controlled schema migrations (`PRAGMA user_ver`) │
 │  - Full-text & structured metadata search engine            │
@@ -58,18 +58,18 @@ The Rust backend is structured as a modular Cargo workspace rooted at `/Cargo.to
 | Crate Path | Role & Responsibility | Key Dependencies |
 | :--- | :--- | :--- |
 | **`src-tauri/`** | Thin application shell. Manages window state, frameless window decorations, app lifecycle, and exposes IPC endpoints to the frontend. | `tauri`, `tauri-plugin-dialog`, `trash`, internal crates |
-| **`crates/berry-domain/`** | Pure domain models, value objects, metadata formats (`MetadataFormat`), sort criteria, and error types. Zero I/O dependencies. | `serde`, `serde_json` |
-| **`crates/berry-metadata/`** | Container sniffers (`detect_container`) and metadata extractors for WebUI (A1111/SD.Next), ComfyUI, NovelAI, Fooocus, InvokeAI, EasyDiffusion, and `.txt` sidecars. | `berry-domain`, `kamadak-exif`, `serde_json` |
-| **`crates/berry-scan/`** | Recursive recovery scanner plus path-targeted reconciliation. Uses incremental fingerprinting `(size_bytes, modified_at)`, batches database upserts, and emits progress events. | `berry-domain`, `berry-metadata`, `berry-storage`, `walkdir` |
-| **`crates/berry-storage/`** | SQLite persistence layer. Owns schema migrations (`MIGRATIONS`), structured metadata indexing, multi-term query builder, model hash reverse cache, and live database backup/restore. | `berry-domain`, `rusqlite` |
+| **`crates/omera-domain/`** | Pure domain models, value objects, metadata formats (`MetadataFormat`), sort criteria, and error types. Zero I/O dependencies. | `serde`, `serde_json` |
+| **`crates/omera-metadata/`** | Container sniffers (`detect_container`) and metadata extractors for WebUI (A1111/SD.Next), ComfyUI, NovelAI, Fooocus, InvokeAI, EasyDiffusion, and `.txt` sidecars. | `omera-domain`, `kamadak-exif`, `serde_json` |
+| **`crates/omera-scan/`** | Recursive recovery scanner plus path-targeted reconciliation. Uses incremental fingerprinting `(size_bytes, modified_at)`, batches database upserts, and emits progress events. | `omera-domain`, `omera-metadata`, `omera-storage`, `walkdir` |
+| **`crates/omera-storage/`** | SQLite persistence layer. Owns schema migrations (`MIGRATIONS`), structured metadata indexing, multi-term query builder, model hash reverse cache, and live database backup/restore. | `omera-domain`, `rusqlite` |
 
 ---
 
 ## 🗄️ Database & Schema Management
 
-All user metadata, albums, tags, and cached checkpoint models are persisted in a local SQLite database (`berry.db`) located in the OS standard application data directory.
+All user metadata, albums, tags, and cached checkpoint models are persisted in a local SQLite database (`omera.db`) located in the OS standard application data directory.
 
-- **Schema Evolution**: Handled via `PRAGMA user_version` migrations. All schema transitions are strictly incremental, atomic, and defined in `crates/berry-storage/src/migrations.rs`.
+- **Schema Evolution**: Handled via `PRAGMA user_version` migrations. All schema transitions are strictly incremental, atomic, and defined in `crates/omera-storage/src/migrations.rs`.
 - **Concurrency & WAL**: SQLite operates in `WAL` (Write-Ahead Logging) mode, enabling non-blocking reads during background filesystem scanning.
 - **Maintenance & Safety**: Supports live runtime `VACUUM` compaction and non-locking snapshot export via `VACUUM INTO`.
 
@@ -96,7 +96,7 @@ The frontend is built with **Vue 3 Composition API** + **TypeScript** + **Vite**
 
 - The shell loads the indexed SQLite library first so the gallery becomes usable without waiting for filesystem I/O.
 - Optional startup scans are rate-limited per folder. New installations leave startup scanning disabled by default.
-- A cross-platform `notify` watcher records coalesced events in the v10 SQLite journal. After a short quiet period, `berry-scan` reconciles only the affected files or subtrees and the frontend refreshes from SQLite.
+- A cross-platform `notify` watcher records coalesced events in the v10 SQLite journal. After a short quiet period, `omera-scan` reconciles only the affected files or subtrees and the frontend refreshes from SQLite.
 - Visible thumbnails have priority. Each viewport change advances a monotonic request generation, canceling stale visible and look-ahead work before decode. Near look-ahead outranks backward look-ahead, begins only after scrolling settles, and runs through serialized bounded batches.
 - Gallery surfaces derive the thumbnail tier from rendered dimensions and device scale. The user's resolution preference is an upper bound, so compact cards and Table rows do not pay the decode or disk cost of the largest configured tier.
 - On an exact-tier miss, the manifest supplies the smallest valid larger tier for the same source revision. Broken manifest paths are pruned during lookup before the decoder is used.
@@ -123,7 +123,7 @@ Omera extends conventional folder management into three high-performance modes (
 ## 🗃️ Image Stacking Architecture
 
 To solve the "AI Burst / Roll" gallery clutter problem:
-- **Burst Clustering**: `berry-domain` builds a mutation-free grouping plan from normalized prompt fragments. It excludes empty prompts and existing stack members, keeps groups inside one folder/model context, and bounds comparisons by the configured generation window before the Tauri adapter persists each stack.
+- **Burst Clustering**: `omera-domain` builds a mutation-free grouping plan from normalized prompt fragments. It excludes empty prompts and existing stack members, keeps groups inside one folder/model context, and bounds comparisons by the configured generation window before the Tauri adapter persists each stack.
 - **Discoverable Organization Flow**: `Tools > Organize Library by Prompt` can rescan either the current folder or every registered folder before applying the saved similarity and time-window preferences.
 - **Manual Stacking**: Full keyboard-driven grouping via `Ctrl+G` (stack) and `Ctrl+Shift+G` (unstack).
 - **Poker Deck Presentation**: Collapsed stack presentation with item count badges (`📚 N`), inline expansion, hero cover selection (`Alt+S`), and side-by-side comparison (`C`).

@@ -1,6 +1,6 @@
 # Documentación en Español (Spanish)
 
-¡Bienvenido a la documentación oficial en español de **Berry AI Studio**!
+¡Bienvenido a la documentación oficial en español de **Omera**!
 
 👉 **[Acceder al Inicio de la documentación en español (Home)](Home.md)**
 

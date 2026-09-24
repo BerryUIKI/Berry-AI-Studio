@@ -3394,7 +3394,7 @@ mod tests {
 
     #[test]
     fn file_database_persists_and_tracks_path() {
-        let dir = std::env::temp_dir().join(format!("berry-storage-test-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("omera-storage-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("test.db");
 

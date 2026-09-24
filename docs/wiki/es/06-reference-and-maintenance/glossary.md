@@ -1,6 +1,6 @@
 # Glosario del producto
 
-Este glosario define los términos esenciales del dominio, conceptos de arquitectura y funcionalidades clave utilizados a lo largo de **Berry AI Studio**.
+Este glosario define los términos esenciales del dominio, conceptos de arquitectura y funcionalidades clave utilizados a lo largo de **Omera**.
 
 ---
 
@@ -17,8 +17,8 @@ Este glosario define los términos esenciales del dominio, conceptos de arquitec
 ## C
 - **Escala CFG (Classifier-Free Guidance)**: Parámetro en modelos de difusión que controla con qué rigor la generación visual debe ajustarse a las instrucciones del prompt de texto.
 - **Modelo Checkpoint**: Modelo base de red neuronal generativa que contiene los pesos entrenados (habitualmente en formato `.safetensors`), identificado por su nombre y hash SHA256.
-- **CLIP (Contrastive Language-Image Pre-training)**: Arquitectura multimodal de red neuronal utilizada en Berry AI Studio para la búsqueda semántica en lenguaje natural y el cálculo de similitud visual.
-- **ComfyUI**: Motor de flujos de trabajo modulares basado en nodos para IA generativa. Berry interpreta sus grafos incrustados y permite el reenvío directo mediante la API `/prompt`.
+- **CLIP (Contrastive Language-Image Pre-training)**: Arquitectura multimodal de red neuronal utilizada en Omera para la búsqueda semántica en lenguaje natural y el cálculo de similitud visual.
+- **ComfyUI**: Motor de flujos de trabajo modulares basado en nodos para IA generativa. Omera interpreta sus grafos incrustados y permite el reenvío directo mediante la API `/prompt`.
 - **Eliminar borradores (Cull Drafts)**: Acción de descarte en lote que conserva las obras Hero con mayor puntuación en una pila de ráfaga mientras traslada las variaciones secundarias a la papelera del sistema.
 
 ## E
