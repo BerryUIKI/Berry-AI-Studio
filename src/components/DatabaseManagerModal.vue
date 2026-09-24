@@ -52,7 +52,7 @@ async function handleVacuum() {
 
 async function handleBackup() {
   try {
-    const defaultName = `berry_backup_${new Date().toISOString().slice(0, 10)}.db`;
+    const defaultName = `omera_backup_${new Date().toISOString().slice(0, 10)}.db`;
     const destination = await save({
       defaultPath: defaultName,
       filters: [{ name: "SQLite Database", extensions: ["db", "sqlite"] }],

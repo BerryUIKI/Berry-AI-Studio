@@ -7,12 +7,21 @@ const PREFIX: &str = "keyring:";
 
 fn resolve(value: &mut Option<String>) -> Result<(), String> {
     if let Some(account) = value.as_deref().and_then(|s| s.strip_prefix(PREFIX)) {
-        *value = Some(
-            keyring::Entry::new("Berry-AI-Studio", account)
-                .map_err(|e| e.to_string())?
-                .get_password()
-                .map_err(|e| format!("Credential store unavailable: {e}"))?,
-        );
+        let password = keyring::Entry::new("Omera", account)
+            .ok()
+            .and_then(|e| e.get_password().ok())
+            .or_else(|| {
+                keyring::Entry::new("Berry-AI-Studio", account)
+                    .ok()
+                    .and_then(|e| e.get_password().ok())
+            })
+            .or_else(|| {
+                keyring::Entry::new("Berry-AIGC-Toolbox", account)
+                    .ok()
+                    .and_then(|e| e.get_password().ok())
+            })
+            .ok_or_else(|| "Credential store unavailable or entry not found".to_string())?;
+        *value = Some(password);
     }
     Ok(())
 }
@@ -23,7 +32,7 @@ fn protect(value: &mut Option<String>) -> Result<(), String> {
         .filter(|s| !s.is_empty() && !s.starts_with(PREFIX))
     {
         let account = uuid::Uuid::new_v4().to_string();
-        keyring::Entry::new("Berry-AI-Studio", &account)
+        keyring::Entry::new("Omera", &account)
             .map_err(|e| e.to_string())?
             .set_password(secret)
             .map_err(|e| format!("Could not secure credentials: {e}"))?;

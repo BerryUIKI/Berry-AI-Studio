@@ -54,6 +54,8 @@ impl MigrationCoordinator {
             }
         } else if let Some(ref job) = self.active_job {
             job.status.clone()
+        } else if destination_exists {
+            "migrated".to_string()
         } else if discovered_sources.is_empty() {
             "none".to_string()
         } else if discovered_sources.len() > 1 {
@@ -77,6 +79,35 @@ impl MigrationCoordinator {
             active_receipt,
             available_actions,
         })
+    }
+
+    /// Attempt automatic migration on startup if omera.db does not exist yet
+    /// and there is exactly one unambiguous, unlocked legacy source database.
+    pub fn auto_migrate_if_unambiguous(&mut self, app: &AppHandle) -> Result<bool, String> {
+        let (omera_root, _) = resolve_migration_roots(app)?;
+        if omera_root.join("omera.db").exists() {
+            return Ok(false);
+        }
+
+        let status = self.get_status(app)?;
+        if status.discovered_sources.len() == 1 {
+            let source = &status.discovered_sources[0];
+            if !source.is_locked {
+                let preview = self.preview_migration(app, &source.source_id)?;
+                if preview.conflicts.is_empty() {
+                    let job = self.start_migration(app, &preview.plan_id)?;
+                    if job.status == "completed" {
+                        eprintln!(
+                            "Auto-migrated legacy Berry library from {} to {}",
+                            source.database_path,
+                            omera_root.join("omera.db").display()
+                        );
+                        return Ok(true);
+                    }
+                }
+            }
+        }
+        Ok(false)
     }
 
     /// Preview a migration plan for a specific discovered source.
@@ -558,6 +589,11 @@ pub fn resolve_migration_roots(
     let legacy_2 = parent.join("com.berryuiki.berryaigctoolbox");
     if legacy_2 != omera_root {
         candidates.push(("com.berryuiki.berryaigctoolbox".to_string(), legacy_2));
+    }
+    if current_data_dir.join("berry.db").exists()
+        && !candidates.iter().any(|(_, p)| p == &current_data_dir)
+    {
+        candidates.push(("legacy_in_root".to_string(), current_data_dir));
     }
 
     Ok((omera_root, candidates))

@@ -58,7 +58,7 @@ function generateNewUuid() {
 
 async function handleBrowseDestination() {
   try {
-    const defaultName = `berry_central_migration_${dialect.value}_${new Date().toISOString().slice(0, 10)}.sql`;
+    const defaultName = `omera_central_migration_${dialect.value}_${new Date().toISOString().slice(0, 10)}.sql`;
     const selected = await save({
       defaultPath: defaultName,
       filters: [{ name: "SQL Script", extensions: ["sql"] }],
@@ -104,9 +104,9 @@ const cliCommand = computed(() => {
   if (!exportSummary.value) return "";
   const path = exportSummary.value.output_path;
   if (dialect.value === "mysql") {
-    return `mysql -u berry_user -p -h db.internal -P 3306 berry_team < "${path}"`;
+    return `mysql -u omera_user -p -h db.internal -P 3306 omera_team < "${path}"`;
   } else {
-    return `psql -U berry_user -h db.internal -p 5432 -d berry_team -f "${path}"`;
+    return `psql -U omera_user -h db.internal -p 5432 -d omera_team -f "${path}"`;
   }
 });
 

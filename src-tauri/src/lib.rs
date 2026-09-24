@@ -48,7 +48,16 @@ pub fn run() {
             let _ = std::fs::create_dir_all(data_dir.join("updates"));
             let _ = std::fs::create_dir_all(data_dir.join("thumbnails"));
             let _ = std::fs::create_dir_all(data_dir.join("models"));
-            let database_path = data_dir.join("berry.db");
+            let database_path = commands::active_database_path(&data_dir);
+            let migration_coordinator =
+                Arc::new(Mutex::new(legacy_migration::MigrationCoordinator::new()));
+
+            if !database_path.exists() {
+                if let Ok(mut coord) = migration_coordinator.lock() {
+                    let _ = coord.auto_migrate_if_unambiguous(app.handle());
+                }
+            }
+
             omera_storage::recovery::apply_pending_restore(&database_path)
                 .map_err(std::io::Error::other)?;
             let db = Database::connect(&database_path)?;
@@ -74,9 +83,7 @@ pub fn run() {
                 cloud_sync: Arc::new(Mutex::new(cloud_sync::CloudSyncState::default())),
                 clip_failures: Arc::new(Mutex::new(HashMap::new())),
                 clip_cancel: Arc::new(AtomicBool::new(false)),
-                migration_coordinator: Arc::new(Mutex::new(
-                    legacy_migration::MigrationCoordinator::new(),
-                )),
+                migration_coordinator: migration_coordinator.clone(),
             });
             let app_handle = app.handle().clone();
             std::thread::spawn(move || {

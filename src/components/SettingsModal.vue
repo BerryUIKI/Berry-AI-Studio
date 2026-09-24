@@ -32,6 +32,7 @@ import {
   type LocaleSetting,
 } from "../i18n";
 import {
+  getStorageItem,
   loadAppConfig,
   saveAppConfig,
   getStoragePaths,
@@ -77,7 +78,7 @@ const activeTab = ref<"general" | "display" | "stacking" | "interop" | "collabor
 const selectedLocale = ref<LocaleSetting>(currentLocaleSetting.value);
 const autoScanOnStartup = ref(false);
 const startupScanIntervalMinutes = ref(360);
-const selectedTheme = ref<AppTheme>(normalizeTheme(localStorage.getItem("berry_theme")));
+const selectedTheme = ref<AppTheme>(normalizeTheme(getStorageItem("theme")));
 const autoCheckUpdate = ref(true);
 const blurNsfwDefault = ref(true);
 const showCardBadges = ref(true);
@@ -528,9 +529,9 @@ async function saveSettings() {
       default_view: defaultView.value,
       thumbnail_max_edge: thumbnailMaxEdge.value,
       thumbnail_cache_budget_mb: thumbnailCacheBudgetMb.value,
-      similarity_limit: Number(localStorage.getItem("berry_similarity_limit")) || 50,
+      similarity_limit: Number(getStorageItem("similarity_limit")) || 50,
       auto_check_update: autoCheckUpdate.value,
-      silent_install: localStorage.getItem("berry_silent_install") === "true",
+      silent_install: getStorageItem("silent_install") === "true",
       auto_stack: autoStack.value,
       stack_similarity_threshold: stackSimilarityThreshold.value,
       stack_time_window_minutes: stackTimeWindowMinutes.value,

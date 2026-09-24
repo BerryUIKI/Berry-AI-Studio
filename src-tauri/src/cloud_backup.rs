@@ -395,7 +395,9 @@ impl<'a> S3Client<'a> {
         let mut keys = Vec::new();
         for chunk in body.split("<Key>") {
             if let Some(key) = chunk.split("</Key>").next() {
-                if key.ends_with(".zip") && key.contains("berry_snapshot") {
+                if key.ends_with(".zip")
+                    && (key.contains("omera_snapshot") || key.contains("berry_snapshot"))
+                {
                     let filename = key.rsplit('/').next().unwrap_or(key).to_string();
                     keys.push(filename);
                 }
@@ -575,7 +577,10 @@ impl<'a> WebDavClient<'a> {
             if let Some(href) = chunk.split("</d:href>").next() {
                 let trimmed = href.trim_matches('/');
                 if let Some(filename) = trimmed.rsplit('/').next() {
-                    if filename.ends_with(".zip") && filename.contains("berry_snapshot") {
+                    if filename.ends_with(".zip")
+                        && (filename.contains("omera_snapshot")
+                            || filename.contains("berry_snapshot"))
+                    {
                         keys.push(filename.to_string());
                     }
                 }
@@ -677,7 +682,7 @@ pub fn create_cloud_snapshot(
         .unwrap_or_default()
         .as_secs() as i64;
     let (date_str, _) = format_iso8601_basic(SystemTime::now());
-    let snapshot_id = format!("berry_snapshot_{date_str}_{now_secs}");
+    let snapshot_id = format!("omera_snapshot_{date_str}_{now_secs}");
     let filename = format!("{snapshot_id}.zip");
 
     // 1. Point-in-time consistent SQLite database backup using VACUUM INTO
@@ -701,6 +706,7 @@ pub fn create_cloud_snapshot(
         album_count: stats.album_count,
         description,
         berry_version: env!("CARGO_PKG_VERSION").to_string(),
+        omera_version: Some(env!("CARGO_PKG_VERSION").to_string()),
     };
     let manifest_bytes = serde_json::to_vec_pretty(&manifest)
         .map_err(|e| format!("Failed to serialize snapshot manifest: {e}"))?;
@@ -717,10 +723,10 @@ pub fn create_cloud_snapshot(
         zip.write_all(&manifest_bytes)
             .map_err(|e| format!("Failed to write manifest in zip: {e}"))?;
 
-        zip.start_file("berry.db", zip_opts)
-            .map_err(|e| format!("Failed to start berry.db in zip: {e}"))?;
+        zip.start_file("omera.db", zip_opts)
+            .map_err(|e| format!("Failed to start omera.db in zip: {e}"))?;
         zip.write_all(&db_bytes)
-            .map_err(|e| format!("Failed to write berry.db in zip: {e}"))?;
+            .map_err(|e| format!("Failed to write omera.db in zip: {e}"))?;
 
         zip.finish()
             .map_err(|e| format!("Failed to finish zip bundle: {e}"))?;
@@ -783,7 +789,8 @@ pub fn list_cloud_snapshots(config: &CloudBackupConfig) -> Result<Vec<CloudSnaps
                         .file_name()
                         .and_then(|s| s.to_str())
                         .unwrap_or_default();
-                    if file_name.contains("berry_snapshot") {
+                    if file_name.contains("omera_snapshot") || file_name.contains("berry_snapshot")
+                    {
                         if let Ok(meta) = extract_manifest_from_zip_file(&path) {
                             snapshots.push(meta);
                         }
@@ -853,18 +860,26 @@ pub fn restore_cloud_snapshot(
         }
     };
 
-    // 2. Unpack and extract berry.db
+    // 2. Unpack and extract omera.db (with legacy fallback to berry.db)
     let mut archive = ZipArchive::new(Cursor::new(&zip_bytes))
         .map_err(|e| format!("Failed to parse zip archive: {e}"))?;
 
+    let db_entry_name = if archive.file_names().any(|n| n == "omera.db") {
+        "omera.db"
+    } else if archive.file_names().any(|n| n == "berry.db") {
+        "berry.db"
+    } else {
+        return Err("Snapshot archive does not contain omera.db or berry.db".to_string());
+    };
+
     let mut db_entry = archive
-        .by_name("berry.db")
-        .map_err(|_| "Snapshot archive does not contain berry.db".to_string())?;
+        .by_name(db_entry_name)
+        .map_err(|e| format!("Failed to locate {db_entry_name} in snapshot: {e}"))?;
 
     let mut restored_db_bytes = Vec::new();
     db_entry
         .read_to_end(&mut restored_db_bytes)
-        .map_err(|e| format!("Failed to unpack berry.db: {e}"))?;
+        .map_err(|e| format!("Failed to unpack database from snapshot: {e}"))?;
 
     // 3. Write to temporary validation database and verify schema integrity
     let temp_validation_path = active_db_path.with_extension("restore_temp.db");
@@ -952,5 +967,44 @@ mod tests {
             hex::encode(hmac),
             "b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7"
         );
+    }
+
+    #[test]
+    fn test_snapshot_meta_serde_backwards_compatible() {
+        let legacy_json = r#"{
+            "snapshot_id": "berry_snapshot_2026-09-21_120000",
+            "filename": "berry_snapshot_2026-09-21_120000.zip",
+            "size_bytes": 1024,
+            "created_at": 1726920000,
+            "file_count": 42,
+            "folder_count": 3,
+            "tag_count": 5,
+            "album_count": 2,
+            "description": "Legacy backup",
+            "berry_version": "0.2.1"
+        }"#;
+
+        let meta: CloudSnapshotMeta = serde_json::from_str(legacy_json).unwrap();
+        assert_eq!(meta.snapshot_id, "berry_snapshot_2026-09-21_120000");
+        assert_eq!(meta.berry_version, "0.2.1");
+        assert_eq!(meta.omera_version, None);
+
+        let new_meta = CloudSnapshotMeta {
+            snapshot_id: "omera_snapshot_2026-09-24_120000".into(),
+            filename: "omera_snapshot_2026-09-24_120000.zip".into(),
+            size_bytes: 2048,
+            created_at: 1727180000,
+            file_count: 50,
+            folder_count: 4,
+            tag_count: 6,
+            album_count: 3,
+            description: None,
+            berry_version: "0.3.0".into(),
+            omera_version: Some("0.3.0".into()),
+        };
+        let serialized = serde_json::to_string(&new_meta).unwrap();
+        assert!(serialized.contains("omera_version"));
+        let deserialized: CloudSnapshotMeta = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized.omera_version.as_deref(), Some("0.3.0"));
     }
 }
