@@ -14,8 +14,8 @@ jobs:
     runs-on: macos-14
 
     env:
-      BUNDLE_ID: com.berryuiki.berryaistudio
-      APP_NAME: Berry AI Studio
+      BUNDLE_ID: com.berryuiki.omera
+      APP_NAME: Omera
 
     steps:
       - name: Checkout repository
@@ -122,7 +122,7 @@ jobs:
           APP_DIR="${app_dirs[0]}"
           echo "Found app bundle at: $APP_DIR"
           ENTITLEMENTS="src-tauri/Entitlements.plist"
-          PKG_OUT="$RUNNER_TEMP/Berry-AI-Studio-${{ inputs.version }}.pkg"
+          PKG_OUT="$RUNNER_TEMP/Omera-${{ inputs.version }}.pkg"
 
           # Re-unlock keychain before signing
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH" || true
@@ -161,7 +161,7 @@ jobs:
       - name: Upload .pkg as workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Berry-AI-Studio-MAS-Package
+          name: Omera-MAS-Package
           path: ${{ env.PKG_PATH }}
           retention-days: 14
 

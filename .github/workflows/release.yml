@@ -26,12 +26,12 @@ jobs:
           - target: aarch64-apple-darwin
             arch_name: aarch64
             args: --target aarch64-apple-darwin
-            dmg_asset_name: Berry-AI-Studio_macOS_aarch64.dmg
+            dmg_asset_name: Omera_macOS_aarch64.dmg
 
     runs-on: macos-latest
 
     env:
-      APP_NAME: Berry AI Studio
+      APP_NAME: Omera
       RELEASE_TAG: >-
         ${{ github.event_name == 'workflow_dispatch'
             && inputs.tag_name
@@ -183,7 +183,7 @@ jobs:
           APPLE_API_KEY_PATH: ${{ steps.notarization.outputs.key_path }}
         with:
           tagName: ${{ env.RELEASE_TAG }}
-          releaseName: 'Berry AI Studio ${{ env.RELEASE_TAG }}'
+          releaseName: 'Omera ${{ env.RELEASE_TAG }}'
           releaseBody: 'See [CHANGELOG.md](CHANGELOG.md) for full release details.'
           releaseDraft: true
           prerelease: false
@@ -445,7 +445,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ env.RELEASE_TAG }}
-          releaseName: 'Berry AI Studio ${{ env.RELEASE_TAG }}'
+          releaseName: 'Omera ${{ env.RELEASE_TAG }}'
           releaseBody: 'See [CHANGELOG.md](CHANGELOG.md) for full release details.'
           releaseDraft: true
           prerelease: false

@@ -3038,7 +3038,7 @@ pub async fn download_update(
     let clean_filename = Path::new(&filename)
         .file_name()
         .and_then(|n| n.to_str())
-        .unwrap_or("update_installer.exe")
+        .unwrap_or("omera_update_installer.exe")
         .to_string();
     let dest_path = updates_dir.join(&clean_filename);
     let temporary = tempfile::NamedTempFile::new_in(&updates_dir).map_err(|e| e.to_string())?;
@@ -3056,7 +3056,7 @@ pub async fn download_update(
 
         let resp = agent
             .get(&url_clone)
-            .set("User-Agent", "Berry-AI-Studio-Updater")
+            .set("User-Agent", "Omera-Updater")
             .call()
             .map_err(|e| format!("Download request failed: {e}"))?;
 
